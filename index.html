@@ -838,6 +838,7 @@ function renderTripPlanner(gpsSites) {
         }).join('')}
         ${ordered.length >= 1 ? `
           <button class="btn primary" style="margin-top:14px;" onclick="openTripInMaps()">Open route in Maps ↗</button>
+          <button class="btn secondary" style="margin-top:8px;" onclick="exportTripGpx()">Export these as GPX (onX, Gaia…)</button>
           <p class="tiny subtle" style="margin-top:8px;text-align:center;">Straight-line distances. Maps will compute real road routes and may reorder for drivability.</p>
         ` : ''}
       </div>
@@ -1249,11 +1250,84 @@ function openData() {
     <button class="btn secondary" onclick="document.getElementById('import-file').click()">Import from file</button>
     <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
     <div class="divider"></div>
+    <p class="eyebrow" style="margin-bottom:8px;">Send to mapping apps</p>
+    <p class="tiny subtle" style="margin-bottom:12px;line-height:1.5;">
+      Export your GPS-tagged sites as a GPX file — the standard format onX, Gaia, Garmin, and Google Earth all import. ${S.sites.filter(s=>s.gps).length} of your ${S.sites.length} site${S.sites.length===1?'':'s'} ${S.sites.filter(s=>s.gps).length===1?'has':'have'} coordinates.
+    </p>
+    <button class="btn secondary" onclick="exportGpx()">Export GPX (for onX, Gaia, Garmin)</button>
+    <div class="divider"></div>
     <button class="btn ghost" onclick="copyData()">Copy data as text (paste anywhere)</button>
     <p class="tiny subtle" style="margin-top:14px;text-align:center;">
       iPhone tip: add this page to your Home Screen (Share → Add to Home Screen) so it opens like an app.
     </p>
   `);
+}
+
+function buildGpx(gpsSites) {
+  const xmlEsc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+  const waypoints = gpsSites.map(s => {
+    const sc = evalScore(s);
+    const pct = Math.round((s.score != null ? s.score : sc.pct) * 100);
+    const [verdict] = scoreVerdict(s.score != null ? s.score : sc.pct);
+    let desc = `${verdict} — score ${pct}/100.`;
+    if (s.gps.heightAboveStream != null) desc += ` ~${s.gps.heightAboveStream}m above stream${s.gps.heightAboveStream >= 3 ? ' (possible old channel)' : ''}.`;
+    if (s.gps.slope) desc += ` Slope: ${s.gps.slope}.`;
+    const assessed = INDICATORS.filter(ind => s.answers && s.answers[ind.id]);
+    if (assessed.length) {
+      desc += ' Indicators: ' + assessed.map(ind => `${ind.q.replace(/\?$/, '')} = ${s.answers[ind.id].label}`).join('; ') + '.';
+    }
+    if (s.notes) desc += ' Notes: ' + s.notes;
+    const ele = (s.gps.altitude != null && !isNaN(s.gps.altitude)) ? `\n    <ele>${s.gps.altitude.toFixed(1)}</ele>` : '';
+    const time = s.savedAt || s.created || new Date().toISOString();
+    return `  <wpt lat="${s.gps.lat}" lon="${s.gps.lon}">${ele}
+    <time>${xmlEsc(time)}</time>
+    <name>${xmlEsc(s.name || 'Prospect')}</name>
+    <desc>${xmlEsc(desc)}</desc>
+    <sym>Flag, Gold</sym>
+    <type>Prospect</type>
+  </wpt>`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Field Gold Brain" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Field Gold prospects</name>
+    <desc>Placer-gold prospect sites exported from Field Gold Brain</desc>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+${waypoints}
+</gpx>`;
+}
+
+function downloadGpx(gpx, label) {
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `field-gold-${label}-${new Date().toISOString().slice(0,10)}.gpx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportGpx() {
+  const gpsSites = S.sites.filter(s => s.gps);
+  if (!gpsSites.length) { toast('No GPS-tagged sites to export'); return; }
+  downloadGpx(buildGpx(gpsSites), 'sites');
+  toast(`Exported ${gpsSites.length} waypoint${gpsSites.length===1?'':'s'} as GPX`);
+}
+
+function exportTripGpx() {
+  const gpsSites = S.sites.filter(s => s.gps);
+  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
+  if (!selected.length) { toast('Select sites first'); return; }
+  const ordered = orderTrip(selected);
+  downloadGpx(buildGpx(ordered), 'trip');
+  toast(`Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} as GPX`);
 }
 
 function exportData() {
