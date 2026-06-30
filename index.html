@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Placer — Field Brain</title>
+<style>
+:root {
+  --bg: #14110C;
+  --bg-elev: #1E1A13;
+  --bg-card: #241F17;
+  --bg-subtle: #2C2619;
+  --border: #3A3225;
+  --border-strong: #4A3F2D;
+  --ink: #F2EDE0;
+  --ink-soft: #D8D0BE;
+  --ink-muted: #9C9684;
+  --ink-subtle: #6E6857;
+  --gold: #C9A227;
+  --gold-bright: #E8C04A;
+  --gold-faint: #2E2613;
+  --green: #6FA760;
+  --amber: #D29A3A;
+  --rust: #C25A3A;
+  --blue: #5B8AA6;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 84px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 0.95rem; font-weight: 700; }
+.eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.muted { color: var(--ink-muted); }
+.subtle { color: var(--ink-subtle); }
+.soft { color: var(--ink-soft); }
+.small { font-size: 0.85rem; }
+.tiny { font-size: 0.75rem; }
+.gold { color: var(--gold-bright); }
+
+/* Header */
+header {
+  padding: 20px 20px 12px;
+  position: sticky; top: 0;
+  background: linear-gradient(to bottom, var(--bg) 70%, transparent);
+  z-index: 10;
+}
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--gold), #9A7B1C);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.1rem; color: #14110C;
+  flex-shrink: 0;
+}
+
+/* Content */
+main { padding: 0 20px; }
+.view { display: none; }
+.view.active { display: block; animation: fade 0.2s; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.card.tappable { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.card.tappable:active { background: var(--bg-subtle); border-color: var(--border-strong); }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 100px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
+  background: var(--bg-subtle); color: var(--ink-soft);
+  white-space: nowrap;
+}
+.badge.gold { background: var(--gold-faint); color: var(--gold-bright); }
+.badge.green { background: #1E2A1A; color: var(--green); }
+.badge.amber { background: #2E2410; color: var(--amber); }
+.badge.rust { background: #2E1810; color: var(--rust); }
+.badge.blue { background: #16242C; color: var(--blue); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 16px; border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 700;
+  border: none; cursor: pointer; font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s;
+  width: 100%;
+}
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--gold); color: #14110C; }
+.btn.secondary { background: var(--bg-subtle); color: var(--ink-soft); border: 1px solid var(--border-strong); }
+.btn.ghost { background: transparent; color: var(--ink-muted); }
+.btn.sm { padding: 7px 12px; font-size: 0.8rem; width: auto; }
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { width: auto; flex: 1; }
+
+/* Forms */
+.field { margin-bottom: 14px; }
+.label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
+         text-transform: uppercase; color: var(--ink-muted); margin-bottom: 5px; }
+.input, .select, .textarea {
+  width: 100%; padding: 11px 13px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-size: 0.95rem; background: var(--bg-elev); color: var(--ink);
+  font-family: inherit;
+  -webkit-appearance: none;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none; border-color: var(--gold);
+}
+.textarea { resize: vertical; min-height: 70px; }
+.select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239C9684' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+
+/* Slider */
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; height: 6px; border-radius: 3px;
+  background: var(--bg-subtle);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--gold); cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-val { min-width: 32px; text-align: right; font-weight: 700; }
+
+/* Bottom nav */
+.tabbar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 720px;
+  display: flex;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 50;
+}
+.tab {
+  flex: 1; padding: 10px 4px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-subtle); font-family: inherit;
+  font-size: 0.65rem; font-weight: 600;
+}
+.tab.active { color: var(--gold-bright); }
+.tab svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+/* Score ring */
+.ring-wrap { display: flex; align-items: center; gap: 16px; }
+.ring { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+.ring svg { transform: rotate(-90deg); }
+.ring-label {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.ring-score { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.ring-max { font-size: 0.65rem; color: var(--ink-subtle); }
+
+/* Indicator rows */
+.ind { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ind:last-child { border-bottom: none; }
+.ind-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.ind-body { flex: 1; min-width: 0; }
+
+/* Knowledge accordion */
+.kb-item { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.kb-head {
+  padding: 14px 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--bg-card);
+}
+.kb-head:active { background: var(--bg-subtle); }
+.kb-chevron { transition: transform 0.2s; color: var(--ink-muted); flex-shrink: 0; }
+.kb-item.open .kb-chevron { transform: rotate(90deg); }
+.kb-content { display: none; padding: 0 16px 16px; background: var(--bg-card); }
+.kb-item.open .kb-content { display: block; }
+.kb-content p { margin-bottom: 10px; font-size: 0.9rem; color: var(--ink-soft); }
+.kb-content strong { color: var(--ink); font-weight: 700; }
+.kb-content ul { margin: 8px 0 12px 18px; }
+.kb-content li { font-size: 0.88rem; color: var(--ink-soft); margin-bottom: 5px; }
+.kb-tag { font-size: 0.68rem; }
+
+/* Empty state */
+.empty { text-align: center; padding: 48px 20px; color: var(--ink-muted); }
+.empty svg { width: 36px; height: 36px; stroke: var(--ink-subtle); fill: none; stroke-width: 1.5; margin-bottom: 12px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: var(--bg);
+  padding: 11px 18px; border-radius: 100px;
+  font-size: 0.85rem; font-weight: 600;
+  opacity: 0; transition: opacity 0.2s, transform 0.2s;
+  z-index: 100; pointer-events: none; white-space: nowrap;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Modal */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: none; align-items: flex-end; justify-content: center; z-index: 200;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--bg-elev); width: 100%; max-width: 720px;
+  border-radius: 20px 20px 0 0; padding: 8px 20px 28px;
+  max-height: 92vh; overflow-y: auto;
+  animation: slideup 0.25s;
+}
+@keyframes slideup { from { transform: translateY(100%); } to { transform: none; } }
+.modal-grip { width: 36px; height: 4px; background: var(--border-strong); border-radius: 2px; margin: 8px auto 16px; }
+
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.wrap { flex-wrap: wrap; }
+.stack > * + * { margin-top: 10px; }
+.pill-select { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  padding: 7px 12px; border-radius: 100px; font-size: 0.8rem; font-weight: 600;
+  background: var(--bg-subtle); color: var(--ink-muted);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.pill.on { background: var(--gold-faint); color: var(--gold-bright); border-color: var(--gold); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-icon">Au</div>
+      <div>
+        <h1 style="font-size:1.25rem;">Field Brain</h1>
+        <div class="tiny subtle mono" id="header-sub">Placer prospecting · Mat-Su</div>
+      </div>
+    </div>
+    <button class="btn ghost sm" onclick="openData()" aria-label="Data">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ EVALUATE ============ -->
+  <section class="view active" id="view-evaluate"></section>
+
+  <!-- ============ SITES ============ -->
+  <section class="view" id="view-sites"></section>
+
+  <!-- ============ KNOWLEDGE ============ -->
+  <section class="view" id="view-knowledge"></section>
+
+  <!-- ============ PHOTO ============ -->
+  <section class="view" id="view-photo"></section>
+
+  <!-- ============ RESEARCH ============ -->
+  <section class="view" id="view-research"></section>
+
+  <!-- ============ CHECKLIST ============ -->
+  <section class="view" id="view-checklist"></section>
+</main>
+
+<!-- Bottom tab bar -->
+<nav class="tabbar">
+  <button class="tab active" data-view="evaluate" onclick="switchView('evaluate')">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    Evaluate
+  </button>
+  <button class="tab" data-view="sites" onclick="switchView('sites')">
+    <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    Sites
+  </button>
+  <button class="tab" data-view="knowledge" onclick="switchView('knowledge')">
+    <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Knowledge
+  </button>
+  <button class="tab" data-view="photo" onclick="switchView('photo')">
+    <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    Photo
+  </button>
+  <button class="tab" data-view="research" onclick="switchView('research')">
+    <svg viewBox="0 0 24 24"><path d="M12 6.5V3M5 12H3m18 0h-2M7.8 7.8L6 6m12 1.8L19.5 6M12 8a4 4 0 0 1 4 4c0 1.5-.8 2.6-1.8 3.4-.7.5-1.2 1.3-1.2 2.1V18H11v-.5c0-.8-.5-1.6-1.2-2.1C8.8 14.6 8 13.5 8 12a4 4 0 0 1 4-4z"/><path d="M10 21h4"/></svg>
+    Research
+  </button>
+  <button class="tab" data-view="checklist" onclick="switchView('checklist')">
+    <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Kit
+  </button>
+</nav>
+
+<div class="modal-bg" id="modal-bg" onclick="if(event.target.id==='modal-bg')closeModal()">
+  <div class="modal" id="modal"><div class="modal-grip"></div><div id="modal-inner"></div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===========================================================================
+// STATE
+// ===========================================================================
+const S = {
+  sites: [],            // logged prospects
+  evalDraft: null,      // working evaluation
+  briefs: [],           // saved research briefs
+  briefDraft: null,     // working research brief
+  apiKey: '',           // held in memory only, never exported
+  model: 'claude-haiku-4-5-20251001',
+  photos: [],           // analyzed photos this session
+  sitesView: 'list',    // 'list', 'map', or 'plan'
+  tripSelection: [],    // site ids selected for the trip planner
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ===========================================================================
+// EVALUATION FRAMEWORK
+// The placer-favorability model. Each indicator is something a prospector can
+// actually observe or research, weighted by how strongly it predicts placer
+// gold concentration. This is a reasoning scaffold, not a guarantee.
+// ===========================================================================
+const INDICATORS = [
+  {
+    id: 'source', weight: 3,
+    q: 'Known lode/hardrock gold source upstream?',
+    help: 'Placer gold has to come from somewhere. A documented lode source, historic mine, or mineralized belt upstream is the single strongest indicator. Check USGS MRDS, ARDF (Alaska Resource Data File), and old mining district records.',
+    options: [
+      ['Documented source upstream', 1.0, 'green'],
+      ['Mineralized belt / indirect signs', 0.6, 'amber'],
+      ['Unknown', 0.3, 'amber'],
+      ['Ruled out / wrong geology', 0.0, 'rust'],
+    ],
+  },
+  {
+    id: 'history', weight: 3,
+    q: 'Historic placer production nearby?',
+    help: 'Gold is where it was. Districts that produced before almost always still hold gold. Mat-Su has Willow Creek, Cache Creek, Peters Creek, Cottonwood, and the Hatcher Pass drainages. Historic production de-risks a prospect enormously.',
+    options: [
+      ['Worked district, documented gold', 1.0, 'green'],
+      ['Anecdotal / colors reported', 0.6, 'amber'],
+      ['No records either way', 0.3, 'amber'],
+      ['Worked out / mined heavily', 0.4, 'amber'],
+    ],
+  },
+  {
+    id: 'trap', weight: 2.5,
+    q: 'Natural gold traps present?',
+    help: 'Gold is 19x denser than water and ~7x denser than typical gravel. It drops where flow slows or hits an obstruction: inside bends, behind boulders, bedrock crevices, slate/schist riffles, the downstream end of gravel bars, and at gradient breaks where a steep reach flattens.',
+    options: [
+      ['Strong traps: bedrock crevices, inside bends', 1.0, 'green'],
+      ['Some traps: bars, boulders', 0.65, 'amber'],
+      ['Few obvious traps', 0.3, 'amber'],
+      ['Smooth, fast, scoured reach', 0.1, 'rust'],
+    ],
+  },
+  {
+    id: 'bedrock', weight: 2,
+    q: 'Bedrock accessible / shallow?',
+    help: 'Most placer gold rides on or near bedrock — the "pay streak" sits at the gravel-bedrock contact. Exposed or shallow bedrock means you can reach the richest layer. Deep overburden means heavy excavation. Slate, schist, and fractured bedrock trap gold better than smooth granite.',
+    options: [
+      ['Exposed bedrock in/near channel', 1.0, 'green'],
+      ['Shallow (<1m to bedrock)', 0.7, 'amber'],
+      ['Moderate depth (1-3m)', 0.4, 'amber'],
+      ['Deep overburden (>3m)', 0.15, 'rust'],
+    ],
+  },
+  {
+    id: 'blacksand', weight: 1.5,
+    q: 'Black sand / heavy mineral concentration?',
+    help: 'Magnetite and other heavy minerals concentrate by the same density sorting that concentrates gold. Strong black sand streaks in your pan or in exposed gravels tell you the stream is sorting heavies effectively — a good sign even before you find color.',
+    options: [
+      ['Heavy black sand, garnet, etc.', 1.0, 'green'],
+      ['Moderate black sand', 0.6, 'amber'],
+      ['Trace', 0.3, 'amber'],
+      ['None found', 0.1, 'rust'],
+    ],
+  },
+  {
+    id: 'gradient', weight: 1.5,
+    q: 'Stream gradient / energy regime?',
+    help: 'You want a stream with enough energy to move gold from source but a deposition zone where it slows. Gradient breaks — where a steep mountain reach hits a valley flat — are classic concentration points. Too steep everywhere = gold passes through. Too flat = gold never arrived.',
+    options: [
+      ['Gradient break / deposition zone', 1.0, 'green'],
+      ['Moderate, mixed', 0.6, 'amber'],
+      ['Uniformly steep (transport)', 0.35, 'amber'],
+      ['Uniformly flat (no delivery)', 0.25, 'rust'],
+    ],
+  },
+  {
+    id: 'access', weight: 1,
+    q: 'Legal access & claim status?',
+    help: 'Critical and non-geological: is the ground open? Check for active mining claims (BLM LR2000 / MLRS), private land, state/federal restrictions, and whether recreational panning is allowed. Jumping a valid claim is a fast way to ruin your season. In Alaska, also check state mining-closed areas and Native corporation lands.',
+    options: [
+      ['Open / claimable / public panning OK', 1.0, 'green'],
+      ['Need to verify', 0.5, 'amber'],
+      ['Restricted but possible (permit)', 0.4, 'amber'],
+      ['Active claim / closed', 0.0, 'rust'],
+    ],
+  },
+  {
+    id: 'colors', weight: 2,
+    q: 'Have you found actual color here?',
+    help: 'Nothing beats ground truth. Even a few small colors in a test pan confirms gold is present and the system is concentrating it. Note the size and shape: rough, chunky gold means a close source; fine, flat, worn gold has traveled far.',
+    options: [
+      ['Yes — chunky / coarse', 1.0, 'green'],
+      ['Yes — fine / flour gold', 0.75, 'amber'],
+      ['Not yet tested', 0.4, 'amber'],
+      ['Tested, no color', 0.1, 'rust'],
+    ],
+  },
+];
+
+function blankEval() {
+  return { id: uid(), name: '', notes: '', answers: {}, gps: null, created: new Date().toISOString() };
+}
+
+function evalScore(ev) {
+  let got = 0, max = 0;
+  INDICATORS.forEach(ind => {
+    max += ind.weight;
+    const a = ev.answers[ind.id];
+    if (a != null) got += ind.weight * a.value;
+  });
+  const answered = INDICATORS.filter(i => ev.answers[i.id] != null).length;
+  return { pct: max ? got / max : 0, answered, total: INDICATORS.length };
+}
+
+function scoreVerdict(pct) {
+  if (pct >= 0.72) return ['STRONG PROSPECT', 'green', 'Multiple strong indicators align. Worth serious sampling and a return trip with equipment.'];
+  if (pct >= 0.5) return ['WORTH TESTING', 'amber', 'Mixed signals. Enough favorable indicators to justify test panning before committing time.'];
+  if (pct >= 0.3) return ['MARGINAL', 'amber', 'Weak overall. A few good signs but significant gaps. Test only if convenient.'];
+  return ['UNFAVORABLE', 'rust', 'Indicators point away from concentration here. Better to relocate unless you have a specific reason.'];
+}
+
+// ===========================================================================
+// VIEW: EVALUATE
+// ===========================================================================
+function renderEvaluate() {
+  if (!S.evalDraft) S.evalDraft = blankEval();
+  const ev = S.evalDraft;
+  const sc = evalScore(ev);
+  const [verdict, tone, blurb] = scoreVerdict(sc.pct);
+  const ringPct = sc.pct;
+  const circ = 2 * Math.PI * 38;
+  const ringColor = tone === 'green' ? 'var(--green)' : tone === 'amber' ? 'var(--amber)' : 'var(--rust)';
+
+  $('view-evaluate').innerHTML = `
+    <div class="card">
+      <div class="ring-wrap">
+        <div class="ring">
+          <svg width="88" height="88">
+            <circle cx="44" cy="44" r="38" stroke="var(--bg-subtle)" stroke-width="7" fill="none"/>
+            <circle cx="44" cy="44" r="38" stroke="${ringColor}" stroke-width="7" fill="none"
+              stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ringPct)}"
+              stroke-linecap="round" style="transition: stroke-dashoffset 0.5s;"/>
+          </svg>
+          <div class="ring-label">
+            <span class="ring-score">${Math.round(sc.pct * 100)}</span>
+            <span class="ring-max">/ 100</span>
+          </div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <span class="badge ${tone}">${verdict}</span>
+          <p class="small soft" style="margin-top:8px;">${blurb}</p>
+          <p class="tiny subtle" style="margin-top:6px;">${sc.answered}/${sc.total} indicators assessed</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <input class="input" placeholder="Site name (e.g. Cache Creek bend, mi 4)" value="${esc(ev.name)}"
+        oninput="S.evalDraft.name = this.value">
+    </div>
+
+    <div class="row between" style="margin:-4px 0 14px;padding:0 4px;">
+      <span class="tiny ${ev.gps ? 'gold' : 'subtle'} mono">${ev.gps ? `📍 ${ev.gps.lat.toFixed(5)}, ${ev.gps.lon.toFixed(5)}${ev.gps.heightAboveStream != null ? ` · ⛰${ev.gps.heightAboveStream}m above stream` : ''}` : 'No location set'}</span>
+      <span class="tiny gold" style="cursor:pointer;" onclick="setEvalGps()">${ev.gps ? 'Change' : '+ Add location'}</span>
+    </div>
+
+    <div class="stack">
+      ${INDICATORS.map(ind => {
+        const a = ev.answers[ind.id];
+        return `
+          <div class="card tappable" onclick="openIndicator('${ind.id}')">
+            <div class="row between">
+              <div style="flex:1; min-width:0;">
+                <div class="row" style="gap:8px;">
+                  <span class="badge ${a ? a.tone : ''}" style="${a ? '' : 'background:var(--bg-subtle);color:var(--ink-subtle);'}">
+                    ${a ? Math.round(a.value * 100) + '%' : '—'}
+                  </span>
+                  <span class="tiny subtle mono">×${ind.weight}</span>
+                </div>
+                <h3 style="margin-top:8px;">${ind.q}</h3>
+                ${a ? `<p class="tiny muted" style="margin-top:4px;">${esc(a.label)}</p>` : `<p class="tiny subtle" style="margin-top:4px;">Tap to assess</p>`}
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+
+    <div class="field" style="margin-top:4px;">
+      <label class="label">Field notes</label>
+      <textarea class="textarea" placeholder="What you saw, weather, water level, gravel character, anything..."
+        oninput="S.evalDraft.notes = this.value">${esc(ev.notes)}</textarea>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:24px;">
+      <button class="btn secondary" onclick="resetEval()">Clear</button>
+      <button class="btn primary" onclick="saveEval()">Save to Sites</button>
+    </div>
+  `;
+}
+
+function openIndicator(indId) {
+  const ind = INDICATORS.find(i => i.id === indId);
+  const ev = S.evalDraft;
+  const current = ev.answers[indId];
+  openModal(`
+    <h2>${ind.q}</h2>
+    <p class="small muted" style="margin:10px 0 16px;">${ind.help}</p>
+    <div class="stack">
+      ${ind.options.map((opt, i) => {
+        const [label, value, tone] = opt;
+        const isOn = current && current.label === label;
+        return `
+          <div class="card tappable" style="margin:0; ${isOn ? 'border-color:var(--gold);' : ''}"
+            onclick="setIndicator('${indId}', ${i})">
+            <div class="row between">
+              <span class="small soft">${label}</span>
+              <span class="badge ${tone}">${Math.round(value * 100)}%</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <button class="btn ghost" style="margin-top:14px;" onclick="clearIndicator('${indId}')">Clear this indicator</button>
+  `);
+}
+
+function setIndicator(indId, optIdx) {
+  const ind = INDICATORS.find(i => i.id === indId);
+  const [label, value, tone] = ind.options[optIdx];
+  S.evalDraft.answers[indId] = { label, value, tone };
+  closeModal();
+  renderEvaluate();
+}
+function clearIndicator(indId) {
+  delete S.evalDraft.answers[indId];
+  closeModal();
+  renderEvaluate();
+}
+function setEvalGps() {
+  if (!S.evalDraft) S.evalDraft = blankEval();
+  const g = S.evalDraft.gps;
+  openModal(`
+    <h2>Location & elevation</h2>
+    <p class="small muted" style="margin:10px 0 16px;">Use your phone's GPS, or enter coordinates manually. The height-above-stream field is the key number for spotting benches.</p>
+    <button class="btn primary" onclick="useLiveGpsForEval()">Use my current location</button>
+    <div class="divider"></div>
+    <div class="field">
+      <label class="label">Latitude</label>
+      <input class="input mono" id="eval-lat" inputmode="decimal" placeholder="61.59880" value="${g ? g.lat : ''}">
+    </div>
+    <div class="field">
+      <label class="label">Longitude</label>
+      <input class="input mono" id="eval-lon" inputmode="decimal" placeholder="-149.11540" value="${g ? g.lon : ''}">
+    </div>
+    <div class="divider"></div>
+    <p class="eyebrow" style="margin-bottom:10px;">Elevation cues (for benches)</p>
+    <div class="field">
+      <label class="label">Height above active stream (m) — the bench number</label>
+      <input class="input mono" id="eval-hgt" inputmode="decimal" placeholder="e.g. 8" value="${g && g.heightAboveStream != null ? g.heightAboveStream : ''}">
+      <p class="tiny subtle" style="margin-top:5px;">Eyeball how far this spot sits above the current water line. Rounded gravel sitting several meters up is a likely old channel — the richest, most-missed target. Leave blank if at stream level.</p>
+    </div>
+    <div class="field">
+      <label class="label">Slope here</label>
+      <select class="select" id="eval-slope">
+        <option value="">— not noted —</option>
+        <option value="flat bench/terrace" ${g && g.slope === 'flat bench/terrace' ? 'selected' : ''}>Flat bench / terrace (good — possible old channel)</option>
+        <option value="gentle" ${g && g.slope === 'gentle' ? 'selected' : ''}>Gentle slope</option>
+        <option value="moderate" ${g && g.slope === 'moderate' ? 'selected' : ''}>Moderate slope</option>
+        <option value="steep" ${g && g.slope === 'steep' ? 'selected' : ''}>Steep (transport zone)</option>
+      </select>
+    </div>
+    <button class="btn secondary" onclick="saveEvalGpsManual()">Save location & elevation</button>
+  `);
+}
+
+function useLiveGpsForEval() {
+  if (!navigator.geolocation) { toast('Geolocation not available — enter manually'); return; }
+  toast('Getting location…');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const c = pos.coords;
+      S.evalDraft.gps = Object.assign(S.evalDraft.gps || {}, {
+        lat: c.latitude, lon: c.longitude, acc: c.accuracy,
+        altitude: (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null,
+        altitudeAcc: (c.altitudeAccuracy != null) ? c.altitudeAccuracy : null,
+      });
+      closeModal();
+      renderEvaluate();
+      toast(c.altitude != null ? 'Location set (altitude approx.)' : 'Location set');
+    },
+    err => { toast('GPS unavailable — enter manually (open from Home Screen helps)'); },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+  );
+}
+
+function saveEvalGpsManual() {
+  const lat = parseFloat($('eval-lat').value);
+  const lon = parseFloat($('eval-lon').value);
+  const hgt = parseFloat($('eval-hgt').value);
+  const slope = $('eval-slope').value;
+  if (isNaN(lat) || isNaN(lon)) { toast('Enter valid coordinates'); return; }
+  S.evalDraft.gps = Object.assign(S.evalDraft.gps || {}, {
+    lat, lon,
+    acc: (S.evalDraft.gps && S.evalDraft.gps.acc) || null,
+    heightAboveStream: isNaN(hgt) ? null : hgt,
+    slope: slope || null,
+  });
+  closeModal();
+  renderEvaluate();
+  toast('Location & elevation saved');
+}
+
+function resetEval() {
+  S.evalDraft = blankEval();
+  renderEvaluate();
+  toast('Evaluation cleared');
+}
+function saveEval() {
+  const ev = S.evalDraft;
+  if (!ev.name.trim()) { toast('Give the site a name first'); return; }
+  const sc = evalScore(ev);
+  ev.score = sc.pct;
+  ev.savedAt = new Date().toISOString();
+  S.sites.unshift(ev);
+  S.evalDraft = blankEval();
+  renderEvaluate();
+  toast(`Saved "${ev.name}" to Sites`);
+  switchView('sites');
+}
+
+// ===========================================================================
+// VIEW: SITES
+// ===========================================================================
+function renderSites() {
+  const v = $('view-sites');
+  if (S.sites.length === 0) {
+    v.innerHTML = `
+      <div class="empty">
+        <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <h3 style="color:var(--ink-soft);margin-bottom:6px;">No sites logged yet</h3>
+        <p class="small">Evaluate a prospect and save it. Your logged sites build into a record you can export and keep.</p>
+      </div>`;
+    return;
+  }
+  const gpsSites = S.sites.filter(s => s.gps);
+  v.innerHTML = `
+    <div class="row between" style="margin:4px 0 14px;">
+      <p class="eyebrow" style="margin:0;">${S.sites.length} logged site${S.sites.length === 1 ? '' : 's'}</p>
+      ${gpsSites.length ? `
+        <div class="row" style="gap:6px;">
+          <span class="pill ${S.sitesView === 'list' || !S.sitesView ? 'on' : ''}" onclick="setSitesView('list')">List</span>
+          <span class="pill ${S.sitesView === 'map' ? 'on' : ''}" onclick="setSitesView('map')">Map</span>
+          <span class="pill ${S.sitesView === 'plan' ? 'on' : ''}" onclick="setSitesView('plan')">Plan</span>
+        </div>
+      ` : ''}
+    </div>
+
+    ${S.sitesView === 'map' && gpsSites.length ? `
+      <div class="card" style="padding:12px;">
+        <canvas id="sites-map" style="width:100%;height:300px;display:block;border-radius:8px;"></canvas>
+        <p class="tiny subtle" style="margin-top:8px;text-align:center;">Relative positions of ${gpsSites.length} GPS-tagged site${gpsSites.length===1?'':'s'}. Tap a dot for details. North is up.</p>
+      </div>
+      <p class="tiny subtle" style="margin:8px 0;">${S.sites.length - gpsSites.length} site${S.sites.length - gpsSites.length===1?'':'s'} without coordinates ${S.sites.length - gpsSites.length===0?'':'(not shown on map)'}</p>
+    ` : S.sitesView === 'plan' && gpsSites.length ? renderTripPlanner(gpsSites) : `
+    <div class="stack">
+      ${S.sites.map(ev => {
+        const sc = evalScore(ev);
+        const [verdict, tone] = scoreVerdict(ev.score != null ? ev.score : sc.pct);
+        const pct = Math.round((ev.score != null ? ev.score : sc.pct) * 100);
+        return `
+          <div class="card tappable" onclick="openSite('${ev.id}')">
+            <div class="row between">
+              <div style="flex:1; min-width:0;">
+                <h3>${esc(ev.name)}</h3>
+                <div class="row" style="gap:6px; margin-top:6px;">
+                  <span class="badge ${tone}">${verdict}</span>
+                  <span class="tiny subtle">${new Date(ev.savedAt || ev.created).toLocaleDateString()}${ev.gps ? ' · 📍' : ''}</span>
+                </div>
+                ${ev.notes ? `<p class="tiny muted" style="margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(ev.notes)}</p>` : ''}
+              </div>
+              <div class="mono" style="font-size:1.5rem; font-weight:800; color:${tone === 'green' ? 'var(--green)' : tone === 'amber' ? 'var(--amber)' : 'var(--rust)'};">${pct}</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    `}
+    <div style="height:24px;"></div>
+  `;
+  if (S.sitesView === 'map' && gpsSites.length) drawSitesMap(gpsSites);
+}
+
+function setSitesView(mode) {
+  S.sitesView = mode;
+  renderSites();
+}
+
+// Haversine straight-line distance in km
+function distKm(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lon - a.lon) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180, lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function toggleTripSite(id) {
+  const i = S.tripSelection.indexOf(id);
+  if (i === -1) S.tripSelection.push(id);
+  else S.tripSelection.splice(i, 1);
+  renderSites();
+}
+
+// Nearest-neighbor ordering from the first selected site
+function orderTrip(sites) {
+  if (sites.length <= 2) return sites.slice();
+  const remaining = sites.slice();
+  const route = [remaining.shift()];
+  while (remaining.length) {
+    const last = route[route.length - 1];
+    let bestIdx = 0, bestD = Infinity;
+    remaining.forEach((s, idx) => {
+      const d = distKm(last.gps, s.gps);
+      if (d < bestD) { bestD = d; bestIdx = idx; }
+    });
+    route.push(remaining.splice(bestIdx, 1)[0]);
+  }
+  return route;
+}
+
+function renderTripPlanner(gpsSites) {
+  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
+  const ordered = orderTrip(selected);
+  let totalKm = 0;
+  for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
+
+  // Sort available sites by score desc for the picker
+  const ranked = gpsSites.slice().sort((a, b) => {
+    const sa = a.score != null ? a.score : evalScore(a).pct;
+    const sb = b.score != null ? b.score : evalScore(b).pct;
+    return sb - sa;
+  });
+
+  return `
+    <p class="small muted" style="margin-bottom:14px;">Pick the sites you want to visit. They'll be ordered into a sensible path from your first pick, then handed to Maps for real directions.</p>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:10px;">Select sites (by score)</p>
+      <div class="stack" style="gap:6px;">
+        ${ranked.map(s => {
+          const pct = Math.round((s.score != null ? s.score : evalScore(s).pct) * 100);
+          const [, tone] = scoreVerdict(s.score != null ? s.score : evalScore(s).pct);
+          const on = S.tripSelection.includes(s.id);
+          return `
+            <div class="row between" style="padding:8px;border-radius:8px;cursor:pointer;background:${on ? 'var(--gold-faint)' : 'transparent'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};" onclick="toggleTripSite('${s.id}')">
+              <div class="row" style="gap:8px;min-width:0;">
+                <div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;border:2px solid ${on ? 'var(--gold)' : 'var(--border-strong)'};background:${on ? 'var(--gold)' : 'transparent'};display:flex;align-items:center;justify-content:center;">
+                  ${on ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#14110C" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>' : ''}
+                </div>
+                <span class="small soft" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
+              </div>
+              <span class="badge ${tone}">${pct}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    ${ordered.length >= 1 ? `
+      <div class="card">
+        <div class="row between" style="margin-bottom:12px;">
+          <p class="eyebrow" style="margin:0;">Route (${ordered.length} stop${ordered.length===1?'':'s'})</p>
+          ${ordered.length >= 2 ? `<span class="tiny gold mono">~${totalKm.toFixed(1)} km straight-line</span>` : ''}
+        </div>
+        ${ordered.map((s, i) => {
+          const pct = Math.round((s.score != null ? s.score : evalScore(s).pct) * 100);
+          const legKm = i > 0 ? distKm(ordered[i-1].gps, s.gps) : null;
+          return `
+            ${i > 0 ? `<div class="tiny subtle mono" style="margin:2px 0 2px 14px;">↓ ${legKm.toFixed(1)} km</div>` : ''}
+            <div class="row" style="gap:10px;padding:6px 0;">
+              <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;background:var(--gold);color:#14110C;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;">${i+1}</div>
+              <span class="small soft" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
+              <span class="badge">${pct}</span>
+            </div>
+          `;
+        }).join('')}
+        ${ordered.length >= 1 ? `
+          <button class="btn primary" style="margin-top:14px;" onclick="openTripInMaps()">Open route in Maps ↗</button>
+          <p class="tiny subtle" style="margin-top:8px;text-align:center;">Straight-line distances. Maps will compute real road routes and may reorder for drivability.</p>
+        ` : ''}
+      </div>
+    ` : `
+      <div class="card"><div class="card-body empty" style="padding:30px 16px;">
+        <p class="small">Select sites above to build a route.</p>
+      </div></div>
+    `}
+  `;
+}
+
+function openTripInMaps() {
+  const gpsSites = S.sites.filter(s => s.gps);
+  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
+  if (!selected.length) { toast('Select sites first'); return; }
+  const ordered = orderTrip(selected);
+  // Apple Maps supports daddr with multiple "to:" waypoints
+  if (ordered.length === 1) {
+    const s = ordered[0];
+    window.open(`https://maps.apple.com/?daddr=${s.gps.lat},${s.gps.lon}`, '_blank');
+    return;
+  }
+  const saddr = `${ordered[0].gps.lat},${ordered[0].gps.lon}`;
+  const daddr = ordered.slice(1).map(s => `${s.gps.lat},${s.gps.lon}`).join(' to:');
+  window.open(`https://maps.apple.com/?saddr=${saddr}&daddr=${daddr}`, '_blank');
+  toast('Opening route in Maps…');
+}
+
+function drawSitesMap(gpsSites) {
+  const cv = $('sites-map');
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  cv.width = rect.width * dpr;
+  cv.height = rect.height * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Background
+  ctx.fillStyle = '#1A1610';
+  ctx.fillRect(0, 0, W, H);
+
+  // Compute bounds
+  const lats = gpsSites.map(s => s.gps.lat);
+  const lons = gpsSites.map(s => s.gps.lon);
+  let minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  let minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  // Pad; handle single-point case
+  const latPad = Math.max((maxLat - minLat) * 0.2, 0.002);
+  const lonPad = Math.max((maxLon - minLon) * 0.2, 0.002);
+  minLat -= latPad; maxLat += latPad; minLon -= lonPad; maxLon += lonPad;
+
+  const pad = 36;
+  const project = (lat, lon) => {
+    const x = pad + (lon - minLon) / (maxLon - minLon) * (W - 2*pad);
+    // Latitude increases upward, so invert y
+    const y = pad + (maxLat - lat) / (maxLat - minLat) * (H - 2*pad);
+    return [x, y];
+  };
+
+  // Grid
+  ctx.strokeStyle = '#2C2619';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = pad + i/4 * (W - 2*pad);
+    const y = pad + i/4 * (H - 2*pad);
+    ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, H-pad); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W-pad, y); ctx.stroke();
+  }
+
+  // North arrow
+  ctx.fillStyle = '#9C9684';
+  ctx.font = '700 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', W - 16, 16);
+  ctx.beginPath();
+  ctx.moveTo(W - 16, 20); ctx.lineTo(W - 19, 28); ctx.lineTo(W - 13, 28);
+  ctx.closePath();
+  ctx.fillStyle = '#C9A227';
+  ctx.fill();
+
+  // Store hit regions for tap
+  cv._hits = [];
+
+  gpsSites.forEach(s => {
+    const sc = evalScore(s);
+    const pct = s.score != null ? s.score : sc.pct;
+    const [, tone] = scoreVerdict(pct);
+    const color = tone === 'green' ? '#6FA760' : tone === 'amber' ? '#D29A3A' : '#C25A3A';
+    const [x, y] = project(s.gps.lat, s.gps.lon);
+    // Dot
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, 2*Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#14110C';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Score label
+    ctx.fillStyle = '#F2EDE0';
+    ctx.font = '700 9px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(pct*100), x, y - 12);
+    cv._hits.push({ x, y, r: 12, id: s.id });
+  });
+
+  // Tap handler
+  cv.onclick = (e) => {
+    const r = cv.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    for (const h of cv._hits) {
+      if (Math.hypot(px - h.x, py - h.y) <= h.r) { openSite(h.id); return; }
+    }
+  };
+}
+
+function openSite(id) {
+  const ev = S.sites.find(s => s.id === id);
+  if (!ev) return;
+  const sc = evalScore(ev);
+  const [verdict, tone, blurb] = scoreVerdict(ev.score != null ? ev.score : sc.pct);
+  openModal(`
+    <h2>${esc(ev.name)}</h2>
+    <div class="row" style="gap:6px; margin:10px 0 16px;">
+      <span class="badge ${tone}">${verdict}</span>
+      <span class="badge">${Math.round((ev.score != null ? ev.score : sc.pct) * 100)}/100</span>
+    </div>
+    <p class="small soft" style="margin-bottom:16px;">${blurb}</p>
+    <div class="divider"></div>
+    <p class="eyebrow" style="margin-bottom:10px;">Indicators</p>
+    ${INDICATORS.map(ind => {
+      const a = ev.answers[ind.id];
+      const dotColor = a ? (a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--rust)') : 'var(--ink-subtle)';
+      return `
+        <div class="ind">
+          <div class="ind-dot" style="background:${dotColor};"></div>
+          <div class="ind-body">
+            <div class="small soft">${ind.q}</div>
+            <div class="tiny muted" style="margin-top:2px;">${a ? esc(a.label) : 'Not assessed'}</div>
+          </div>
+          ${a ? `<span class="badge ${a.tone}">${Math.round(a.value*100)}%</span>` : ''}
+        </div>
+      `;
+    }).join('')}
+    ${ev.notes ? `<div class="divider"></div><p class="eyebrow" style="margin-bottom:8px;">Notes</p><p class="small soft">${esc(ev.notes)}</p>` : ''}
+    ${ev.gps ? `<div class="divider"></div>
+      <div class="row between">
+        <span class="tiny subtle mono">📍 ${ev.gps.lat.toFixed(5)}, ${ev.gps.lon.toFixed(5)}</span>
+        <a class="tiny gold" href="https://maps.apple.com/?ll=${ev.gps.lat},${ev.gps.lon}&q=${encodeURIComponent(ev.name||'Prospect')}" target="_blank" rel="noopener" style="text-decoration:none;">Open in Maps ↗</a>
+      </div>
+      ${(ev.gps.heightAboveStream != null || ev.gps.slope) ? `<div class="tiny gold mono" style="margin-top:6px;">${ev.gps.heightAboveStream != null ? `⛰ ${ev.gps.heightAboveStream}m above stream` : ''}${ev.gps.heightAboveStream != null && ev.gps.slope ? ' · ' : ''}${ev.gps.slope ? ev.gps.slope : ''}${ev.gps.heightAboveStream != null && ev.gps.heightAboveStream >= 3 ? '  ← possible old channel' : ''}</div>` : ''}` : ''}
+    <div class="btn-row" style="margin-top:20px;">
+      <button class="btn secondary" onclick="reopenSite('${ev.id}')">Edit</button>
+      <button class="btn ghost" onclick="deleteSite('${ev.id}')" style="color:var(--rust);">Delete</button>
+    </div>
+  `);
+}
+function reopenSite(id) {
+  const ev = S.sites.find(s => s.id === id);
+  if (!ev) return;
+  S.evalDraft = JSON.parse(JSON.stringify(ev));
+  S.sites = S.sites.filter(s => s.id !== id);
+  closeModal();
+  switchView('evaluate');
+  toast('Loaded into Evaluate — re-save when done');
+}
+function deleteSite(id) {
+  S.sites = S.sites.filter(s => s.id !== id);
+  closeModal();
+  renderSites();
+  toast('Site deleted');
+}
+
+// ===========================================================================
+// VIEW: KNOWLEDGE
+// Tuned to placer prospecting with Alaska / Mat-Su specifics.
+// ===========================================================================
+const KB = [
+  {
+    cat: 'Geology', tone: 'gold',
+    title: 'Where placer gold concentrates',
+    body: `
+      <p>Placer gold is gold that has weathered out of a hardrock (lode) source and been concentrated by moving water. Because gold is extraordinarily dense (19.3 g/cm³ vs ~2.7 for quartz gravel), it behaves differently from everything around it: it sinks, fast, the moment water loses energy.</p>
+      <p><strong>The pay streak</strong> is the concentrated layer, almost always at or near the gravel–bedrock contact. Gold works its way down through gravel over time until it hits bedrock and can go no further, then travels along bedrock until trapped.</p>
+      <p><strong>Classic concentration sites:</strong></p>
+      <ul>
+        <li>Inside bends of meanders (slower water on the inside)</li>
+        <li>Behind and downstream of large boulders</li>
+        <li>Bedrock crevices, cracks, and false bedrock (clay layers)</li>
+        <li>The downstream tail end of gravel bars</li>
+        <li>Gradient breaks — where a steep reach flattens out</li>
+        <li>Where a tributary enters a larger, slower stream</li>
+      </ul>
+    `,
+  },
+  {
+    cat: 'Tectonics', tone: 'blue',
+    title: 'Why Alaska is gold country',
+    body: `
+      <p>Southern Alaska sits on an active convergent margin — the Pacific Plate subducting beneath North America. Over ~150 million years, this accreted a collage of terranes, drove repeated magmatism, and emplaced gold-bearing quartz veins along major fault systems.</p>
+      <p><strong>The Mat-Su / Willow Creek connection:</strong> The Willow Creek district (Hatcher Pass) produced lode gold from quartz veins in the Talkeetna Mountains granitics. That hardrock gold has been shedding into the surrounding drainages for ages, feeding placer deposits in Willow, Cache, Peters, and the Little Susitna systems.</p>
+      <p><strong>Practical upshot:</strong> proximity to a major fault zone or a granitic/metamorphic contact with quartz veining raises placer odds. The structural grain of the region channels where mineralization went.</p>
+    `,
+  },
+  {
+    cat: 'Topography', tone: 'green',
+    title: 'Reading the stream & landscape',
+    body: `
+      <p>Topography tells you where energy changes — and energy change is where gold drops.</p>
+      <p><strong>Gradient:</strong> Steep upper reaches transport gold; valley flats deposit it. The transition zone — the gradient break — is prime. On a topo map, look for where contour lines spread apart after being tightly packed.</p>
+      <p><strong>Stream maturity:</strong> Young, steep streams move material fast. Mature streams with developed floodplains, meanders, and gravel bars have had time to sort and concentrate. Both can hold gold but you work them differently.</p>
+      <p><strong>Ancient channels:</strong> Gold doesn't only sit in the current stream. Old, abandoned channels (benches, terraces above the modern stream) can be very rich — they concentrated gold over long periods before the stream cut down to its present level. Look for flat benches of rounded gravel above the active channel.</p>
+    `,
+  },
+  {
+    cat: 'Historical record', tone: 'amber',
+    title: 'Mining the record before the ground',
+    body: `
+      <p>The cheapest gold you'll ever find is in a library. Before walking a creek, mine the documented record:</p>
+      <ul>
+        <li><strong>USGS MRDS / ARDF</strong> — Mineral Resources Data System and the Alaska Resource Data File catalog known occurrences, mines, and prospects with locations.</li>
+        <li><strong>BLM claim records (MLRS, formerly LR2000)</strong> — who has claimed what, and where ground is open.</li>
+        <li><strong>State of Alaska DGGS</strong> — geologic maps, district reports, and production histories.</li>
+        <li><strong>Old USGS Bulletins</strong> — early-1900s district reports often describe exactly where gold was found, in detail modern reports omit.</li>
+      </ul>
+      <p><strong>Rule of thumb:</strong> gold is where it was. Districts that produced historically almost always still hold gold — the old-timers couldn't recover fine gold, couldn't reach deep pay, and never had metal detectors.</p>
+    `,
+  },
+  {
+    cat: 'Fluid dynamics', tone: 'blue',
+    title: 'How water sorts gold',
+    body: `
+      <p>Understanding flow makes you read a stream like a map of where gold is.</p>
+      <p><strong>Settling velocity:</strong> A particle stays suspended while flow energy exceeds its settling tendency. Gold's density means it settles at far lower velocities than equivalent-size quartz — so the instant water slows below a threshold, gold drops while lighter material keeps moving. This is the entire basis of panning, sluicing, and natural placer formation.</p>
+      <p><strong>Stream energy zones:</strong></p>
+      <ul>
+        <li>High energy (riffles, narrows, steep drops): gold passes through, won't deposit</li>
+        <li>Energy drop (bend insides, behind obstructions, pool heads): gold deposits</li>
+        <li>Dead water (deep pools, eddies): fine gold and black sand settle</li>
+      </ul>
+      <p><strong>Flood logic:</strong> Major floods rearrange everything and can expose or bury pay. After a big flood event, previously barren spots may hold fresh gold and old hot spots may be scoured or buried.</p>
+    `,
+  },
+  {
+    cat: 'Material science', tone: 'gold',
+    title: 'Recognizing gold & its companions',
+    body: `
+      <p><strong>Identifying real gold in the pan:</strong></p>
+      <ul>
+        <li>Stays bright in shadow (fool's gold / pyrite goes dull)</li>
+        <li>Malleable — flattens when pressed, won't shatter</li>
+        <li>Heavy — stays put when you tap and tilt the pan</li>
+        <li>No crystal faces — placer gold is rounded and worn</li>
+      </ul>
+      <p><strong>Indicator minerals (the company gold keeps):</strong></p>
+      <ul>
+        <li><strong>Black sand</strong> (magnetite, hematite) — concentrates with gold by the same density sorting. Strong black sand = the stream sorts heavies well.</li>
+        <li><strong>Garnets</strong> — dense, often co-occur in the heavy fraction.</li>
+        <li><strong>Pyrite</strong> in source rock can indicate the hydrothermal systems that also carry gold.</li>
+      </ul>
+      <p><strong>Reading the gold itself:</strong> Coarse, rough, chunky gold = close to source. Fine, flat, worn "flour gold" = traveled far. The character of your gold tells you which way to walk.</p>
+    `,
+  },
+  {
+    cat: 'Extraction', tone: 'green',
+    title: 'Placer recovery methods',
+    body: `
+      <p>Matched to a one-person, low-burden, legal recreational operation:</p>
+      <ul>
+        <li><strong>Panning</strong> — the universal test. Always pan first to confirm gold is present before deploying anything heavier.</li>
+        <li><strong>Sluicing</strong> — a sluice box runs more material than a pan. Riffles catch the heavies as water carries off lighter gravel. Needs flowing water and (in many areas) attention to regulations.</li>
+        <li><strong>Metal detecting</strong> — for coarse gold and nuggets, especially on exposed bedrock, in crevices, and on benches. Excellent where gold is chunky.</li>
+        <li><strong>Crevicing</strong> — working gold out of bedrock cracks by hand with picks, brushes, and a suction device. Where the pay streak meets exposed bedrock, this is where the gold actually is.</li>
+      </ul>
+      <p><strong>Always:</strong> Confirm legality of method. Suction dredging in particular is heavily regulated and seasonally restricted in Alaska. Recreational vs. permitted operations have very different rules.</p>
+    `,
+  },
+  {
+    cat: 'Material processing', tone: 'amber',
+    title: 'From concentrate to clean gold',
+    body: `
+      <p>Once you have heavy concentrate (the bottom of the pan or sluice cleanout):</p>
+      <ul>
+        <li><strong>Final panning</strong> — careful pan-down to separate gold from remaining black sand.</li>
+        <li><strong>Magnet</strong> — pull magnetite off; gold is non-magnetic. (Be careful not to lose fine gold trapped in the sand.)</li>
+        <li><strong>Snuffer bottle</strong> — suck up fine gold and small pickers from the pan.</li>
+        <li><strong>Drying & blowing</strong> — dry the cleaned concentrate and gently blow off the last light sand, leaving gold.</li>
+      </ul>
+      <p><strong>Avoid mercury.</strong> Old methods used mercury amalgamation; it's toxic, illegal in many contexts, and unnecessary for recreational recovery. Gravity methods recover all but the very finest gold cleanly.</p>
+      <p><strong>Fine gold:</strong> If your gold is very fine, a proper finishing pan, a vortex/spiral wheel, or a clean-up sluice recovers what a pan loses.</p>
+    `,
+  },
+  {
+    cat: 'Field method', tone: 'gold',
+    title: 'The systematic prospecting workflow',
+    body: `
+      <p>Turn luck into method:</p>
+      <ul>
+        <li><strong>1. Research first.</strong> Identify districts with documented production and open ground. Mark targets before leaving home.</li>
+        <li><strong>2. Read the topo & geology.</strong> Find gradient breaks, bends, bench gravels, and proximity to lode sources.</li>
+        <li><strong>3. Sample systematically.</strong> Test pan at multiple spots: inside bends, behind boulders, at bedrock, bar tails. Log every pan — even the blanks tell you something.</li>
+        <li><strong>4. Follow the gold.</strong> When you find color, sample upstream and downstream to bracket where it's coming from and where it concentrates.</li>
+        <li><strong>5. Work the best traps hard.</strong> Once you've located concentration, focus effort on the highest-probability traps — bedrock crevices, the pay streak.</li>
+        <li><strong>6. Record everything.</strong> A logged record of where you found gold (and didn't) compounds over seasons into real knowledge.</li>
+      </ul>
+    `,
+  },
+];
+
+function renderKnowledge() {
+  const cats = [...new Set(KB.map(k => k.cat))];
+  $('view-knowledge').innerHTML = `
+    <p class="eyebrow" style="margin:4px 0 12px;">Prospecting knowledge · placer · Alaska-tuned</p>
+    <p class="small muted" style="margin-bottom:16px;">A working reference across the disciplines that matter for finding placer gold. Tap any topic.</p>
+    ${KB.map((k, i) => `
+      <div class="kb-item" id="kb-${i}">
+        <div class="kb-head" onclick="toggleKB(${i})">
+          <div style="flex:1; min-width:0;">
+            <span class="badge ${k.tone} kb-tag">${k.cat}</span>
+            <h3 style="margin-top:8px;">${k.title}</h3>
+          </div>
+          <svg class="kb-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="kb-content">${k.body}</div>
+      </div>
+    `).join('')}
+    <div style="height:24px;"></div>
+  `;
+}
+function toggleKB(i) {
+  $('kb-' + i).classList.toggle('open');
+}
+
+// ===========================================================================
+// VIEW: CHECKLIST (Field Kit)
+// ===========================================================================
+const KIT = [
+  { cat: 'Core tools', items: ['Gold pan (+ finishing pan)', 'Classifier / sieve', 'Snuffer bottle', 'Vials or capsules for gold', 'Plastic scoop & crevice tools', 'Magnet (for black sand)', 'Tweezers'] },
+  { cat: 'Sampling', items: ['Small shovel / trowel', 'Pick or rock hammer', 'Buckets', 'Sample bags + marker', 'Magnifying loupe (10x)'] },
+  { cat: 'Navigation & record', items: ['Phone w/ offline topo maps', 'GPS or marked waypoints', 'This Field Brain (export saved!)', 'Notebook / pencil', 'Camera (phone)'] },
+  { cat: 'Safety (Alaska)', items: ['Bear spray', 'Layers + rain gear', 'Waders or boots', 'First-aid kit', 'Water + food', 'Tell someone your plan', 'Satellite messenger (remote areas)'] },
+  { cat: 'Legal & research', items: ['Verified claim status (open ground)', 'Method legality checked', 'Required permits/licenses', 'Land ownership confirmed'] },
+];
+
+function renderChecklist() {
+  $('view-checklist').innerHTML = `
+    <p class="eyebrow" style="margin:4px 0 12px;">Field kit & pre-trip checklist</p>
+    <p class="small muted" style="margin-bottom:16px;">Tap items to check them off for a trip. Resets when you reload — it's a pre-flight, not a permanent list.</p>
+    ${KIT.map((group, gi) => `
+      <div class="card">
+        <p class="eyebrow" style="margin-bottom:10px;">${group.cat}</p>
+        <div class="stack">
+          ${group.items.map((item, ii) => `
+            <div class="row" style="gap:10px; cursor:pointer;" onclick="toggleKit(${gi},${ii},this)">
+              <div class="kit-box" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--border-strong);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
+              </div>
+              <span class="small soft kit-label">${item}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+    <div style="height:24px;"></div>
+  `;
+}
+function toggleKit(gi, ii, el) {
+  const box = el.querySelector('.kit-box');
+  const label = el.querySelector('.kit-label');
+  const on = box.dataset.on === '1';
+  if (on) {
+    box.dataset.on = '0';
+    box.style.background = 'transparent';
+    box.style.borderColor = 'var(--border-strong)';
+    box.innerHTML = '';
+    label.style.color = 'var(--ink-soft)';
+    label.style.textDecoration = 'none';
+  } else {
+    box.dataset.on = '1';
+    box.style.background = 'var(--gold)';
+    box.style.borderColor = 'var(--gold)';
+    box.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#14110C" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>';
+    label.style.color = 'var(--ink-subtle)';
+    label.style.textDecoration = 'line-through';
+  }
+}
+
+// ===========================================================================
+// DATA: export / import (the persistence workaround)
+// ===========================================================================
+function openData() {
+  openModal(`
+    <h2>Your data</h2>
+    <p class="small muted" style="margin:10px 0 16px;">
+      This brain keeps your sites in memory for this session. To <strong>keep them permanently</strong>,
+      export to a file and save it to your phone (Files app). Next session, import it to pick up where you left off.
+    </p>
+    <div class="card" style="margin:0 0 12px;">
+      <div class="row between">
+        <div>
+          <div class="small soft">Logged sites & briefs</div>
+          <div class="tiny subtle">${S.sites.length} site${S.sites.length === 1 ? '' : 's'} · ${S.briefs.length} research brief${S.briefs.length === 1 ? '' : 's'}</div>
+        </div>
+        <span class="mono gold" style="font-size:1.5rem;font-weight:800;">${S.sites.length + S.briefs.length}</span>
+      </div>
+    </div>
+    <button class="btn primary" onclick="exportData()">Export sites to file</button>
+    <div style="height:10px;"></div>
+    <button class="btn secondary" onclick="document.getElementById('import-file').click()">Import from file</button>
+    <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    <div class="divider"></div>
+    <button class="btn ghost" onclick="copyData()">Copy data as text (paste anywhere)</button>
+    <p class="tiny subtle" style="margin-top:14px;text-align:center;">
+      iPhone tip: add this page to your Home Screen (Share → Add to Home Screen) so it opens like an app.
+    </p>
+  `);
+}
+
+function exportData() {
+  const data = JSON.stringify({ version: 2, exported: new Date().toISOString(), sites: S.sites, briefs: S.briefs }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `field-brain-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Exported — save it to Files');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.sites && Array.isArray(data.sites)) {
+        // Merge sites, avoiding duplicate ids
+        const existing = new Set(S.sites.map(s => s.id));
+        let added = 0;
+        data.sites.forEach(s => { if (!existing.has(s.id)) { S.sites.push(s); added++; } });
+        S.sites.sort((a, b) => new Date(b.savedAt || b.created) - new Date(a.savedAt || a.created));
+        // Merge briefs too
+        let briefsAdded = 0;
+        if (data.briefs && Array.isArray(data.briefs)) {
+          const existB = new Set(S.briefs.map(x => x.id));
+          data.briefs.forEach(x => { if (!existB.has(x.id)) { S.briefs.push(x); briefsAdded++; } });
+          S.briefs.sort((a, b) => new Date(b.created) - new Date(a.created));
+        }
+        closeModal();
+        renderSites();
+        switchView('sites');
+        toast(`Imported ${added} site${added === 1 ? '' : 's'}${briefsAdded ? `, ${briefsAdded} brief${briefsAdded===1?'':'s'}` : ''}`);
+      } else { toast('File format not recognized'); }
+    } catch (err) { toast('Could not read file'); }
+  };
+  reader.readAsText(file);
+}
+
+function copyData() {
+  const data = JSON.stringify({ version: 2, exported: new Date().toISOString(), sites: S.sites, briefs: S.briefs });
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(data).then(() => toast('Copied to clipboard')).catch(() => toast('Copy failed'));
+  } else {
+    toast('Clipboard not available');
+  }
+}
+
+// ===========================================================================
+// PHOTO ANALYSIS MODULE
+// Real vision-model analysis of a creek/site photo. Sends the image to the
+// Anthropic API with an expert placer-prospecting prompt and returns a
+// structured "where to start" recommendation. Key is held in memory only and
+// is never written to the exported data file.
+// ===========================================================================
+
+const VISION_PROMPT = `You are a veteran Alaska placer-gold prospector with decades of field experience, looking at a photograph a prospector took of a stream, gravel bar, outcrop, or potential prospecting site. Analyze ONLY what is actually visible in the image. Do not invent features you cannot see. If the photo is unclear or shows little of prospecting value, say so plainly.
+
+Weight your attention toward the features that most strongly predict placer gold, in this priority order:
+1. BEDROCK CREVICES & EXPOSED BEDROCK — the single richest trap. Look hard for exposed bedrock in or beside the channel, cracks, fractures, and the gravel-bedrock contact where the pay streak sits. Slate/schist with crevices traps far better than smooth granite.
+2. OLD CHANNELS, BENCHES & TERRACES — flat shelves of rounded, water-worn gravel sitting ABOVE the modern active channel are often the richest and most-overlooked target. They concentrated gold over long periods before the stream cut down to its present level. Look specifically for: level benches partway up the bank, rounded (not angular) gravel high above current water, abrupt flat steps in the valley wall, and reddish/oxidized or cemented old gravel. Angular gravel is local slope wash and means little; ROUNDED gravel up high means an ancient stream ran there. Call these out explicitly whenever you see them — many prospectors walk right past benches to work the active stream and miss the better ground.
+3. NATURAL GOLD TRAPS — inside bends, behind and downstream of large boulders, bar tails (downstream end of gravel bars), and gradient breaks where a steep reach flattens. Gold drops where flow loses energy.
+4. BLACK SAND / HEAVY-MINERAL STREAKS — dark streaks in gravel or sand indicate density sorting is happening; gold sorts with the black sand. Note any visible.
+5. GRADIENT & FLOW ENERGY — read whether this reach transports (too steep/fast) or deposits (a slowing/flattening zone). Deposition zones hold gold.
+6. GRAVEL CHARACTER — sorting and rounding in the active channel; well-rounded, well-sorted gravel means a competent, mature stream that has had time to concentrate.
+
+Respond in this exact structure with these headers:
+
+VERDICT: One short line — is this worth sampling? (Promising / Worth a test / Marginal / Poor)
+
+WHERE TO START: The single highest-probability spot visible in the photo to put your first pan, described so they can find it ("the gravel wedged in the bedrock crack at center-left, just downstream of the big boulder").
+
+WHY: 2-3 sentences on the geology/hydraulics behind that pick, referencing the weighted features above.
+
+ALSO CHECK: 2-4 secondary spots or features worth sampling, as a short list. If you see any bench/terrace/old-channel gravel above the active stream, name it here (or in WHERE TO START if it's the best target) — do not let it go unmentioned.
+
+LOOK CLOSER AT: Anything in the image you'd want a better photo of, or that's ambiguous but potentially important.
+
+CAUTION: An honest caveat — what the photo can't tell you, or what would change the assessment.
+
+INDICATORS: After the prose, output exactly this block so a companion tool can read it. For each, give ONLY a rating of strong, moderate, weak, or unknown based strictly on what the photo shows. Use unknown freely — a photo genuinely cannot judge most of these.
+trap=<strong|moderate|weak|unknown>
+bedrock=<strong|moderate|weak|unknown>
+blacksand=<strong|moderate|weak|unknown>
+gradient=<strong|moderate|weak|unknown>
+bench=<yes|no|unknown>  (yes if you see likely old-channel/bench/terrace gravel above the active stream)
+
+Keep the prose concrete and field-usable. Be honest when the photo is inconclusive; never manufacture confidence.`;
+
+function renderPhoto() {
+  const hasKey = !!S.apiKey;
+  $('view-photo').innerHTML = `
+    <p class="eyebrow" style="margin:4px 0 6px;">Photo analysis</p>
+    <p class="small muted" style="margin-bottom:16px;">
+      Take or upload a photo of a creek, gravel bar, or outcrop. A vision model reads it like a prospector and tells you where to start. Needs internet + your API key.
+    </p>
+
+    <div class="card" id="key-card" style="${hasKey ? 'border-color:var(--border);' : 'border-color:var(--gold);'}">
+      <div class="row between" onclick="toggleKeyCard()" style="cursor:pointer;">
+        <div class="row" style="gap:10px;">
+          <div style="width:30px;height:30px;border-radius:7px;flex-shrink:0;
+            background:${hasKey ? 'var(--gold-faint)' : 'var(--bg-subtle)'};
+            color:${hasKey ? 'var(--gold-bright)' : 'var(--ink-subtle)'};
+            display:flex;align-items:center;justify-content:center;font-weight:800;">
+            ${hasKey ? '✓' : '🔑'}
+          </div>
+          <div>
+            <div class="small soft" style="font-weight:700;">${hasKey ? 'API key set for this session' : 'Set your API key'}</div>
+            <div class="tiny subtle">${hasKey ? 'Tap to change or clear' : 'One-time paste · stays in memory only'}</div>
+          </div>
+        </div>
+        <svg id="key-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" style="transition:transform 0.2s;${hasKey ? '' : 'transform:rotate(90deg);'}"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div id="key-body" style="${hasKey ? 'display:none;' : 'display:block;'}margin-top:14px;">
+        <div class="field" style="margin-bottom:8px;">
+          <input class="input mono" id="key-input" type="password" placeholder="sk-ant-..." value="${esc(S.apiKey)}" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="label">Model</label>
+          <select class="select" id="model-select">
+            <option value="claude-haiku-4-5-20251001" ${S.model.includes('haiku') ? 'selected' : ''}>Haiku 4.5 — cheapest, fast (fractions of a cent/photo)</option>
+            <option value="claude-sonnet-4-6" ${S.model.includes('sonnet') ? 'selected' : ''}>Sonnet 4.6 — deeper reasoning (a few cents/photo)</option>
+          </select>
+        </div>
+        <button class="btn primary" onclick="saveKey()">Save key for this session</button>
+        ${hasKey ? `<button class="btn ghost" style="margin-top:8px;" onclick="clearKey()">Clear key</button>` : ''}
+        <p class="tiny subtle" style="margin-top:12px;line-height:1.5;">
+          Your key is held in memory for this session only — it's never written into your exported data file. You'll re-paste it next session. Get a key at console.anthropic.com (Settings → Billing → add card + spending cap → API Keys → Create). Set a $5 cap and you can't overspend.
+        </p>
+      </div>
+    </div>
+
+    <div class="card tappable" onclick="onPhotoCardTap()"
+      style="text-align:center;padding:28px 16px;${hasKey ? '' : 'opacity:0.6;'}">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5" style="margin-bottom:10px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <div class="small soft" style="font-weight:700;">Take or upload a photo</div>
+      <div class="tiny subtle" style="margin-top:4px;">Tap to open camera or photo library</div>
+    </div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+
+    <div class="row between" style="margin-top:-4px;margin-bottom:4px;padding:0 4px;">
+      <span class="tiny subtle">📍 GPS auto-attaches if your phone allows it</span>
+      <span class="tiny gold" style="cursor:pointer;" onclick="addManualGps()">Add manually</span>
+    </div>
+
+    <div id="photo-results"></div>
+
+    ${S.photos.length ? `
+      <div class="divider"></div>
+      <p class="eyebrow" style="margin-bottom:10px;">This session (${S.photos.length})</p>
+      <div class="stack">
+        ${S.photos.map(p => `
+          <div class="card tappable" onclick="openPhoto('${p.id}')">
+            <div class="row" style="gap:12px;">
+              <img src="${p.thumb}" style="width:54px;height:54px;border-radius:8px;object-fit:cover;flex-shrink:0;">
+              <div style="flex:1;min-width:0;">
+                <div class="small soft" style="font-weight:700;">${esc(p.verdict || 'Analyzed')}</div>
+                <div class="tiny subtle" style="margin-top:2px;">${new Date(p.created).toLocaleTimeString()}${p.gps ? ' · 📍' : ''}${p.indicators && Object.keys(p.indicators).length ? ' · ⊞ indicators' : ''}</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <p class="tiny subtle" style="margin-top:10px;font-style:italic;">Photos analyze in memory and aren't saved to your export file (images are large). Screenshot any analysis you want to keep.</p>
+    ` : ''}
+    <div style="height:24px;"></div>
+  `;
+}
+
+function toggleKeyCard() {
+  const body = $('key-body');
+  const chev = $('key-chev');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function saveKey() {
+  const k = $('key-input').value.trim();
+  const m = $('model-select').value;
+  if (!k.startsWith('sk-ant-')) { toast('Key should start with sk-ant-'); return; }
+  S.apiKey = k;
+  S.model = m;
+  renderPhoto();
+  toast('Key set for this session');
+}
+
+function clearKey() {
+  S.apiKey = '';
+  renderPhoto();
+  toast('Key cleared');
+}
+
+function triggerPhoto() {
+  $('photo-input').click();
+}
+
+function onPhotoCardTap() {
+  if (!S.apiKey) { toast('Set your API key first'); return; }
+  // Try to grab location before opening the camera; non-blocking.
+  window._pendingGps = null;
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        window._pendingGps = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          acc: pos.coords.accuracy,
+        };
+      },
+      err => { window._pendingGps = null; },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  }
+  triggerPhoto();
+}
+
+function addManualGps() {
+  openModal(`
+    <h2>Add location manually</h2>
+    <p class="small muted" style="margin:10px 0 16px;">
+      If automatic GPS didn't work (common when opening the file directly rather than from a hosted page), paste coordinates here. You can copy them from Apple Maps: drop a pin, tap it, and copy the lat/long.
+    </p>
+    <div class="field">
+      <label class="label">Latitude</label>
+      <input class="input mono" id="gps-lat" inputmode="decimal" placeholder="61.59880">
+    </div>
+    <div class="field">
+      <label class="label">Longitude</label>
+      <input class="input mono" id="gps-lon" inputmode="decimal" placeholder="-149.11540">
+    </div>
+    <button class="btn primary" onclick="saveManualGps()">Set location for next photo</button>
+  `);
+}
+
+function saveManualGps() {
+  const lat = parseFloat($('gps-lat').value);
+  const lon = parseFloat($('gps-lon').value);
+  if (isNaN(lat) || isNaN(lon)) { toast('Enter valid coordinates'); return; }
+  window._pendingGps = { lat, lon, acc: null };
+  closeModal();
+  toast('Location set — it will attach to your next photo');
+}
+
+function handlePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    analyzePhoto(dataUrl, file.type);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = ''; // allow re-selecting same file
+}
+
+async function analyzePhoto(dataUrl, mediaType) {
+  const results = $('photo-results');
+  results.innerHTML = `
+    <div class="card" style="text-align:center;padding:28px;">
+      <div class="small soft" style="font-weight:700;">Analyzing photo…</div>
+      <div class="tiny subtle" style="margin-top:6px;">Reading the image like a prospector. ~5-15 seconds.</div>
+    </div>
+  `;
+
+  // Strip the data URL prefix to get raw base64
+  const base64 = dataUrl.split(',')[1];
+  // Normalize media type
+  let mt = mediaType || 'image/jpeg';
+  if (mt === 'image/jpg') mt = 'image/jpeg';
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: S.model,
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mt, data: base64 } },
+            { type: 'text', text: VISION_PROMPT },
+          ],
+        }],
+      }),
+    });
+
+    if (!resp.ok) {
+      let msg = `Error ${resp.status}`;
+      if (resp.status === 401) msg = 'Key rejected (401). Check the key is correct and billing is set up.';
+      else if (resp.status === 400) msg = 'Bad request (400). The image may be too large — try a smaller photo.';
+      else if (resp.status === 429) msg = 'Rate limited (429). Wait a moment and try again.';
+      else if (resp.status === 529) msg = 'API overloaded (529). Try again shortly.';
+      else {
+        try { const j = await resp.json(); if (j.error && j.error.message) msg += ': ' + j.error.message; } catch(e){}
+      }
+      results.innerHTML = `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Analysis failed</p><p class="small soft">${esc(msg)}</p></div>`;
+      return;
+    }
+
+    const data = await resp.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) {
+      results.innerHTML = `<div class="card" style="border-color:var(--amber);"><p class="small soft">The model returned no text. Try another photo.</p></div>`;
+      return;
+    }
+
+    // Extract verdict line for the list label
+    const verdictMatch = text.match(/VERDICT:\s*(.+)/i);
+    const verdict = verdictMatch ? verdictMatch[1].trim() : 'Analyzed';
+
+    // Parse the INDICATORS block (photo-derived suggestions for the Evaluate tab)
+    const indicators = {};
+    const ratingMap = { strong: 1.0, moderate: 0.65, weak: 0.3, unknown: null };
+    ['trap','bedrock','blacksand','gradient'].forEach(key => {
+      const m = text.match(new RegExp(key + '\\s*=\\s*(strong|moderate|weak|unknown)', 'i'));
+      if (m) {
+        const rating = m[1].toLowerCase();
+        if (ratingMap[rating] != null) indicators[key] = { rating, value: ratingMap[rating] };
+      }
+    });
+    // Parse bench flag (old-channel detection — a high-value flag, not an Evaluate indicator)
+    const benchMatch = text.match(/bench\s*=\s*(yes|no|unknown)/i);
+    const bench = benchMatch ? benchMatch[1].toLowerCase() : 'unknown';
+
+    // Hide the INDICATORS block from the displayed prose
+    const proseText = text.replace(/INDICATORS:[\s\S]*$/i, '').trim();
+
+    const photo = {
+      id: uid(),
+      thumb: dataUrl,
+      analysis: proseText,
+      indicators,
+      bench,
+      gps: window._pendingGps || null,
+      verdict,
+      created: new Date().toISOString(),
+    };
+    window._pendingGps = null;
+    S.photos.unshift(photo);
+
+    results.innerHTML = '';
+    renderPhoto();
+    // Open the fresh result
+    openPhoto(photo.id);
+
+  } catch (err) {
+    results.innerHTML = `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Connection failed</p><p class="small soft">Couldn't reach the API. Check your internet connection. (${esc(String(err.message || err))})</p></div>`;
+  }
+}
+
+function formatAnalysis(text) {
+  // Bold the section headers for readability
+  const headers = ['VERDICT', 'WHERE TO START', 'WHY', 'ALSO CHECK', 'LOOK CLOSER AT', 'CAUTION'];
+  let html = esc(text);
+  headers.forEach(h => {
+    const re = new RegExp('(' + h + ':)', 'g');
+    html = html.replace(re, '<strong class="gold">$1</strong>');
+  });
+  return html.replace(/\n/g, '<br>');
+}
+
+function openPhoto(id) {
+  const p = S.photos.find(x => x.id === id);
+  if (!p) return;
+  const indKeys = p.indicators ? Object.keys(p.indicators) : [];
+  const indLabels = { trap: 'Gold traps', bedrock: 'Bedrock access', blacksand: 'Black sand', gradient: 'Gradient' };
+  openModal(`
+    <img src="${p.thumb}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:280px;object-fit:cover;">
+    ${p.gps ? `<div class="row between" style="margin-bottom:12px;">
+      <span class="tiny subtle mono">📍 ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}${p.gps.acc ? ` · ±${Math.round(p.gps.acc)}m` : ''}</span>
+      <a class="tiny gold" href="https://maps.apple.com/?ll=${p.gps.lat},${p.gps.lon}&q=Prospect" target="_blank" rel="noopener" style="text-decoration:none;">Open in Maps ↗</a>
+    </div>` : ''}
+    ${p.bench === 'yes' ? `<div class="card" style="margin:0 0 12px;background:var(--gold-faint);border-color:var(--gold);">
+      <div class="small gold" style="font-weight:700;">⛰ Possible old-channel bench detected</div>
+      <div class="tiny soft" style="margin-top:4px;">The analysis flagged likely bench/terrace gravel above the active stream — often the richest and most-overlooked target. Read the WHERE TO START / ALSO CHECK notes for where.</div>
+    </div>` : ''}
+    <div class="small soft" style="line-height:1.6;">${formatAnalysis(p.analysis)}</div>
+    ${indKeys.length ? `
+      <div class="divider"></div>
+      <p class="eyebrow" style="margin-bottom:8px;">Photo-derived indicators</p>
+      <p class="tiny subtle" style="margin-bottom:10px;">What the photo could judge. Send these to the Evaluate tab as a starting point — you confirm and add the rest.</p>
+      ${indKeys.map(k => {
+        const ind = p.indicators[k];
+        const tone = ind.value >= 0.7 ? 'green' : ind.value >= 0.5 ? 'amber' : 'rust';
+        return `<div class="row between" style="padding:6px 0;">
+          <span class="small soft">${indLabels[k] || k}</span>
+          <span class="badge ${tone}">${ind.rating}</span>
+        </div>`;
+      }).join('')}
+      <button class="btn primary" style="margin-top:12px;" onclick="sendPhotoToEvaluate('${p.id}')">Send to Evaluate →</button>
+    ` : ''}
+    <div class="btn-row" style="margin-top:18px;">
+      <button class="btn secondary" onclick="copyPhoto('${p.id}')">Copy analysis</button>
+      <button class="btn ghost" onclick="deletePhoto('${p.id}')" style="color:var(--rust);">Delete</button>
+    </div>
+  `);
+}
+
+function sendPhotoToEvaluate(id) {
+  const p = S.photos.find(x => x.id === id);
+  if (!p || !p.indicators) return;
+  if (!S.evalDraft) S.evalDraft = blankEval();
+  const labelMap = {
+    trap: { strong: 'Strong traps: bedrock crevices, inside bends', moderate: 'Some traps: bars, boulders', weak: 'Few obvious traps' },
+    bedrock: { strong: 'Exposed bedrock in/near channel', moderate: 'Shallow (<1m to bedrock)', weak: 'Moderate depth (1-3m)' },
+    blacksand: { strong: 'Heavy black sand, garnet, etc.', moderate: 'Moderate black sand', weak: 'Trace' },
+    gradient: { strong: 'Gradient break / deposition zone', moderate: 'Moderate, mixed', weak: 'Uniformly steep (transport)' },
+  };
+  Object.keys(p.indicators).forEach(k => {
+    const ind = p.indicators[k];
+    const tone = ind.value >= 0.7 ? 'green' : ind.value >= 0.5 ? 'amber' : 'rust';
+    const label = (labelMap[k] && labelMap[k][ind.rating]) || ind.rating;
+    S.evalDraft.answers[k] = { label: label + ' (from photo)', value: ind.value, tone };
+  });
+  // Seed the site name and notes if empty
+  if (!S.evalDraft.notes) {
+    S.evalDraft.notes = 'Indicators seeded from photo analysis. Verify in person.' + (p.gps ? ` Location: ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : '');
+  }
+  if (p.gps && !S.evalDraft.gps) S.evalDraft.gps = p.gps;
+  closeModal();
+  switchView('evaluate');
+  toast('Photo indicators sent to Evaluate');
+}
+
+function copyPhoto(id) {
+  const p = S.photos.find(x => x.id === id);
+  if (!p) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(p.analysis).then(() => toast('Analysis copied')).catch(() => toast('Copy failed'));
+  } else { toast('Clipboard not available'); }
+}
+
+function deletePhoto(id) {
+  S.photos = S.photos.filter(x => x.id !== id);
+  closeModal();
+  renderPhoto();
+  toast('Photo removed');
+}
+
+// ===========================================================================
+// RESEARCH MODULE
+// A guided, source-by-source office-research session that produces a written
+// brief per target. Each "station" is one real research source, with: what it
+// is, exactly what to do, what to look for, how to interpret it, and a capture
+// field. Alaska/Mat-Su tuned. Sources verified current as of build.
+// ===========================================================================
+
+// Districts & known placer creeks (Mat-Su / Susitna region), from USGS/DGGS record.
+const DISTRICTS = [
+  {
+    name: 'Willow Creek (Hatcher Pass)',
+    note: 'Lode-gold district: high-sulfide gold-quartz-carbonate veins cutting a 79–72 Ma pluton and pelitic schist. The Lucky Shot Mine ran 2–4 oz/ton. This lode gold sheds into surrounding drainages.',
+    creeks: ['Willow Creek', 'Grubstake Gulch', 'Fishhook Creek', 'Little Susitna headwaters'],
+  },
+  {
+    name: 'Cache Creek / Petersville',
+    note: 'Major placer district on the southwest flank of the Alaska Range. Dozens of documented gold-bearing creeks; long placer-mining history.',
+    creeks: ['Cache Creek', 'Peters Creek', 'Bird Creek', 'Bonanza Creek', 'Dollar Creek', 'Gold Creek', 'Nugget Creek', 'Thunder Creek', 'Short Creek', 'Poorman Creek'],
+  },
+  {
+    name: 'Valdez Creek (upper Susitna)',
+    note: 'Historically one of the larger interior placer producers, on the upper Susitna drainage. Coarse gold known.',
+    creeks: ['Valdez Creek', 'Lucky Gulch', 'Timberline Creek'],
+  },
+  {
+    name: 'Chickaloon / Talkeetna Mtns',
+    note: 'Heavy-mineral concentrate from placer-bearing streams (Boulder Creek, Chickaloon River, Alfred Creek, Metal Creek, Grasshopper Valley) is enriched in gold and silver.',
+    creeks: ['Boulder Creek', 'Chickaloon River', 'Alfred Creek', 'Metal Creek'],
+  },
+];
+
+// The research stations: the guided walk. Order matters — claim status gates
+// everything, geology and history build the case, geochem/maps refine it.
+const STATIONS = [
+  {
+    id: 'target',
+    icon: 'pin',
+    title: 'Name your target',
+    source: 'You',
+    link: null,
+    what: 'Pin down what you are researching before opening any database — a specific creek, drainage reach, or area. Vague targets produce vague briefs.',
+    steps: [
+      'Name the creek or drainage reach (e.g. "Cache Creek, lower 3 miles").',
+      'Note the general area / district if you know it.',
+      'If you are starting from a district rather than a creek, pick the most-documented creek in it first.',
+    ],
+    interpret: 'A good target is specific enough to look up in a claims database and a geologic map. "Somewhere near Hatcher Pass" is not yet a target; "Willow Creek below the Lucky Shot" is.',
+    capture: 'Target name & description',
+  },
+  {
+    id: 'claims',
+    icon: 'lock',
+    title: 'Claim status — is the ground open?',
+    source: 'BLM MLRS + Alaska state GIS',
+    link: 'https://mlrs.blm.gov',
+    link2: 'https://gis.data.alaska.gov',
+    what: 'This gates everything. The BLM Mineral & Land Records System (MLRS) replaced the old LR2000/ACRES systems in 2024 and holds federal mining-claim records. Alaska\u2019s state GIS portal also publishes a federal mining-claims layer you can browse on a map. Working a valid claim is trespass — check first, always.',
+    steps: [
+      'Open MLRS (mlrs.blm.gov) → use the research map to find your area, or search by legal land description.',
+      'Alternatively open the Alaska state GIS portal and load the "BLM AK Federal Mining Claims" layer for a quick map view.',
+      'Look for ACTIVE claims overlapping your target. Note serial numbers of any you find.',
+      'Separately confirm land ownership — state, federal, private, or Native corporation. Each has different rules.',
+    ],
+    interpret: 'OPEN ground with no active claims = proceed. ACTIVE claims = you generally cannot work it without the claimant\u2019s permission; pick elsewhere. State land often allows recreational mining under specific rules; Native corp and private land need permission. "Closed to mineral entry" areas are off-limits regardless.',
+    capture: 'Claim status, any serial numbers, land owner',
+  },
+  {
+    id: 'ardf',
+    icon: 'database',
+    title: 'Known occurrences & production',
+    source: 'USGS Alaska Resource Data File (ARDF)',
+    link: 'https://mrdata.usgs.gov/ardf/',
+    what: 'ARDF is the master catalog of Alaska mines, prospects, and mineral occurrences — over a century of geologists\u2019 work, organized by USGS quadrangle. It tells you whether gold is documented at or near your target, and points you to the source reports.',
+    steps: [
+      'Open the ARDF search (mrdata.usgs.gov/ardf/find-ardf.php).',
+      'Search by site name or browse your quadrangle; filter commodity = Gold.',
+      'Read records near your target: commodity, deposit type, production notes, and the references field.',
+      'Note the ARDF number(s) and any cited USGS bulletins — those are your next reads.',
+    ],
+    interpret: 'A documented gold occurrence or past producer at/near your target is the strongest possible desk signal — gold is where it was. Placer records confirm concentration; lode records upstream confirm a source. No record isn\u2019t a no — much ground is under-documented — but a record is a strong yes.',
+    capture: 'ARDF numbers, deposit type, production notes',
+  },
+  {
+    id: 'prospectivity',
+    icon: 'target',
+    title: 'Pro prospectivity scoring',
+    source: 'USGS Lode-Gold GIS prospectivity (HUC scores)',
+    link: 'https://www.usgs.gov/data/data-and-results-gis-based-identification-areas-have-resource-potential-lode-gold-deposits',
+    what: 'A USGS data-driven analysis that scored Alaska subwatersheds (12-digit HUCs) for lode-gold potential — high / medium / low — by combining geology, geochemistry, aeromagnetics, and ARDF occurrences. It is essentially a professional first-pass prospectivity map of the whole state.',
+    steps: [
+      'Open the USGS data release page; review the methodology and download the results (shapefile/CSV) if you can.',
+      'Find the HUC subwatershed containing your target.',
+      'Read its potential rating (high/med/low) and certainty rating.',
+      'Note which deposit-type model lit up (orogenic, intrusion-related, epithermal, porphyry).',
+    ],
+    interpret: 'A high-potential, high-certainty HUC means professional geologists\u2019 models agree your watershed is prospective for lode gold — the source feeding any placer. High/medium is encouraging; low isn\u2019t fatal for placer (gold can travel into a low-rated HUC) but lowers odds of a local source.',
+    capture: 'HUC potential & certainty rating, deposit model',
+  },
+  {
+    id: 'geology',
+    icon: 'layers',
+    title: 'Bedrock & structural setting',
+    source: 'Alaska DGGS geologic maps + USGS',
+    link: 'https://dggs.alaska.gov/maps-data/index.html',
+    what: 'The state geological survey (DGGS) publishes geologic maps and district reports. You want the host rocks and structures: gold in this region rides with quartz-carbonate veins in plutons and pelitic schist, along major faults like the Castle Mountain fault.',
+    steps: [
+      'Open the DGGS Geologic Map Index (interactive) and locate your target.',
+      'Identify the bedrock units: look for granitic plutons, schist, and greenstone/greenschist — and contacts between them.',
+      'Note major faults or shear zones crossing the area (structural plumbing for mineralizing fluids).',
+      'Check the DGGS Alaska Minerals Explorer web app for an integrated view.',
+    ],
+    interpret: 'Favorable: a pluton-schist contact, quartz veining, and a through-going fault/shear — the classic recipe for orogenic gold. Unfavorable: young unmineralized cover, pure sedimentary basins with no veins or structure. Structure concentrates mineralization; a fault near a pluton contact is a strong tell.',
+    capture: 'Host rocks, faults/structures, favorable contacts',
+  },
+  {
+    id: 'geochem',
+    icon: 'flask',
+    title: 'Stream geochemistry',
+    source: 'Alaska Geochemical Database (AGDB) / NURE',
+    link: 'https://mrdata.usgs.gov/geochem/',
+    what: 'Decades of government stream-sediment and heavy-mineral-concentrate sampling are public. Anomalous gold — or its pathfinder elements arsenic, antimony, silver, tungsten, bismuth — in a stream sample points straight at an upstream source.',
+    steps: [
+      'Open the Alaska Geochemical Database (via DGGS geochem map or USGS mrdata geochem).',
+      'Find sample sites in or upstream of your target drainage.',
+      'Look at gold values and pathfinders: As, Sb, Ag, W, Bi, Pb.',
+      'Note any anomalies and where along the drainage they sit.',
+    ],
+    interpret: 'Anomalous gold in stream sediment = gold is moving through that drainage now. Anomalous pathfinders (especially arsenic) even without visible gold often flag a concealed gold source upstream. Walk toward rising values to bracket the source.',
+    capture: 'Gold & pathfinder anomalies, locations',
+  },
+  {
+    id: 'topo',
+    icon: 'map',
+    title: 'Topography & access',
+    source: 'USGS topo / offline maps (CalTopo, Avenza, Gaia)',
+    link: 'https://www.usgs.gov/programs/national-geospatial-program/topographic-maps',
+    what: 'Read the landscape for where gold drops and how you\u2019ll get there. Gradient breaks, meanders, and bench gravels are your concentration targets; roads, trails, and terrain are your access reality.',
+    steps: [
+      'Load the target on a topo app (CalTopo in browser; Avenza/Gaia for offline phone maps).',
+      'Find gradient breaks — where tight contour lines spread out (steep → flat).',
+      'Mark meander bends, tributary junctions, and flat benches/terraces above the active channel (old channels).',
+      'Plan access: roads, trailheads, walking distance, water crossings, and download offline map tiles for the area.',
+    ],
+    interpret: 'Best targets: a gradient break with inside bends and bench gravels, reachable without a helicopter. Note that a great prospect you can\u2019t legally or physically reach is not yet a real target — access is part of the score.',
+    capture: 'Gradient breaks, bends, benches, access plan',
+  },
+];
+
+function blankBrief() {
+  return {
+    id: uid(),
+    target: '',
+    district: '',
+    findings: {},   // stationId -> text
+    created: new Date().toISOString(),
+  };
+}
+
+function researchProgress(b) {
+  const done = STATIONS.filter(s => (b.findings[s.id] || '').trim()).length;
+  return { done, total: STATIONS.length };
+}
+
+function renderResearch() {
+  if (!S.briefDraft) S.briefDraft = blankBrief();
+  const b = S.briefDraft;
+  const prog = researchProgress(b);
+  const pct = prog.done / prog.total;
+
+  $('view-research').innerHTML = `
+    <p class="eyebrow" style="margin:4px 0 6px;">Guided research session</p>
+    <p class="small muted" style="margin-bottom:16px;">
+      Work these stations in order. Each opens a real government source with exact steps and how to read what you find. Capture findings as you go; produce a written brief at the end.
+    </p>
+
+    <div class="card">
+      <div class="row between">
+        <div>
+          <div class="small soft" style="font-weight:700;">${b.target ? esc(b.target) : 'Untitled target'}</div>
+          <div class="tiny subtle" style="margin-top:2px;">${prog.done}/${prog.total} stations complete</div>
+        </div>
+        <div class="mono gold" style="font-size:1.4rem;font-weight:800;">${Math.round(pct*100)}%</div>
+      </div>
+      <div class="score-bar" style="margin-top:10px;height:6px;">
+        <div class="score-bar-fill" style="width:${pct*100}%;background:var(--gold);"></div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--bg-elev);">
+      <div class="row between" onclick="toggleDistricts()" style="cursor:pointer;">
+        <div class="small soft" style="font-weight:700;">Mat-Su / Susitna district reference</div>
+        <svg id="dist-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" style="transition:transform 0.2s;"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div id="dist-body" style="display:none;margin-top:12px;">
+        ${DISTRICTS.map(d => `
+          <div style="padding:10px 0;border-top:1px solid var(--border);">
+            <div class="small gold" style="font-weight:700;">${esc(d.name)}</div>
+            <div class="tiny muted" style="margin:4px 0;">${esc(d.note)}</div>
+            <div class="tiny subtle">Creeks: ${d.creeks.map(esc).join(' · ')}</div>
+          </div>
+        `).join('')}
+        <p class="tiny subtle" style="margin-top:10px;font-style:italic;">Tap a creek name idea into your target at Station 1. These are documented gold-bearing drainages — good starting points.</p>
+      </div>
+    </div>
+
+    <div class="stack" style="margin-top:4px;">
+      ${STATIONS.map((st, i) => {
+        const done = (b.findings[st.id] || '').trim();
+        return `
+          <div class="card tappable" onclick="openStation('${st.id}')">
+            <div class="row" style="gap:12px;">
+              <div style="
+                width:34px;height:34px;border-radius:8px;flex-shrink:0;
+                background:${done ? 'var(--gold-faint)' : 'var(--bg-subtle)'};
+                color:${done ? 'var(--gold-bright)' : 'var(--ink-subtle)'};
+                display:flex;align-items:center;justify-content:center;font-weight:800;">
+                ${done ? '✓' : (i+1)}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <h3>${st.title}</h3>
+                <div class="tiny subtle" style="margin-top:2px;">${st.source}</div>
+                ${done ? `<div class="tiny muted" style="margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(done)}</div>` : ''}
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+
+    <div class="field" style="margin-top:8px;">
+      <input class="input" placeholder="Name this target (e.g. Cache Creek lower)" value="${esc(b.target)}"
+        oninput="S.briefDraft.target = this.value">
+    </div>
+
+    <div class="btn-row" style="margin-bottom:8px;">
+      <button class="btn secondary" onclick="resetBrief()">Clear</button>
+      <button class="btn primary" onclick="finishBrief()">Generate brief</button>
+    </div>
+
+    ${S.briefs.length ? `
+      <div class="divider"></div>
+      <p class="eyebrow" style="margin-bottom:10px;">Saved briefs (${S.briefs.length})</p>
+      <div class="stack">
+        ${S.briefs.map(br => {
+          const p = researchProgress(br);
+          return `
+            <div class="card tappable" onclick="openBrief('${br.id}')">
+              <div class="row between">
+                <div style="flex:1;min-width:0;">
+                  <div class="small soft" style="font-weight:700;">${esc(br.target || 'Untitled')}</div>
+                  <div class="tiny subtle" style="margin-top:2px;">${p.done}/${p.total} stations · ${new Date(br.created).toLocaleDateString()}</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : ''}
+    <div style="height:24px;"></div>
+  `;
+}
+
+function toggleDistricts() {
+  const body = $('dist-body');
+  const chev = $('dist-chev');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function openStation(stId) {
+  const st = STATIONS.find(s => s.id === stId);
+  const b = S.briefDraft;
+  const current = b.findings[stId] || '';
+  const linkBtns = [];
+  if (st.link) linkBtns.push(`<a class="btn secondary sm" href="${st.link}" target="_blank" rel="noopener" style="text-decoration:none;">Open source ↗</a>`);
+  if (st.link2) linkBtns.push(`<a class="btn secondary sm" href="${st.link2}" target="_blank" rel="noopener" style="text-decoration:none;">State GIS ↗</a>`);
+
+  openModal(`
+    <p class="eyebrow">${st.source}</p>
+    <h2 style="margin:6px 0 12px;">${st.title}</h2>
+
+    <p class="small soft" style="margin-bottom:14px;">${st.what}</p>
+
+    ${linkBtns.length ? `<div class="row" style="gap:8px;margin-bottom:16px;">${linkBtns.join('')}</div>` : ''}
+
+    <p class="eyebrow" style="margin-bottom:8px;">Do this</p>
+    <ol style="margin:0 0 16px 18px;">
+      ${st.steps.map(s => `<li class="small soft" style="margin-bottom:6px;">${esc(s)}</li>`).join('')}
+    </ol>
+
+    <div class="card" style="margin:0 0 16px;background:var(--gold-faint);border-color:var(--border-strong);">
+      <p class="eyebrow" style="margin-bottom:6px;">How to read it</p>
+      <p class="small soft">${st.interpret}</p>
+    </div>
+
+    <div class="field">
+      <label class="label">${st.capture}</label>
+      <textarea class="textarea" id="station-capture" placeholder="What did you find?">${esc(current)}</textarea>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveStation('${stId}')">Save finding</button>
+    </div>
+  `);
+}
+
+function saveStation(stId) {
+  const val = $('station-capture').value;
+  S.briefDraft.findings[stId] = val;
+  closeModal();
+  renderResearch();
+  toast('Finding saved');
+}
+
+function resetBrief() {
+  S.briefDraft = blankBrief();
+  renderResearch();
+  toast('Research session cleared');
+}
+
+function finishBrief() {
+  const b = S.briefDraft;
+  if (!b.target.trim()) { toast('Name the target first'); return; }
+  const prog = researchProgress(b);
+  if (prog.done === 0) { toast('Complete at least one station'); return; }
+  S.briefs.unshift(JSON.parse(JSON.stringify(b)));
+  const saved = b.target;
+  S.briefDraft = blankBrief();
+  renderResearch();
+  toast(`Brief saved: ${saved}`);
+}
+
+function openBrief(id) {
+  const b = S.briefs.find(x => x.id === id);
+  if (!b) return;
+  const prog = researchProgress(b);
+  openModal(`
+    <p class="eyebrow">Research brief</p>
+    <h2 style="margin:6px 0 4px;">${esc(b.target || 'Untitled')}</h2>
+    <p class="tiny subtle" style="margin-bottom:16px;">${prog.done}/${prog.total} stations · ${new Date(b.created).toLocaleString()}</p>
+
+    ${STATIONS.map(st => {
+      const f = (b.findings[st.id] || '').trim();
+      if (!f) return '';
+      return `
+        <div style="padding:12px 0;border-top:1px solid var(--border);">
+          <div class="tiny subtle" style="margin-bottom:2px;">${st.source}</div>
+          <div class="small gold" style="font-weight:700;margin-bottom:4px;">${st.title}</div>
+          <div class="small soft" style="white-space:pre-wrap;">${esc(f)}</div>
+        </div>
+      `;
+    }).join('')}
+
+    <div class="btn-row" style="margin-top:18px;">
+      <button class="btn secondary" onclick="reopenBrief('${b.id}')">Edit</button>
+      <button class="btn secondary" onclick="copyBrief('${b.id}')">Copy text</button>
+      <button class="btn ghost" onclick="deleteBrief('${b.id}')" style="color:var(--rust);">Delete</button>
+    </div>
+  `);
+}
+
+function reopenBrief(id) {
+  const b = S.briefs.find(x => x.id === id);
+  if (!b) return;
+  S.briefDraft = JSON.parse(JSON.stringify(b));
+  S.briefs = S.briefs.filter(x => x.id !== id);
+  closeModal();
+  renderResearch();
+  toast('Loaded into session — re-generate when done');
+}
+
+function copyBrief(id) {
+  const b = S.briefs.find(x => x.id === id);
+  if (!b) return;
+  let txt = `PROSPECT RESEARCH BRIEF\nTarget: ${b.target}\nDate: ${new Date(b.created).toLocaleDateString()}\n\n`;
+  STATIONS.forEach(st => {
+    const f = (b.findings[st.id] || '').trim();
+    if (f) txt += `## ${st.title} (${st.source})\n${f}\n\n`;
+  });
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(() => toast('Brief copied')).catch(() => toast('Copy failed'));
+  } else { toast('Clipboard not available'); }
+}
+
+function deleteBrief(id) {
+  S.briefs = S.briefs.filter(x => x.id !== id);
+  closeModal();
+  renderResearch();
+  toast('Brief deleted');
+}
+
+// ===========================================================================
+// MODAL + NAV PLUMBING
+// ===========================================================================
+function openModal(html) {
+  $('modal-inner').innerHTML = html;
+  $('modal-bg').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  $('modal-bg').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === name));
+  $('view-' + name).classList.add('active');
+  if (name === 'evaluate') renderEvaluate();
+  if (name === 'sites') renderSites();
+  if (name === 'knowledge') renderKnowledge();
+  if (name === 'photo') renderPhoto();
+  if (name === 'research') renderResearch();
+  if (name === 'checklist') renderChecklist();
+  window.scrollTo(0, 0);
+}
+
+// Boot
+renderEvaluate();
+</script>
+</body>
+</html>
