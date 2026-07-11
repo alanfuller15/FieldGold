@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+<title>FieldGold — Stage 3</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
+  #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
+  #panel{position:absolute;z-index:1000;top:10px;left:10px;background:rgba(30,26,19,.95);
+    border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;max-width:300px;}
+  #panel h1{font-size:.95rem;margin:0 0 8px;color:#E8C04A;}
+  .layer{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#D8D0BE;margin:6px 0;cursor:pointer;}
+  .layer input{width:15px;height:15px;margin:0;flex-shrink:0;}
+  .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .status{font-family:monospace;font-size:.67rem;color:#6E6857;margin-top:9px;max-height:64px;overflow:auto;}
+  .ok{color:#6FA760;} .err{color:#C25A3A;}
+  .info-pop{font-size:.8rem;line-height:1.45;max-width:240px;} .info-pop b{color:#14110C;}
+  .info-pop .h{font-weight:700;color:#8a5a1a;display:block;margin-top:4px;}
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>FieldGold · Mat-Su</h1>
+  <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
+  <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As)</label>
+  <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>Mining claims — DON'T dig here</label>
+  <div style="border-top:1px solid #4A3F2D;margin:9px 0 7px;"></div>
+  <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#6FA760;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Find PROVEN + OPEN ground</button>
+  <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Old-timer drainages with documented gold (ARDF) that show no active claim right now. <b style="color:#D29A3A;">Research only — always verify with BLM before acting.</b></div>
+  <div class="status" id="status"></div>
+</div>
+<div id="map"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__lf=1"></script>
+<script>
+const S=document.getElementById('status');
+function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
+window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
+
+window.addEventListener('load',()=>{
+  if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
+  const map=L.map('map',{center:[61.78,-149.15],zoom:11});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
+  log('map ready ✓','ok');
+
+  function wms(base,layers,attr){
+    const lyr=L.tileLayer.wms(base+'?',{layers,format:'image/png',transparent:true,version:'1.3.0',attribution:attr});
+    let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' ✓','ok');}});
+    return lyr;
+  }
+  const ardf=wms('https://mrdata.usgs.gov/services/ardf','ardf','USGS ARDF').addTo(map);
+  const geo =wms('https://mrdata.usgs.gov/services/ngdbsed','ngdbsed','USGS NGDB').addTo(map);
+
+  // CLAIMS — now as proper TILES via a custom Leaflet tile layer that hits the ArcGIS
+  // export endpoint per-tile (256x256). This pans/zooms smoothly like WMS, loads incrementally,
+  // and no more single-image stretching/green-grid drag artifact.
+  const ClaimTiles = L.TileLayer.extend({
+    getTileUrl: function(coords){
+      const nw = this._map.unproject([coords.x*256, coords.y*256], coords.z);
+      const se = this._map.unproject([(coords.x+1)*256, (coords.y+1)*256], coords.z);
+      // ArcGIS export in Web Mercator (3857) matches Leaflet's tile grid exactly -> crisp, aligned tiles
+      const b3857 = [L.CRS.EPSG3857.project(nw), L.CRS.EPSG3857.project(se)];
+      const bbox = `${b3857[0].x},${b3857[1].y},${b3857[1].x},${b3857[0].y}`;
+      return 'https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/export?'
+        + new URLSearchParams({ bbox, bboxSR:'3857', imageSR:'3857', size:'256,256',
+            format:'png32', transparent:'true', f:'image', layers:'show:0' });
+    }
+  });
+  const claims = new ClaimTiles('', { opacity:0.6, attribution:'BLM AK Claims' });
+  let claimDone=false; claims.on('load',()=>{if(!claimDone){claimDone=true;log('claims ✓','ok');}});
+  claims.addTo(map);
+  log('requesting 3 layers…');
+
+  document.getElementById('t-ardf').addEventListener('change',e=>e.target.checked?ardf.addTo(map):map.removeLayer(ardf));
+  document.getElementById('t-geo').addEventListener('change',e=>e.target.checked?geo.addTo(map):map.removeLayer(geo));
+  document.getElementById('t-claim').addEventListener('change',e=>e.target.checked?claims.addTo(map):map.removeLayer(claims));
+
+  // helper: fetch with timeout so a slow server can't hang the popup
+  function fetchT(url,opts={},ms=6000){
+    return Promise.race([fetch(url,opts),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+  }
+
+  map.on('click',async e=>{
+    const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
+    const pop=L.popup({maxWidth:260}).setLatLng(e.latlng).setContent('<div class="info-pop">checking this spot…</div>').openOn(map);
+    let claimHtml='', ardfHtml='', claimDone=false, ardfDone=false;
+    function render(){
+      let h='';
+      if(claimHtml) h+='<div class="info-pop"><span class="h">⚠ CLAIMED GROUND — don\'t dig</span>'+claimHtml+'</div>';
+      if(ardfHtml)  h+='<div class="info-pop"><span class="h">Gold occurrence (ARDF)</span>'+ardfHtml+'</div>';
+      if(claimDone&&ardfDone&&!h) h='<div class="info-pop">No claim or recorded occurrence at this point.</div>';
+      else if(!h) h='<div class="info-pop">checking… (claims server can be slow)</div>';
+      pop.setContent(h);
+    }
+    // ARDF (fast) — show as soon as it returns
+    (async()=>{
+      try{
+        const url='https://mrdata.usgs.gov/services/ardf?'+new URLSearchParams({service:'WMS',version:'1.3.0',
+          request:'GetFeatureInfo',layers:'ardf',query_layers:'ardf',info_format:'text/html',crs:'EPSG:4326',
+          width:sz.x,height:sz.y,bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`,
+          i:Math.round(pt.x),j:Math.round(pt.y)});
+        const r=await fetchT(url,{},6000);const tx=(await r.text()).replace(/<\?xml[^>]*\?>/,'').trim();
+        if(tx&&tx.length>25&&!/no features|unable to access/i.test(tx)) ardfHtml=tx;
+      }catch(_){}
+      ardfDone=true; render();
+    })();
+    // Claims (slow) — fills in when ready, times out gracefully
+    (async()=>{
+      try{
+        const url='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/identify?'
+          +new URLSearchParams({geometry:`${e.latlng.lng},${e.latlng.lat}`,geometryType:'esriGeometryPoint',
+          sr:'4326',layers:'all:0',tolerance:'5',mapExtent:`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+          imageDisplay:`${sz.x},${sz.y},96`,returnGeometry:'false',f:'json'});
+        const r=await fetchT(url,{},6000);const j=await r.json();
+        if(j.results&&j.results.length){const a=j.results[0].attributes;
+          claimHtml='Casefile: '+(a['Case Serial Number']||a.CSE_SERIAL_NBR||a.SERIAL||Object.values(a)[0]||'?');}
+      }catch(_){}
+      claimDone=true; render();
+    })();
+  });
+  // ===== PROVEN + OPEN GROUND (Chris Ralph's old-timer-drainage-claim workflow, automated) =====
+  // For gold occurrences (ARDF) currently in view, check each against BLM active claims.
+  // Flag: has documented gold BUT not inside an active claim = candidate open ground.
+  // HONEST: this is a research aid. Data has lag/gaps. ALWAYS verify with BLM before acting.
+  const openMarkers = L.layerGroup().addTo(map);
+
+  async function ardfPointsInView(){
+    // Query ARDF features in the current bbox via WFS (GeoJSON) to get occurrence points+names.
+    const b=map.getBounds();
+    const url='https://mrdata.usgs.gov/wfs/ardf?'+new URLSearchParams({
+      service:'WFS',version:'2.0.0',request:'GetFeature',typeNames:'ardf',
+      outputFormat:'application/json',srsName:'EPSG:4326',count:'80',
+      bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()},EPSG:4326`
+    });
+    try{const r=await fetch(url);const j=await r.json();return j.features||[];}
+    catch(_){return [];}
+  }
+  async function isClaimed(lng,lat){
+    const b=map.getBounds(),sz=map.getSize();
+    const url='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/identify?'
+      +new URLSearchParams({geometry:`${lng},${lat}`,geometryType:'esriGeometryPoint',sr:'4326',
+      layers:'all:0',tolerance:'3',mapExtent:`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+      imageDisplay:`${sz.x},${sz.y},96`,returnGeometry:'false',f:'json'});
+    try{const r=await Promise.race([fetch(url),new Promise((_,x)=>setTimeout(()=>x(),6000))]);
+      const j=await r.json();return !!(j.results&&j.results.length);}
+    catch(_){return null;} // null = unknown (server slow); treat as "can't confirm"
+  }
+
+  document.getElementById('findopen').addEventListener('click',async ()=>{
+    const btn=document.getElementById('findopen');
+    btn.textContent='⛏ scanning occurrences…'; btn.disabled=true; openMarkers.clearLayers();
+    log('scanning ARDF occurrences in view…');
+    const feats=await ardfPointsInView();
+    log('found '+feats.length+' occurrences; checking claims…');
+    let open=0,claimed=0,unknown=0;
+    for(const f of feats){
+      const c=f.geometry&&f.geometry.coordinates; if(!c) continue;
+      const [lng,lat]=c;
+      const name=(f.properties&&(f.properties.site_name||f.properties.name||f.properties.NAME))||'occurrence';
+      const claimedNow=await isClaimed(lng,lat);
+      if(claimedNow===false){
+        open++;
+        L.circleMarker([lat,lng],{radius:9,color:'#6FA760',weight:3,fillColor:'#6FA760',fillOpacity:.35})
+          .addTo(openMarkers)
+          .bindPopup('<div class="info-pop"><span class="h" style="color:#3a7a2a;">⛏ PROVEN + OPEN candidate</span>'
+            +'<b>'+name+'</b><br>Documented gold occurrence, no active claim detected here.<br>'
+            +'<span style="color:#C25A3A;font-weight:700;">⚠ Verify with BLM MLRS before driving out or filing. Data lags reality.</span></div>');
+      } else if(claimedNow===true){ claimed++; } else { unknown++; }
+    }
+    log('PROVEN+OPEN: '+open+' candidates · '+claimed+' claimed · '+unknown+' unverified','ok');
+    btn.textContent='⛏ Find PROVEN + OPEN ground'; btn.disabled=false;
+    if(open===0) log('(zoom to a district like Hatcher Pass, then scan)','');
+  });
+
+});
+</script>
+</body>
+</html>
