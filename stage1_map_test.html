@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>FieldGold — Stage 1 map test</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
+  #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
+  #panel{position:absolute;z-index:1000;top:10px;left:10px;right:10px;background:rgba(30,26,19,.94);
+    border:1px solid #4A3F2D;border-radius:10px;padding:10px 12px;max-width:520px;}
+  #panel h1{font-size:1rem;margin:0 0 4px;color:#E8C04A;}
+  #panel p{font-size:.78rem;margin:2px 0;color:#D8D0BE;line-height:1.35;}
+  .status{font-family:monospace;font-size:.72rem;color:#9C9684;margin-top:6px;max-height:120px;overflow:auto;}
+  .ok{color:#6FA760;} .warn{color:#D29A3A;} .err{color:#C25A3A;font-weight:700;}
+  .info-pop{font-size:.8rem;line-height:1.4;} .info-pop b{color:#14110C;}
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>FieldGold · Stage 1 map test</h1>
+  <p>Testing: <b>Leaflet map + USGS ARDF gold layer</b> over the Mat-Su. Watch the log below — it names exactly what loads and what fails.</p>
+  <label style="font-size:.75rem;color:#D8D0BE;"><input type="checkbox" id="ardf-toggle" checked> ARDF gold occurrences (USGS)</label>
+  <div class="status" id="status"></div>
+</div>
+<div id="map"></div>
+
+<!-- Load Leaflet with an explicit success/failure check -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+        onerror="window.__leafletFailed=true"></script>
+<script>
+const S = document.getElementById('status');
+function log(msg, cls){ const d=document.createElement('div'); if(cls)d.className=cls; d.textContent=msg; S.appendChild(d); S.scrollTop=S.scrollHeight; }
+
+// Global error trap so nothing fails silently (the thing that bit us before)
+window.onerror = function(m,src,line,col,err){ log('JS ERROR: '+m+' (line '+line+')','err'); return false; };
+
+window.addEventListener('load', function(){
+  if (window.__leafletFailed || typeof L === 'undefined') {
+    log('Leaflet library FAILED to load from CDN.','err');
+    log('If on iPhone opening a local file: that blocks CDN scripts. Use a real https:// URL (GitHub Pages) or open in desktop Chrome.','warn');
+    return;
+  }
+  log('Leaflet loaded ✓','ok');
+
+  try {
+    const MATSU = [61.75, -149.25];
+    const map = L.map('map', { center: MATSU, zoom: 10 });
+    log('map object created ✓','ok');
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17, attribution: '© OpenStreetMap'
+    });
+    osm.on('load', ()=>log('base map tiles loaded ✓','ok'));
+    osm.on('tileerror', ()=>log('base tile error (network?)','warn'));
+    osm.addTo(map);
+    log('base layer added — you should see a map now','ok');
+
+    const ardf = L.tileLayer.wms('https://mrdata.usgs.gov/services/ardf?', {
+      layers:'ardf', format:'image/png', transparent:true, version:'1.3.0',
+      attribution:'USGS ARDF'
+    });
+    ardf.on('load', ()=>log('ARDF layer tiles loaded ✓ — gold occurrences should be visible','ok'));
+    ardf.on('tileerror', ()=>log('ARDF tile error — layer name/projection/CORS. Visual may still partly work.','err'));
+    ardf.addTo(map);
+    log('ARDF layer requested…','warn');
+
+    document.getElementById('ardf-toggle').addEventListener('change', e=>{
+      e.target.checked ? ardf.addTo(map) : map.removeLayer(ardf);
+    });
+
+    map.on('click', async (e)=>{
+      const size=map.getSize(), pt=map.latLngToContainerPoint(e.latlng,map.getZoom()), b=map.getBounds();
+      const url='https://mrdata.usgs.gov/services/ardf?'+new URLSearchParams({
+        service:'WMS',version:'1.3.0',request:'GetFeatureInfo',layers:'ardf',query_layers:'ardf',
+        info_format:'text/html',crs:'EPSG:4326',width:size.x,height:size.y,
+        bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`,
+        i:Math.round(pt.x),j:Math.round(pt.y)
+      });
+      const pop=L.popup().setLatLng(e.latlng).setContent('querying ARDF…').openOn(map);
+      try{ const r=await fetch(url); const t=(await r.text()).replace(/<\?xml[^>]*\?>/,'').trim();
+        pop.setContent('<div class="info-pop">'+(t&&t.length>20?t:'No ARDF record here — try another spot.')+'</div>');
+      }catch(err){ pop.setContent('<div class="info-pop">Tap-query blocked (CORS). The visual layer is unaffected.</div>'); }
+    });
+  } catch(err){
+    log('Map init failed: '+err.message,'err');
+  }
+});
+</script>
+</body>
+</html>
