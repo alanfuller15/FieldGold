@@ -131,15 +131,40 @@ window.addEventListener('load',()=>{
   const openMarkers = L.layerGroup().addTo(map);
 
   async function ardfPointsInView(){
-    // Query ARDF features in the current bbox via WFS (GeoJSON) to get occurrence points+names.
+    // USGS mrdata WFS is version 1.1.0 (NOT 2.0.0), uses typeName (singular), geojson output.
     const b=map.getBounds();
-    const url='https://mrdata.usgs.gov/wfs/ardf?'+new URLSearchParams({
-      service:'WFS',version:'2.0.0',request:'GetFeature',typeNames:'ardf',
-      outputFormat:'application/json',srsName:'EPSG:4326',count:'80',
-      bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()},EPSG:4326`
-    });
-    try{const r=await fetch(url);const j=await r.json();return j.features||[];}
-    catch(_){return [];}
+    // WFS 1.1.0 with EPSG:4326 uses lat,lon axis order for bbox.
+    const attempts=[
+      // attempt 1: WFS 1.1.0 geojson, lat/lon bbox
+      'https://mrdata.usgs.gov/wfs/ardf?'+new URLSearchParams({
+        service:'WFS',version:'1.1.0',request:'GetFeature',typeName:'ardf',
+        outputFormat:'geojson',srsName:'EPSG:4326',maxFeatures:'100',
+        bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`}),
+      // attempt 2: WFS 1.0.0 geojson, lon/lat bbox
+      'https://mrdata.usgs.gov/wfs/ardf?'+new URLSearchParams({
+        service:'WFS',version:'1.0.0',request:'GetFeature',typeName:'ardf',
+        outputFormat:'geojson',srsName:'EPSG:4326',maxFeatures:'100',
+        bbox:`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`}),
+      // attempt 3: json output alias
+      'https://mrdata.usgs.gov/wfs/ardf?'+new URLSearchParams({
+        service:'WFS',version:'1.1.0',request:'GetFeature',typeName:'ardf',
+        outputFormat:'application/json',maxFeatures:'100',
+        bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`})
+    ];
+    for(let i=0;i<attempts.length;i++){
+      try{
+        const r=await fetch(attempts[i]);
+        const txt=await r.text();
+        if(txt.trim().startsWith('{')){
+          const j=JSON.parse(txt);
+          if(j.features&&j.features.length){ log('ARDF data via attempt '+(i+1)+' ('+j.features.length+' pts)','ok'); return j.features; }
+        } else {
+          // not JSON -> log a hint of what came back (probably an XML error)
+          if(i===attempts.length-1) log('ARDF WFS returned non-JSON: '+txt.slice(0,80).replace(/\s+/g,' '),'err');
+        }
+      }catch(e){ if(i===attempts.length-1) log('ARDF WFS fetch error: '+e.message,'err'); }
+    }
+    return [];
   }
   async function isClaimed(lng,lat){
     const b=map.getBounds(),sz=map.getSize();
