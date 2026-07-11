@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+<title>FieldGold — Stage 2 (gold + geochem)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
+  #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
+  #panel{position:absolute;z-index:1000;top:10px;left:10px;background:rgba(30,26,19,.94);
+    border:1px solid #4A3F2D;border-radius:10px;padding:10px 12px;max-width:290px;}
+  #panel h1{font-size:.95rem;margin:0 0 6px;color:#E8C04A;}
+  .layer{display:flex;align-items:center;gap:7px;font-size:.82rem;color:#D8D0BE;margin:5px 0;cursor:pointer;}
+  .layer input{width:16px;height:16px;}
+  .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .status{font-family:monospace;font-size:.68rem;color:#6E6857;margin-top:8px;max-height:70px;overflow:auto;}
+  .ok{color:#6FA760;} .err{color:#C25A3A;}
+  .info-pop{font-size:.8rem;line-height:1.4;} .info-pop b{color:#14110C;}
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>FieldGold · Mat-Su</h1>
+  <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
+  <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As pathfinders)</label>
+  <div class="status" id="status"></div>
+</div>
+<div id="map"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__lf=1"></script>
+<script>
+const S=document.getElementById('status');
+function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
+window.onerror=(m,s,l)=>{log('ERR: '+m+' ('+l+')','err');return false;};
+
+window.addEventListener('load',()=>{
+  if(window.__lf||typeof L==='undefined'){log('Leaflet failed to load','err');return;}
+  const map=L.map('map',{center:[61.78,-149.15],zoom:11});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
+  log('map ready ✓','ok');
+
+  // helper: WMS layer with quiet edge-tile handling (only log first success, ignore no-data edge errors)
+  function wms(base,layers,attr){
+    const lyr=L.tileLayer.wms(base+'?',{layers,format:'image/png',transparent:true,version:'1.3.0',attribution:attr});
+    let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' loaded ✓','ok');}});
+    return lyr;
+  }
+
+  // Layer 1: ARDF gold occurrences (proven in Stage 1)
+  const ardf=wms('https://mrdata.usgs.gov/services/ardf','ardf','USGS ARDF').addTo(map);
+  // Layer 2: NGDB stream-sediment geochemistry (Au/As pathfinders)
+  const geo=wms('https://mrdata.usgs.gov/services/ngdbsed','ngdbsed','USGS NGDB Sediment').addTo(map);
+  log('requesting ARDF + geochem…');
+
+  document.getElementById('t-ardf').addEventListener('change',e=>e.target.checked?ardf.addTo(map):map.removeLayer(ardf));
+  document.getElementById('t-geo').addEventListener('change',e=>e.target.checked?geo.addTo(map):map.removeLayer(geo));
+
+  // Tap: query BOTH layers via GetFeatureInfo, show whichever returns a record
+  map.on('click',async e=>{
+    const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
+    const pop=L.popup().setLatLng(e.latlng).setContent('querying…').openOn(map);
+    async function q(base,layer){
+      const url=base+'?'+new URLSearchParams({service:'WMS',version:'1.3.0',request:'GetFeatureInfo',
+        layers:layer,query_layers:layer,info_format:'text/html',crs:'EPSG:4326',
+        width:sz.x,height:sz.y,bbox:`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`,
+        i:Math.round(pt.x),j:Math.round(pt.y)});
+      try{const r=await fetch(url);const t=(await r.text()).replace(/<\?xml[^>]*\?>/,'').trim();
+        return (t&&t.length>25&&!/no features/i.test(t))?t:null;}catch(_){return null;}
+    }
+    const [a,g]=await Promise.all([q('https://mrdata.usgs.gov/services/ardf','ardf'),
+                                    q('https://mrdata.usgs.gov/services/ngdbsed','ngdbsed')]);
+    let html='';
+    if(a) html+='<div class="info-pop"><b>Gold occurrence (ARDF)</b>'+a+'</div>';
+    if(g) html+='<div class="info-pop"><b>Stream geochem</b>'+g+'</div>';
+    pop.setContent(html||'<div class="info-pop">No record here — try tapping a colored marker.</div>');
+  });
+});
+</script>
+</body>
+</html>
