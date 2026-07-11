@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-<title>FieldGold — Stage 3 (gold + geochem + claims)</title>
+<title>FieldGold — Stage 3</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <style>
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
@@ -37,7 +37,7 @@
 <script>
 const S=document.getElementById('status');
 function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
-window.onerror=(m,s,l)=>{log('ERR: '+m,'err');return false;};
+window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
   if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
@@ -50,45 +50,36 @@ window.addEventListener('load',()=>{
     let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' ✓','ok');}});
     return lyr;
   }
-
-  // Layers 1-2 (proven): WMS
   const ardf=wms('https://mrdata.usgs.gov/services/ardf','ardf','USGS ARDF').addTo(map);
   const geo =wms('https://mrdata.usgs.gov/services/ngdbsed','ngdbsed','USGS NGDB').addTo(map);
 
-  // Layer 3 (new): BLM Alaska mining claims — ArcGIS MapServer via dynamic export (no plugin needed).
-  // We build an image URL from the current map bounds each time the map moves.
-  const CLAIM_URL='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/export';
-  const claimLayer=L.layerGroup().addTo(map);
-  let claimsOn=true;
-  function refreshClaims(){
-    claimLayer.clearLayers();
-    if(!claimsOn) return;
-    const b=map.getBounds(), sz=map.getSize();
-    // ArcGIS export wants bbox in the map's spatial ref; we use 4326 and ask server to project.
-    const params=new URLSearchParams({
-      bbox:`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
-      bboxSR:'4326', imageSR:'4326', size:`${sz.x},${sz.y}`,
-      format:'png32', transparent:'true', f:'image', layers:'show:0'  // 0 = active claims
-    });
-    const imgUrl=CLAIM_URL+'?'+params;
-    const overlay=L.imageOverlay(imgUrl,b,{opacity:0.55});
-    overlay.on('load',()=>{ if(!window.__claimLogged){window.__claimLogged=1;log('claims ✓','ok');} });
-    overlay.on('error',()=>log('claims tile error','err'));
-    claimLayer.addLayer(overlay);
-  }
-  map.on('moveend zoomend',refreshClaims);
-  refreshClaims();
+  // CLAIMS — now as proper TILES via a custom Leaflet tile layer that hits the ArcGIS
+  // export endpoint per-tile (256x256). This pans/zooms smoothly like WMS, loads incrementally,
+  // and no more single-image stretching/green-grid drag artifact.
+  const ClaimTiles = L.TileLayer.extend({
+    getTileUrl: function(coords){
+      const nw = this._map.unproject([coords.x*256, coords.y*256], coords.z);
+      const se = this._map.unproject([(coords.x+1)*256, (coords.y+1)*256], coords.z);
+      // ArcGIS export in Web Mercator (3857) matches Leaflet's tile grid exactly -> crisp, aligned tiles
+      const b3857 = [L.CRS.EPSG3857.project(nw), L.CRS.EPSG3857.project(se)];
+      const bbox = `${b3857[0].x},${b3857[1].y},${b3857[1].x},${b3857[0].y}`;
+      return 'https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/export?'
+        + new URLSearchParams({ bbox, bboxSR:'3857', imageSR:'3857', size:'256,256',
+            format:'png32', transparent:'true', f:'image', layers:'show:0' });
+    }
+  });
+  const claims = new ClaimTiles('', { opacity:0.6, attribution:'BLM AK Claims' });
+  let claimDone=false; claims.on('load',()=>{if(!claimDone){claimDone=true;log('claims ✓','ok');}});
+  claims.addTo(map);
   log('requesting 3 layers…');
 
   document.getElementById('t-ardf').addEventListener('change',e=>e.target.checked?ardf.addTo(map):map.removeLayer(ardf));
   document.getElementById('t-geo').addEventListener('change',e=>e.target.checked?geo.addTo(map):map.removeLayer(geo));
-  document.getElementById('t-claim').addEventListener('change',e=>{claimsOn=e.target.checked;refreshClaims();});
+  document.getElementById('t-claim').addEventListener('change',e=>e.target.checked?claims.addTo(map):map.removeLayer(claims));
 
-  // Tap: query ARDF (works), claims (ArcGIS identify), skip geochem identify (server-side broken)
   map.on('click',async e=>{
     const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
     const pop=L.popup({maxWidth:260}).setLatLng(e.latlng).setContent('checking this spot…').openOn(map);
-    // ARDF via WMS GetFeatureInfo
     async function ardfQ(){
       const url='https://mrdata.usgs.gov/services/ardf?'+new URLSearchParams({service:'WMS',version:'1.3.0',
         request:'GetFeatureInfo',layers:'ardf',query_layers:'ardf',info_format:'text/html',crs:'EPSG:4326',
@@ -97,7 +88,6 @@ window.addEventListener('load',()=>{
       try{const r=await fetch(url);const t=(await r.text()).replace(/<\?xml[^>]*\?>/,'').trim();
         return (t&&t.length>25&&!/no features|unable to access/i.test(t))?t:null;}catch(_){return null;}
     }
-    // Claims via ArcGIS identify
     async function claimQ(){
       const url='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/identify?'
         +new URLSearchParams({geometry:`${e.latlng.lng},${e.latlng.lat}`,geometryType:'esriGeometryPoint',
@@ -105,15 +95,15 @@ window.addEventListener('load',()=>{
         imageDisplay:`${sz.x},${sz.y},96`,returnGeometry:'false',f:'json'});
       try{const r=await fetch(url);const j=await r.json();
         if(j.results&&j.results.length){const a=j.results[0].attributes;
-          return 'Casefile: '+(a['Case Serial Number']||a.CSE_SERIAL_NBR||a.SERIAL||'?')
-               +'<br>Status: '+(a['Case Disposition']||a.STATUS||'active claim');}
+          const ser=a['Case Serial Number']||a.CSE_SERIAL_NBR||a.SERIAL||Object.values(a)[0]||'?';
+          return 'Casefile: '+ser;}
         return null;}catch(_){return null;}
     }
     const [a,c]=await Promise.all([ardfQ(),claimQ()]);
     let html='';
     if(c) html+='<div class="info-pop"><span class="h">⚠ CLAIMED GROUND — don\'t dig</span>'+c+'</div>';
     if(a) html+='<div class="info-pop"><span class="h">Gold occurrence (ARDF)</span>'+a+'</div>';
-    if(!html) html='<div class="info-pop">No claim or recorded occurrence at this exact point. (Geochem tap-info is unavailable — USGS server limitation; the layer still shows sample locations.)</div>';
+    if(!html) html='<div class="info-pop">No claim or recorded occurrence at this exact point.</div>';
     pop.setContent(html);
   });
 });
