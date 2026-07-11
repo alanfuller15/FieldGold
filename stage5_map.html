@@ -55,7 +55,8 @@ window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 window.addEventListener('load',()=>{
   if(window.innerWidth<=600){ const p=document.getElementById('panel'); if(p) p.classList.add('collapsed'); }
   if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
-  const map=L.map('map',{center:[61.78,-149.15],zoom:11});
+  const map=L.map('map',{center:[61.78,-149.15],zoom:11,zoomControl:false});
+  L.control.zoom({position:'topright'}).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
   log('map ready ✓','ok');
 
