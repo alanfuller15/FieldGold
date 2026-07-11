@@ -13,7 +13,13 @@
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
   #panel{position:absolute;z-index:1000;top:10px;left:10px;background:rgba(30,26,19,.95);
     border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;max-width:300px;}
-  #panel h1{font-size:.95rem;margin:0 0 8px;color:#E8C04A;}
+  #panel h1{font-size:.95rem;margin:0;color:#E8C04A;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  #panel h1 .chev{font-size:.8rem;color:#9C9684;transition:transform .2s;}
+  #panelbody{margin-top:8px;}
+  #panel.collapsed #panelbody{display:none;}
+  #panel.collapsed h1 .chev{transform:rotate(-90deg);}
+  #panel.collapsed{max-width:none;}
+  @media(max-width:600px){ #panel{max-width:none;right:auto;} }
   .layer{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#D8D0BE;margin:6px 0;cursor:pointer;}
   .layer input{width:15px;height:15px;margin:0;flex-shrink:0;}
   .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
@@ -25,7 +31,8 @@
 </head>
 <body>
 <div id="panel">
-  <h1>FieldGold · Mat-Su</h1>
+  <h1 onclick="document.getElementById('panel').classList.toggle('collapsed')"><span>FieldGold · Mat-Su</span><span class="chev">▾</span></h1>
+  <div id="panelbody">
   <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
   <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As)</label>
   <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>Mining claims — DON'T dig here</label>
@@ -35,6 +42,7 @@
   <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#6FA760;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Find PROVEN + OPEN ground</button>
   <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Old-timer drainages with documented gold (ARDF) that show no active claim right now. <b style="color:#D29A3A;">Research only — always verify with BLM before acting.</b></div>
   <div class="status" id="status"></div>
+  </div>
 </div>
 <div id="map"></div>
 
@@ -45,6 +53,7 @@ function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.tex
 window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
+  if(window.innerWidth<=600){ const p=document.getElementById('panel'); if(p) p.classList.add('collapsed'); }
   if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
   const map=L.map('map',{center:[61.78,-149.15],zoom:11});
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
