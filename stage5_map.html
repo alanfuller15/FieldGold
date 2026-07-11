@@ -99,8 +99,47 @@ window.addEventListener('load',()=>{
     else map.removeLayer(terrain);
   });
 
+  // GEOCHEM SAMPLE MARKERS: NGDB sediment sample points, tappable -> link to official assay page.
+  // WFS gives location + lab_id + url; the Au/As values live on the linked USGS page.
+  const geoMarkers=L.layerGroup();
+  let geoLoaded=false;
+  async function loadGeochemMarkers(){
+    if(geoLoaded){ geoMarkers.addTo(map); return; }
+    const b=map.getBounds();
+    const url='https://mrdata.usgs.gov/wfs/ngdbsed?'+new URLSearchParams({
+      service:'WFS',version:'1.1.0',request:'GetFeature',typeName:'ngdbsed',maxFeatures:'300',
+      bbox:`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`});
+    try{
+      const r=await fetch(url); const xml=await r.text();
+      const recs=[...xml.matchAll(/<ms:ngdbsed[\s\S]*?<\/ms:ngdbsed>/g)];
+      const g=(s,re)=>{const x=s.match(re);return x?x[1]:'';};
+      let n=0;
+      recs.forEach(m=>{
+        const s=m[0];
+        const pos=g(s,/<gml:pos>([^<]*)</); if(!pos) return;
+        const [lat,lon]=pos.trim().split(/\s+/).map(parseFloat);
+        const lab=g(s,/<ms:lab_id>([^<]*)</)||'sample';
+        const purl=g(s,/<ms:url>([^<]*)</).replace(/&amp;/g,'&');
+        L.circleMarker([lat,lon],{radius:5,color:'#5B8AA6',weight:1.5,fillColor:'#5B8AA6',fillOpacity:.6})
+          .addTo(geoMarkers)
+          .bindPopup('<div class="info-pop"><span class="h" style="color:#2a5a7a;">Stream sediment sample</span>'
+            +'<b>'+lab+'</b><br>Real Au / As / pathfinder assay values on the USGS page:<br>'
+            +'<a href="'+(purl||'#')+'" target="_blank" style="color:#5B8AA6;font-weight:700;">View full assay ↗</a></div>');
+        n++;
+      });
+      geoLoaded=true; geoMarkers.addTo(map);
+      log('geochem samples: '+n+' (tap a dot for assay link)','ok');
+    }catch(e){ log('geochem markers failed: '+e.message,'err'); }
+  }
+
+
   document.getElementById('t-ardf').addEventListener('change',e=>e.target.checked?ardf.addTo(map):map.removeLayer(ardf));
-  document.getElementById('t-geo').addEventListener('change',e=>e.target.checked?geo.addTo(map):map.removeLayer(geo));
+  document.getElementById('t-geo').addEventListener('change',e=>{
+    if(e.target.checked){ geo.addTo(map); loadGeochemMarkers(); }
+    else { map.removeLayer(geo); map.removeLayer(geoMarkers); }
+  });
+  // load geochem sample markers on start (layer is checked by default)
+  loadGeochemMarkers();
   document.getElementById('t-claim').addEventListener('change',e=>e.target.checked?claims.addTo(map):map.removeLayer(claims));
 
   // helper: fetch with timeout so a slow server can't hang the popup
