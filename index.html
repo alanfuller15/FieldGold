@@ -810,20 +810,47 @@ function renderTripPlanner(gpsSites) {
   // favorability score (they're terrain flags, not evaluations), so they show
   // a "bench" tag instead of a number — honest about what they are.
   let benchStops = [];
+  let remStops = [];
   if (window.FieldGoldData) {
-    benchStops = FieldGoldData.get('bench').map(b => ({
+    const allBench = FieldGoldData.get('bench');
+    // cross-section benches (Bench Hunter) vs REM terrace candidates
+    benchStops = allBench.filter(b => b.source !== 'REM').map(b => ({
       id: benchId(b),
       name: benchLabel(b, true),
       gps: { lat: b.lat, lon: b.lon },
       isBench: true,
     }));
+    remStops = allBench.filter(b => b.source === 'REM').map(b => ({
+      id: benchId(b),
+      name: benchLabel(b, true),
+      gps: { lat: b.lat, lon: b.lon },
+      isBench: true,
+      _area: b.area_m2,
+    }));
   }
-  const allStops = gpsSites.concat(benchStops);
+  const allStops = gpsSites.concat(benchStops).concat(remStops);
   const findStop = id => allStops.find(s => s.id === id);
   const selected = S.tripSelection.map(id => findStop(id)).filter(Boolean);
   const ordered = orderTrip(selected);
   let totalKm = 0;
   for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
+
+  // NEAREST-3 REM candidates to the user's selected logged site(s). The 20 REM
+  // benches are pre-computed for the reach; rather than list all 20, surface the
+  // 3 closest to what the user has picked, so they can add nearby terraces to
+  // the plan. Distance is to the nearest selected site (or selected bench).
+  const selectedSites = selected.length ? selected : gpsSites.map(s => ({gps:s.gps}));
+  function nearestSelDist(stop) {
+    if (!selectedSites.length) return Infinity;
+    return Math.min(...selectedSites.map(sel => distKm(sel.gps, stop.gps)));
+  }
+  let nearestRem = [];
+  if (remStops.length && selectedSites.length) {
+    nearestRem = remStops
+      .map(s => ({ ...s, _dist: nearestSelDist(s) }))
+      .sort((a, b) => a._dist - b._dist)
+      .slice(0, 3);
+  }
 
   // Logged sites ranked by score; benches listed after, in profile order.
   const ranked = gpsSites.slice().sort((a, b) => {
@@ -864,6 +891,30 @@ function renderTripPlanner(gpsSites) {
           ${benchStops.map(s => stopRow(s, true)).join('')}
         </div>
       ` : ''}
+      ${remStops.length ? (
+        nearestRem.length ? `
+        <p class="eyebrow" style="margin:16px 0 4px;">Nearest REM terrace candidates</p>
+        <p class="tiny subtle" style="margin:0 0 10px;">The 3 lidar-derived terraces closest to your selected spot${selected.length>1?'s':''}. Geomorphic candidates — go pan to confirm.</p>
+        <div class="stack" style="gap:6px;">
+          ${nearestRem.map(s => {
+            const on = S.tripSelection.includes(s.id);
+            return `
+            <div class="row between" style="padding:8px;border-radius:8px;cursor:pointer;background:${on ? 'var(--gold-faint)' : 'transparent'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};" onclick="toggleTripSite('${s.id}')">
+              <div class="row" style="gap:8px;min-width:0;">
+                <div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;border:2px solid ${on ? 'var(--gold)' : 'var(--border-strong)'};background:${on ? 'var(--gold)' : 'transparent'};display:flex;align-items:center;justify-content:center;">
+                  ${on ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#14110C" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>' : ''}
+                </div>
+                <span class="small soft" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
+              </div>
+              <span class="tiny gold mono" style="flex-shrink:0;">${s._dist.toFixed(1)} km</span>
+            </div>`;
+          }).join('')}
+        </div>
+        ` : `
+        <p class="eyebrow" style="margin:16px 0 4px;">Nearest REM terrace candidates</p>
+        <p class="tiny subtle" style="margin:0;">Select a logged site above first — then the 3 nearest lidar terrace candidates will appear here to add to your plan.</p>
+        `
+      ) : ''}
     </div>
 
     ${ordered.length >= 1 ? `
