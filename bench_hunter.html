@@ -83,6 +83,18 @@
   footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--line);
     font-size:.78rem;color:var(--ink-soft);font-family:ui-monospace,monospace;line-height:1.7}
   .empty{color:var(--ink-soft);text-align:center;padding:4rem 1rem;font-style:italic}
+  .ground-guide{margin-top:1.5rem;background:var(--paper-2);border:1px solid var(--line);border-radius:2px;overflow:hidden}
+  .gg-head{width:100%;display:flex;justify-content:space-between;align-items:center;padding:1rem 1.1rem;background:none;border:none;cursor:pointer;font-family:ui-monospace,monospace;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-align:left}
+  .gg-chev{color:var(--contour);transition:transform .2s}
+  .ground-guide.open .gg-chev{transform:rotate(180deg)}
+  .gg-body{display:none;padding:0 1.1rem 1.2rem}
+  .ground-guide.open .gg-body{display:block}
+  .gg-body>p{font-size:.9rem;color:var(--ink);margin-bottom:.9rem;line-height:1.6}
+  .gg-item{border-top:1px solid var(--line);padding:.8rem 0}
+  .gg-k{display:block;font-family:ui-monospace,monospace;font-size:.75rem;letter-spacing:.04em;color:var(--bench-strong);font-weight:700;margin-bottom:.35rem}
+  .gg-item p{font-size:.86rem;color:var(--ink-soft);line-height:1.55;margin:0}
+  .gg-src{font-size:.78rem;color:var(--ink-soft);font-style:italic;margin-top:1rem;border-top:1px solid var(--line);padding-top:.8rem}
+  .gg-src a{color:var(--water);font-weight:700;text-decoration:none}
   @media (prefers-reduced-motion:no-preference){
     .prof{animation:rise .4s ease both}
     @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -109,6 +121,33 @@
   <div class="profiles" id="profiles">
     <div class="empty">Load a dataset to read the reach.</div>
   </div>
+
+  <section class="ground-guide" id="groundGuide">
+    <button class="gg-head" onclick="document.getElementById('groundGuide').classList.toggle('open')" aria-expanded="false">
+      <span>Reading a bench on the ground</span>
+      <span class="gg-chev">▾</span>
+    </button>
+    <div class="gg-body">
+      <p>The tool flags flat ground in the bench band. Whether a flag is a real gold bench is a call you make on-site. Here's what separates a true old channel from ordinary flat ground:</p>
+      <div class="gg-item">
+        <span class="gg-k">Rounded gravel, not angular</span>
+        <p>The single best tell. Water-worn, rounded stones sitting well above the current water mean a stream once ran there. Angular, sharp rock is slope wash off the valley wall — it means little. If the flat is rounded creek gravel, you're likely on an old channel.</p>
+      </div>
+      <div class="gg-item">
+        <span class="gg-k">A distinct step, then a riser below</span>
+        <p>A true terrace has a flat tread and a steeper drop below it down to the modern channel. That's the tool's "strong" flag. A flat that just grades gently into the slope is weaker — could be floodplain, could be wash.</p>
+      </div>
+      <div class="gg-item">
+        <span class="gg-k">Reddish, oxidized, or cemented old gravel</span>
+        <p>Ancient gravels often weather to a rusty color or cement together. Old, stained, packed gravel high on the bank is a promising sign it's been sitting a long time — long enough to concentrate gold.</p>
+      </div>
+      <div class="gg-item">
+        <span class="gg-k">Where the pay sits on a bench</span>
+        <p>As on the active stream, gold rode down to the old bedrock and sits at the gravel–bedrock contact. On a bench, that contact may be exposed in the cut-bank face — probe or dig to find how deep bedrock is, and work that layer.</p>
+      </div>
+      <p class="gg-src">These reading cues follow the field method taught by Chris Ralph, professional prospector — worth studying in depth. <a href="https://www.youtube.com/@ChrisRalph" target="_blank" rel="noopener">His channel ↗</a></p>
+    </div>
+  </section>
 
   <footer id="footer"></footer>
 </div>
