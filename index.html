@@ -1574,12 +1574,23 @@ async function buildDayPlan() {
       rows += `<p class="ground">On the ground: this is where the profile crosses the creek. Use the Bench Hunter's walk directions (which bank, how far, how high) to reach the shelf. Read the gravel — rounded = old channel, angular = slope wash.</p>`;
     }
     if (online) {
-      const [geo, ardf] = await Promise.all([ nearbyGeochem(s.gps, 800), nearbyArdf(s.gps) ]);
+      // USGS lookups are best-effort: they can be CORS-blocked or 503 in the
+      // field, so race each against a short timeout and never let them block the
+      // deliverable. If they fail, the plan still generates with an honest note.
+      let geo = null, ardf = null;
+      try {
+        const timeout = new Promise(res => setTimeout(() => res('__timeout__'), 3500));
+        const result = await Promise.race([
+          Promise.all([ nearbyGeochem(s.gps, 800), nearbyArdf(s.gps) ]),
+          timeout
+        ]);
+        if (result !== '__timeout__') { geo = result[0]; ardf = result[1]; }
+      } catch (e) { /* leave geo/ardf null — lookup failed, plan continues */ }
       if (ardf) rows += `<div class="hit"><span class="tag gold">gold</span> Documented occurrence nearby (ARDF): ${esc(ardf)}</div>`;
       if (geo && geo.length) {
         rows += `<div class="hit"><span class="tag blue">geochem</span> Nearby samples: ${geo.map(g=>`${esc(g.lab)} (${g.dist}m)`).join(', ')} <em>— pull real assays on USGS mrdata; many 1980s samples couldn't detect gold at useful levels.</em></div>`;
       }
-      if (!ardf && (!geo || !geo.length)) rows += `<div class="hit muted">No documented occurrence or geochem sample within range.</div>`;
+      if (!ardf && (!geo || !geo.length)) rows += `<div class="hit muted">No documented data retrieved for this stop (USGS lookup unavailable — server may be offline or blocking; pull assays manually on mrdata.usgs.gov).</div>`;
     }
     stopSections.push(`<div class="stop"><h3><span class="num">${i+1}</span> ${esc(s.name)}</h3>${rows}</div>`);
   }
