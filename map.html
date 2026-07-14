@@ -233,6 +233,18 @@ window.addEventListener('load',()=>{
     setTimeout(()=>map.closePopup(done),3500);
   };
 
+  // Save ANY tapped point (not a documented occurrence) as a plain spot to evaluate.
+  window.setSpot=function(lat,lon){
+    if(!window.FieldGoldData){ alert('Shared data not available'); return; }
+    FieldGoldData.put({ kind:'occurrence', lat:lat, lon:lon, source:'map-pick',
+      name:'Picked spot', pending:true, plain:true });
+    map.closePopup();
+    const done=L.popup({maxWidth:240}).setLatLng([lat,lon])
+      .setContent('<div class="info-pop"><span class="h" style="color:#3a7a2a;">✓ Spot sent to Field Brain</span>Open Field Brain → it will offer to start an evaluation here. No coordinates to type.</div>')
+      .openOn(map);
+    setTimeout(()=>map.closePopup(done),3500);
+  };
+
   map.on('click',async e=>{
     const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
     const pop=L.popup({maxWidth:260}).setLatLng(e.latlng).setContent('<div class="info-pop">checking this spot…</div>').openOn(map);
@@ -244,6 +256,13 @@ window.addEventListener('load',()=>{
         +'<button onclick="saveOccurrence('+e.latlng.lat+','+e.latlng.lng+')" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:#C9A227;color:#14110C;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit;">＋ Send to Field Brain to evaluate</button></div>';
       if(claimDone&&ardfDone&&!h) h='<div class="info-pop">No claim or recorded occurrence at this point.</div>';
       else if(!h) h='<div class="info-pop">checking… (claims server can be slow)</div>';
+      // Universal "use this spot" — works on ANY tapped point, not just occurrences.
+      // Only show once both checks are done, so it doesn't jump around while loading.
+      if(claimDone&&ardfDone&&!ardfHtml){
+        h+='<div class="info-pop" style="border-top:1px solid #3A3225;margin-top:6px;padding-top:8px;">'
+          +'<span class="mono" style="font-size:.72rem;color:#9C9684;">'+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)+'</span>'
+          +'<button onclick="setSpot('+e.latlng.lat+','+e.latlng.lng+')" style="margin-top:6px;width:100%;padding:7px;border:none;border-radius:6px;background:#C9A227;color:#14110C;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit;">＋ Use this spot in Field Brain</button></div>';
+      }
       pop.setContent(h);
     }
     // ARDF (fast) — show as soon as it returns
