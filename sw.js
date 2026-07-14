@@ -1,4 +1,4 @@
-const CACHE = 'fieldgold-v1';
+const CACHE = 'fieldgold-v2';
 
 const SHELL = [
   './',
@@ -7,6 +7,7 @@ const SHELL = [
   './bench_hunter.html',
   './creek_manual.html',
   './manifest.json',
+  './fieldgold-data.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
 ];
