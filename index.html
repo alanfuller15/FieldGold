@@ -236,11 +236,22 @@ main { padding: 0 20px; }
 .modal {
   background: var(--bg-elev); width: 100%; max-width: 720px;
   border-radius: 20px 20px 0 0; padding: 8px 20px 28px;
-  max-height: 92vh; overflow-y: auto;
-  animation: slideup 0.25s;
+  max-height: 88vh; max-height: 88dvh; overflow-y: auto;
+  animation: slideup 0.25s; position: relative;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 @keyframes slideup { from { transform: translateY(100%); } to { transform: none; } }
-.modal-grip { width: 36px; height: 4px; background: var(--border-strong); border-radius: 2px; margin: 8px auto 16px; }
+.modal-grip { width: 44px; height: 5px; background: var(--border-strong); border-radius: 3px; margin: 8px auto 16px; cursor: pointer; }
+.modal-grip:active { background: var(--ink-muted); }
+.modal-x {
+  position: sticky; top: 0; float: right; margin: -4px -8px 0 0;
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: var(--bg-subtle); color: var(--ink-soft);
+  font-size: 20px; line-height: 1; cursor: pointer; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-x:active { background: var(--border-strong); color: var(--ink); }
 
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 .row { display: flex; align-items: center; gap: 10px; }
@@ -327,7 +338,7 @@ main { padding: 0 20px; }
 </nav>
 
 <div class="modal-bg" id="modal-bg" onclick="if(event.target.id==='modal-bg')closeModal()">
-  <div class="modal" id="modal"><div class="modal-grip"></div><div id="modal-inner"></div></div>
+  <div class="modal" id="modal"><div class="modal-grip" onclick="closeModal()"></div><button class="modal-x" onclick="closeModal()" aria-label="Close">✕</button><div id="modal-inner"></div></div>
 </div>
 
 <div class="toast" id="toast"></div>
