@@ -249,19 +249,32 @@ window.addEventListener('load',()=>{
     setTimeout(()=>map.closePopup(done),3500);
   };
 
-  // Guard: a drag/scroll shouldn't fire the identify. Track movement between
-  // press and release; only treat it as a real tap if the map didn't move and
-  // no query is already in flight.
-  let moved=false, querying=false;
-  map.on('movestart',()=>{ moved=true; });
-  map.on('mousedown',()=>{ moved=false; });
-  map.on('dragstart',()=>{ moved=true; });
+  // Distinguish a real tap from a pan/scroll by MEASURING travel distance, not
+  // by trusting which events fired. On touch, a finger always jitters a few px,
+  // so Leaflet fires drag events even on an intended tap; measuring distance
+  // against a tolerance (like Leaflet's own tapTolerance) is the robust fix that
+  // works for both mouse and touch. Below tolerance = tap; above = pan.
+  const TAP_TOL=15;              // pixels; matches Leaflet's default tap tolerance
+  let downPt=null, querying=false;
+  const mapEl=map.getContainer();
+  function pressStart(x,y){ downPt=[x,y]; }
+  function pressMovedTooFar(x,y){
+    if(!downPt) return true;
+    const dx=x-downPt[0], dy=y-downPt[1];
+    return Math.sqrt(dx*dx+dy*dy) > TAP_TOL;
+  }
+  mapEl.addEventListener('mousedown',e=>pressStart(e.clientX,e.clientY),{passive:true});
+  mapEl.addEventListener('touchstart',e=>{ if(e.touches[0]) pressStart(e.touches[0].clientX,e.touches[0].clientY); },{passive:true});
 
   map.on('click',async e=>{
-    if(moved){ moved=false; return; }      // was a pan/scroll, not a tap
-    if(querying){ return; }                // don't stack queries
+    // e.originalEvent carries the release coordinates for both mouse and touch
+    const oe=e.originalEvent||{};
+    const ex=oe.clientX!=null?oe.clientX:(oe.changedTouches&&oe.changedTouches[0]?oe.changedTouches[0].clientX:null);
+    const ey=oe.clientY!=null?oe.clientY:(oe.changedTouches&&oe.changedTouches[0]?oe.changedTouches[0].clientY:null);
+    if(ex!=null && pressMovedTooFar(ex,ey)){ return; }   // it was a pan/scroll, not a tap
+    if(querying){ return; }                               // don't stack queries
     querying=true;
-    setTimeout(()=>{ querying=false; }, 12000);  // safety: never stay stuck if a server hangs
+    setTimeout(()=>{ querying=false; }, 12000);           // safety: never stay stuck if a server hangs
     const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
     const pop=L.popup({maxWidth:260}).setLatLng(e.latlng).setContent('<div class="info-pop">checking this spot…</div>').openOn(map);
     let claimHtml='', ardfHtml='', claimDone=false, ardfDone=false;
