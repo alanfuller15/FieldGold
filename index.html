@@ -809,7 +809,7 @@ function renderTripPlanner(gpsSites) {
   let benchStops = [];
   if (window.FieldGoldData) {
     benchStops = FieldGoldData.get('bench').map(b => ({
-      id: 'bench:' + (b.id || (b.lat + ',' + b.lon)),
+      id: 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000))),
       name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?') +
             (b.nearest != null ? ' (~' + b.nearest + 'm up)' : ''),
       gps: { lat: b.lat, lon: b.lon },
@@ -885,6 +885,7 @@ function renderTripPlanner(gpsSites) {
         ${ordered.length >= 1 ? `
           <button class="btn primary" style="margin-top:14px;" onclick="openTripInMaps()">Open route in Maps ↗</button>
           <button class="btn secondary" style="margin-top:8px;" onclick="exportTripGpx()">Export these as GPX (onX, Gaia…)</button>
+          <button class="btn secondary" style="margin-top:8px;" onclick="buildDayPlan()">📋 Build day plan (saveable file)</button>
           <p class="tiny subtle" style="margin-top:8px;text-align:center;">Straight-line distances. Maps will compute real road routes and may reorder for drivability.</p>
           <p class="tiny subtle" style="margin-top:6px;text-align:center;line-height:1.5;">This <b>drives</b> you to each stop's nearest road access, in order — it doesn't walk you onto a bench. A bench coordinate is where the profile crosses the creek; from there, use the <b>Bench Hunter's walk directions</b> (which bank, how far, how high to climb) for the on-foot leg up to the shelf.</p>
         ` : ''}
@@ -904,7 +905,7 @@ function allRoutableStops() {
   let benchStops = [];
   if (window.FieldGoldData) {
     benchStops = FieldGoldData.get('bench').map(b => ({
-      id: 'bench:' + (b.id || (b.lat + ',' + b.lon)),
+      id: 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000))),
       name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?'),
       gps: { lat: b.lat, lon: b.lon }, isBench: true,
     }));
@@ -1441,6 +1442,175 @@ function exportTripGpx() {
   const ordered = orderTrip(selected);
   downloadGpx(buildGpx(ordered), 'trip');
   toast(`Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} as GPX`);
+}
+
+// ===========================================================================
+// DAY PLAN — assembles route + nearby documented hits + tailored gear/PPE
+// into one saveable markdown file for the field. Fetches nearby ARDF/geochem
+// live (needs signal); degrades gracefully to "run offline — no lookup" if not.
+// ===========================================================================
+
+// Haversine meters between two {lat,lon}
+function metersBetween(a, b) {
+  const R = 6371000, toR = Math.PI/180;
+  const dLat = (b.lat-a.lat)*toR, dLon = (b.lon-a.lon)*toR;
+  const la1 = a.lat*toR, la2 = b.lat*toR;
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
+// Fetch nearby geochem samples within ~radiusM of a point via USGS WFS.
+async function nearbyGeochem(pt, radiusM) {
+  const dLat = radiusM/111000, dLon = radiusM/(111000*Math.cos(pt.lat*Math.PI/180));
+  const bbox = `${pt.lon-dLon},${pt.lat-dLat},${pt.lon+dLon},${pt.lat+dLat}`;
+  const url = 'https://mrdata.usgs.gov/wfs/ngdbsed?' + new URLSearchParams({
+    service:'WFS', version:'1.1.0', request:'GetFeature', typeName:'ngdbsed', maxFeatures:'50', bbox });
+  try {
+    const r = await fetch(url); const xml = await r.text();
+    const recs = [...xml.matchAll(/<ms:ngdbsed[\s\S]*?<\/ms:ngdbsed>/g)];
+    const out = [];
+    recs.forEach(m => {
+      const s = m[0];
+      const pos = (s.match(/<gml:pos>([^<]*)</)||[])[1];
+      if (!pos) return;
+      const [lat, lon] = pos.trim().split(/\s+/).map(parseFloat);
+      const lab = (s.match(/<ms:lab_id>([^<]*)</)||[])[1] || 'sample';
+      const dist = metersBetween(pt, {lat, lon});
+      if (dist <= radiusM) out.push({ lab, dist: Math.round(dist) });
+    });
+    return out.sort((a,b)=>a.dist-b.dist).slice(0,3);
+  } catch (e) { return null; }
+}
+
+// Fetch nearby ARDF occurrences via WMS GetFeatureInfo at the point.
+async function nearbyArdf(pt) {
+  const d = 0.01; // ~1km box
+  const url = 'https://mrdata.usgs.gov/services/ardf?' + new URLSearchParams({
+    service:'WMS', version:'1.3.0', request:'GetFeatureInfo', layers:'ardf', query_layers:'ardf',
+    info_format:'text/html', crs:'EPSG:4326', width:'101', height:'101', i:'50', j:'50',
+    bbox:`${pt.lat-d},${pt.lon-d},${pt.lat+d},${pt.lon+d}` });
+  try {
+    const r = await fetch(url); const html = await r.text();
+    const name = (html.match(/name[^>]*>([^<]+)</i)||[])[1];
+    return html.toLowerCase().includes('<td') ? (name ? name.trim() : 'documented occurrence in area') : null;
+  } catch (e) { return null; }
+}
+
+// Gear/PPE tailored to the trip's character.
+function tailoredGear(ordered) {
+  const hasBench = ordered.some(s => s.isBench);
+  const highBench = ordered.some(s => s.isBench && /\d+m up/.test(s.name) && parseInt((s.name.match(/(\d+)m up/)||[])[1]) >= 10);
+  const gear = [
+    'Gold pan + classifier + snuffer bottle',
+    'Steel probe rod (feel bedrock depth before digging)',
+    'View bucket / bathyscope (read the creek bed through glare)',
+    'Polarized sunglasses',
+    'Bagged neodymium magnet (black-sand cleanup)',
+    'Small shovel + crevice tool',
+    'Sample bags + Sharpie (label with GPS)',
+  ];
+  const ppe = [
+    'Bear spray (accessible, not buried in pack)',
+    'Waders or waterproof boots — water is glacial-cold',
+    'Layers + rain gear (Mat-Su weather turns fast)',
+    'First-aid kit',
+    'Water + food',
+    'Tell someone your route + expected return',
+  ];
+  if (hasBench) {
+    ppe.push('Sturdy boots for climbing the bank up to the shelf');
+    gear.push('Trekking pole (stability on the bench riser)');
+  }
+  if (highBench) {
+    ppe.push('Extra caution on steep risers — some benches sit 10m+ up a bank');
+  }
+  ppe.push('Satellite messenger if going beyond cell coverage');
+  return { gear, ppe };
+}
+
+async function buildDayPlan() {
+  const stops = allRoutableStops();
+  const selected = S.tripSelection.map(id => stops.find(s => s.id === id)).filter(Boolean);
+  if (!selected.length) { toast('Select stops first'); return; }
+  const ordered = orderTrip(selected);
+
+  toast('Building day plan — looking up nearby data…');
+  const online = navigator.onLine;
+
+  // Build each stop's section, with nearby hits if online.
+  const stopSections = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const s = ordered[i];
+    const kind = s.isBench ? 'Bench candidate' : 'Prospect';
+    let sec = `### ${i+1}. ${s.name}\n`;
+    sec += `- Type: ${kind}\n`;
+    sec += `- Coordinates: ${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}\n`;
+    sec += `- Maps: https://maps.apple.com/?daddr=${s.gps.lat},${s.gps.lon}\n`;
+    if (s.isBench) {
+      sec += `- On the ground: this is where the profile crosses the creek. Use the Bench Hunter's walk directions (which bank, how far, how high) to reach the shelf. Read the gravel — rounded = old channel, angular = slope wash.\n`;
+    }
+    if (online) {
+      const [geo, ardf] = await Promise.all([ nearbyGeochem(s.gps, 800), nearbyArdf(s.gps) ]);
+      if (ardf) sec += `- Nearby documented gold (ARDF): ${ardf}\n`;
+      if (geo && geo.length) {
+        sec += `- Nearby geochem samples: ${geo.map(g=>`${g.lab} (${g.dist}m)`).join(', ')} — pull assays on USGS mrdata before relying on them; many 1980s samples couldn't detect gold at useful levels.\n`;
+      }
+      if (!ardf && (!geo || !geo.length)) sec += `- No documented occurrence or geochem sample within range of this stop.\n`;
+    }
+    stopSections.push(sec);
+  }
+
+  const { gear, ppe } = tailoredGear(ordered);
+  const date = new Date().toISOString().slice(0,10);
+  let totalKm = 0;
+  for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
+
+  const md = `# FieldGold — Day Plan
+**Date prepared:** ${date}
+**Stops:** ${ordered.length}  ·  **Straight-line route:** ~${totalKm.toFixed(1)} km
+${online ? '' : '\n> Built offline — nearby-hit lookup skipped. Rebuild with signal to include documented gold and geochem near each stop.\n'}
+---
+
+## Route (in order)
+
+${ordered.map((s,i)=>`${i+1}. ${s.name} — ${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}`).join('\n')}
+
+The route **drives** you to each stop's nearest road access in order — it does not walk you onto a bench. For benches, the coordinate is the creek-crossing; use the Bench Hunter's walk directions for the on-foot leg.
+
+---
+
+## Stops in detail
+
+${stopSections.join('\n')}
+---
+
+## Gear to bring
+
+${gear.map(g=>`- [ ] ${g}`).join('\n')}
+
+## PPE & safety (Alaska)
+
+${ppe.map(p=>`- [ ] ${p}`).join('\n')}
+
+---
+
+## Before you dig — verify
+
+- [ ] Confirm claim status for each spot on the map (BLM layer) — data lags reality; check BLM MLRS before filing or digging.
+- [ ] Confirm land ownership (state rec area vs. private) — much of Hatcher-to-Parks is private.
+- [ ] Pull real assays for any geochem samples listed above before weighting them.
+
+*Generated by FieldGold. Documented data is a research aid — the ground makes the final call.*
+`;
+
+  // Download as a .md file
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fieldgold-day-plan-${date}.md`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(online ? 'Day plan saved' : 'Day plan saved (offline — no hit lookup)');
 }
 
 function exportData() {
