@@ -101,7 +101,10 @@ window.addEventListener('load',()=>{
     layers:'3DEPElevation:Hillshade Multidirectional', format:'image/png', transparent:true,
     version:'1.3.0', opacity:0.55, attribution:'USGS 3DEP (IfSAR 5m, AK)'});
   let terrDone=false; terrain.on('load',()=>{if(!terrDone){terrDone=true;log('terrain ✓','ok');}});
-  terrain.on('tileerror',()=>log('terrain tile error (edge/no-data)','err'));
+  // Edge/no-data tiles are expected wherever the IfSAR footprint ends; they fail
+  // gracefully and carry no actionable info, so we don't log them (kept the map
+  // clean while scrolling). The 'load' success above still confirms coverage.
+  terrain.on('tileerror',()=>{});
   document.getElementById('t-terrain').addEventListener('change',e=>{
     if(e.target.checked){ terrain.addTo(map); terrain.bringToFront(); log('terrain requested…'); }
     else map.removeLayer(terrain);
