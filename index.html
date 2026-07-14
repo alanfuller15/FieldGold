@@ -732,7 +732,7 @@ function renderSites() {
         <p class="tiny subtle" style="margin-top:8px;text-align:center;">Relative positions of ${gpsSites.length} GPS-tagged site${gpsSites.length===1?'':'s'}. Tap a dot for details. North is up.</p>
       </div>
       <p class="tiny subtle" style="margin:8px 0;">${S.sites.length - gpsSites.length} site${S.sites.length - gpsSites.length===1?'':'s'} without coordinates ${S.sites.length - gpsSites.length===0?'':'(not shown on map)'}</p>
-    ` : S.sitesView === 'plan' && gpsSites.length ? renderTripPlanner(gpsSites) : `
+    ` : S.sitesView === 'plan' && (gpsSites.length || (window.FieldGoldData && FieldGoldData.get('bench').length)) ? renderTripPlanner(gpsSites) : `
     <div class="stack">
       ${S.sites.map(ev => {
         const sc = evalScore(ev);
@@ -801,41 +801,67 @@ function orderTrip(sites) {
 }
 
 function renderTripPlanner(gpsSites) {
-  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
+  // Routable points = logged sites + bench candidates from the shared record.
+  // Benches are normalized to the same shape (id, name, gps, score) so the
+  // existing ordering/route/export logic works unchanged. Benches carry no
+  // favorability score (they're terrain flags, not evaluations), so they show
+  // a "bench" tag instead of a number — honest about what they are.
+  let benchStops = [];
+  if (window.FieldGoldData) {
+    benchStops = FieldGoldData.get('bench').map(b => ({
+      id: 'bench:' + (b.id || (b.lat + ',' + b.lon)),
+      name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?') +
+            (b.nearest != null ? ' (~' + b.nearest + 'm up)' : ''),
+      gps: { lat: b.lat, lon: b.lon },
+      isBench: true,
+    }));
+  }
+  const allStops = gpsSites.concat(benchStops);
+  const findStop = id => allStops.find(s => s.id === id);
+  const selected = S.tripSelection.map(id => findStop(id)).filter(Boolean);
   const ordered = orderTrip(selected);
   let totalKm = 0;
   for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
 
-  // Sort available sites by score desc for the picker
+  // Logged sites ranked by score; benches listed after, in profile order.
   const ranked = gpsSites.slice().sort((a, b) => {
     const sa = a.score != null ? a.score : evalScore(a).pct;
     const sb = b.score != null ? b.score : evalScore(b).pct;
     return sb - sa;
   });
 
+  const stopRow = (s, isBench) => {
+    const on = S.tripSelection.includes(s.id);
+    const label = isBench
+      ? `<span class="badge amber">bench</span>`
+      : `<span class="badge ${scoreVerdict(s.score != null ? s.score : evalScore(s).pct)[1]}">${Math.round((s.score != null ? s.score : evalScore(s).pct) * 100)}</span>`;
+    return `
+      <div class="row between" style="padding:8px;border-radius:8px;cursor:pointer;background:${on ? 'var(--gold-faint)' : 'transparent'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};" onclick="toggleTripSite('${s.id}')">
+        <div class="row" style="gap:8px;min-width:0;">
+          <div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;border:2px solid ${on ? 'var(--gold)' : 'var(--border-strong)'};background:${on ? 'var(--gold)' : 'transparent'};display:flex;align-items:center;justify-content:center;">
+            ${on ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#14110C" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>' : ''}
+          </div>
+          <span class="small soft" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
+        </div>
+        ${label}
+      </div>
+    `;
+  };
+
   return `
-    <p class="small muted" style="margin-bottom:14px;">Pick the sites you want to visit. They'll be ordered into a sensible path from your first pick, then handed to Maps for real directions.</p>
+    <p class="small muted" style="margin-bottom:14px;">Pick the stops you want to visit — your logged sites and your bench candidates. They'll be ordered into a sensible path from your first pick, then handed to Maps for real directions.</p>
 
     <div class="card">
-      <p class="eyebrow" style="margin-bottom:10px;">Select sites (by score)</p>
+      <p class="eyebrow" style="margin-bottom:10px;">Logged sites</p>
       <div class="stack" style="gap:6px;">
-        ${ranked.map(s => {
-          const pct = Math.round((s.score != null ? s.score : evalScore(s).pct) * 100);
-          const [, tone] = scoreVerdict(s.score != null ? s.score : evalScore(s).pct);
-          const on = S.tripSelection.includes(s.id);
-          return `
-            <div class="row between" style="padding:8px;border-radius:8px;cursor:pointer;background:${on ? 'var(--gold-faint)' : 'transparent'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};" onclick="toggleTripSite('${s.id}')">
-              <div class="row" style="gap:8px;min-width:0;">
-                <div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;border:2px solid ${on ? 'var(--gold)' : 'var(--border-strong)'};background:${on ? 'var(--gold)' : 'transparent'};display:flex;align-items:center;justify-content:center;">
-                  ${on ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#14110C" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>' : ''}
-                </div>
-                <span class="small soft" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
-              </div>
-              <span class="badge ${tone}">${pct}</span>
-            </div>
-          `;
-        }).join('')}
+        ${ranked.length ? ranked.map(s => stopRow(s, false)).join('') : '<p class="tiny subtle">No logged sites yet — log some in Evaluate, or use bench candidates below.</p>'}
       </div>
+      ${benchStops.length ? `
+        <p class="eyebrow" style="margin:16px 0 10px;">Bench candidates (from Bench Hunter)</p>
+        <div class="stack" style="gap:6px;">
+          ${benchStops.map(s => stopRow(s, true)).join('')}
+        </div>
+      ` : ''}
     </div>
 
     ${ordered.length >= 1 ? `
@@ -860,6 +886,7 @@ function renderTripPlanner(gpsSites) {
           <button class="btn primary" style="margin-top:14px;" onclick="openTripInMaps()">Open route in Maps ↗</button>
           <button class="btn secondary" style="margin-top:8px;" onclick="exportTripGpx()">Export these as GPX (onX, Gaia…)</button>
           <p class="tiny subtle" style="margin-top:8px;text-align:center;">Straight-line distances. Maps will compute real road routes and may reorder for drivability.</p>
+          <p class="tiny subtle" style="margin-top:6px;text-align:center;line-height:1.5;">This <b>drives</b> you to each stop's nearest road access, in order — it doesn't walk you onto a bench. A bench coordinate is where the profile crosses the creek; from there, use the <b>Bench Hunter's walk directions</b> (which bank, how far, how high to climb) for the on-foot leg up to the shelf.</p>
         ` : ''}
       </div>
     ` : `
@@ -870,10 +897,25 @@ function renderTripPlanner(gpsSites) {
   `;
 }
 
-function openTripInMaps() {
+// All routable stops = logged GPS sites + bench candidates from shared record.
+// One source of truth so the planner, Maps handoff, and GPX export agree.
+function allRoutableStops() {
   const gpsSites = S.sites.filter(s => s.gps);
-  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
-  if (!selected.length) { toast('Select sites first'); return; }
+  let benchStops = [];
+  if (window.FieldGoldData) {
+    benchStops = FieldGoldData.get('bench').map(b => ({
+      id: 'bench:' + (b.id || (b.lat + ',' + b.lon)),
+      name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?'),
+      gps: { lat: b.lat, lon: b.lon }, isBench: true,
+    }));
+  }
+  return gpsSites.concat(benchStops);
+}
+
+function openTripInMaps() {
+  const stops = allRoutableStops();
+  const selected = S.tripSelection.map(id => stops.find(s => s.id === id)).filter(Boolean);
+  if (!selected.length) { toast('Select stops first'); return; }
   const ordered = orderTrip(selected);
   // Apple Maps supports daddr with multiple "to:" waypoints
   if (ordered.length === 1) {
@@ -1328,6 +1370,18 @@ function buildGpx(gpsSites) {
     .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
   const waypoints = gpsSites.map(s => {
+    // Bench candidates are terrain flags, not scored evaluations — describe them
+    // honestly rather than running them through the favorability scorer.
+    if (s.isBench) {
+      const time = new Date().toISOString();
+      return `  <wpt lat="${s.gps.lat}" lon="${s.gps.lon}">
+    <time>${xmlEsc(time)}</time>
+    <name>${xmlEsc(s.name || 'Bench candidate')}</name>
+    <desc>${xmlEsc('Bench candidate flagged by terrain (Bench Hunter). Walk the shelf and read the ground — rounded gravel = old channel.')}</desc>
+    <sym>Flag, Blue</sym>
+    <type>Bench</type>
+  </wpt>`;
+    }
     const sc = evalScore(s);
     const pct = Math.round((s.score != null ? s.score : sc.pct) * 100);
     const [verdict] = scoreVerdict(s.score != null ? s.score : sc.pct);
@@ -1381,9 +1435,9 @@ function exportGpx() {
 }
 
 function exportTripGpx() {
-  const gpsSites = S.sites.filter(s => s.gps);
-  const selected = S.tripSelection.map(id => gpsSites.find(s => s.id === id)).filter(Boolean);
-  if (!selected.length) { toast('Select sites first'); return; }
+  const stops = allRoutableStops();
+  const selected = S.tripSelection.map(id => stops.find(s => s.id === id)).filter(Boolean);
+  if (!selected.length) { toast('Select stops first'); return; }
   const ordered = orderTrip(selected);
   downloadGpx(buildGpx(ordered), 'trip');
   toast(`Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} as GPX`);
