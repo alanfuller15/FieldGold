@@ -171,6 +171,7 @@
   <footer id="footer"></footer>
 </div>
 
+<script src="fieldgold-data.js"></script>
 <script>
 const BAND_LO=3, BAND_HI=20, FLAT=0.12, RISER=0.20;
 // When a profile flags this many+ candidates, the cross-section is broad low-gradient
@@ -344,6 +345,15 @@ function render(data){
   } else {
     planEl.className='walkplan';
     planEl.innerHTML='';
+  }
+
+  // Write bench candidates to the shared record so the map can show them beside gold
+  if(window.FieldGoldData){
+    FieldGoldData.replaceKind('bench', walkPlan.map(w=>({
+      lat:w.lat, lon:w.lon, source:'benchhunter',
+      profile:w.idx+1, count:w.n, strong:w.strong,
+      nearest:Math.round(w.nearest)
+    })));
   }
 
   document.getElementById('profiles').innerHTML=blocks||'<div class="empty">No profiles in this file.</div>';

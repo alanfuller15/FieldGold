@@ -332,6 +332,7 @@ main { padding: 0 20px; }
 
 <div class="toast" id="toast"></div>
 
+<script src="fieldgold-data.js"></script>
 <script>
 // ===========================================================================
 // STATE
@@ -2249,6 +2250,14 @@ function syncSitesToMap() {
       };
     });
     localStorage.setItem('fieldgold_sites', JSON.stringify({ updated: Date.now(), sites: gpsSites }));
+    // Also write through the shared record so all tools see these sites
+    if (window.FieldGoldData) {
+      FieldGoldData.replaceKind('site', gpsSites.map(function (s) {
+        return { id: s.id, lat: s.lat, lon: s.lon, source: 'fieldbrain',
+                 name: s.name, score: s.score, verdict: s.verdict,
+                 heightAboveStream: s.heightAboveStream };
+      }));
+    }
     return gpsSites.length;
   } catch (e) { return null; }
 }
@@ -2343,6 +2352,43 @@ function switchView(name) {
 
 // Boot
 renderEvaluate();
+
+// Check the shared record for an occurrence tapped on the map, offer to evaluate it
+function checkPendingOccurrence() {
+  if (!window.FieldGoldData) return;
+  const pending = FieldGoldData.get('occurrence').filter(o => o.pending);
+  if (!pending.length) return;
+  const o = pending[0];
+  openModal(`
+    <h2>Evaluate this spot?</h2>
+    <p class="small muted" style="margin:10px 0 16px;">
+      You tapped a documented gold occurrence on the map at <span class="mono gold">${o.lat.toFixed(5)}, ${o.lon.toFixed(5)}</span>. Start an evaluation here? Its location and a strong "documented source" indicator will be pre-filled — you confirm the rest.
+    </p>
+    <button class="btn primary" onclick="startEvalFromOccurrence('${o.id}')">Start evaluation here</button>
+    <button class="btn ghost" style="margin-top:8px;" onclick="dismissOccurrence('${o.id}')">Not now</button>
+  `);
+}
+
+function startEvalFromOccurrence(id) {
+  const o = FieldGoldData.get('occurrence').find(x => x.id === id);
+  if (!o) { closeModal(); return; }
+  S.evalDraft = blankEval();
+  S.evalDraft.name = 'ARDF occurrence (from map)';
+  S.evalDraft.gps = { lat: o.lat, lon: o.lon };
+  S.evalDraft.answers['source'] = { label: 'Documented source upstream', value: 1.0, tone: 'green' };
+  S.evalDraft.notes = `Tapped as a documented ARDF gold occurrence on the map. Verify on the ground.`;
+  FieldGoldData.remove(id);
+  closeModal();
+  switchView('evaluate');
+  toast('Evaluation started from map occurrence');
+}
+
+function dismissOccurrence(id) {
+  FieldGoldData.remove(id);
+  closeModal();
+}
+
+checkPendingOccurrence();
 
 // Register service worker for offline use (fails silently if unsupported or on file://)
 if ('serviceWorker' in navigator) {
