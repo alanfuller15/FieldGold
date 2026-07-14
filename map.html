@@ -60,7 +60,11 @@ window.addEventListener('load',()=>{
   if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
   const map=L.map('map',{center:[61.78,-149.15],zoom:11,zoomControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
+  const streets=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
+  const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+  const topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenTopoMap'});
+  streets.addTo(map);
+  L.control.layers({'Streets':streets,'Satellite':satellite,'Topo':topo},null,{position:'topright'}).addTo(map);
   log('map ready ✓','ok');
 
   function wms(base,layers,attr){
@@ -245,7 +249,19 @@ window.addEventListener('load',()=>{
     setTimeout(()=>map.closePopup(done),3500);
   };
 
+  // Guard: a drag/scroll shouldn't fire the identify. Track movement between
+  // press and release; only treat it as a real tap if the map didn't move and
+  // no query is already in flight.
+  let moved=false, querying=false;
+  map.on('movestart',()=>{ moved=true; });
+  map.on('mousedown',()=>{ moved=false; });
+  map.on('dragstart',()=>{ moved=true; });
+
   map.on('click',async e=>{
+    if(moved){ moved=false; return; }      // was a pan/scroll, not a tap
+    if(querying){ return; }                // don't stack queries
+    querying=true;
+    setTimeout(()=>{ querying=false; }, 12000);  // safety: never stay stuck if a server hangs
     const sz=map.getSize(),pt=map.latLngToContainerPoint(e.latlng,map.getZoom()),b=map.getBounds();
     const pop=L.popup({maxWidth:260}).setLatLng(e.latlng).setContent('<div class="info-pop">checking this spot…</div>').openOn(map);
     let claimHtml='', ardfHtml='', claimDone=false, ardfDone=false;
@@ -256,6 +272,7 @@ window.addEventListener('load',()=>{
         +'<button onclick="saveOccurrence('+e.latlng.lat+','+e.latlng.lng+')" style="margin-top:8px;width:100%;padding:7px;border:none;border-radius:6px;background:#C9A227;color:#14110C;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit;">＋ Send to Field Brain to evaluate</button></div>';
       if(claimDone&&ardfDone&&!h) h='<div class="info-pop">No claim or recorded occurrence at this point.</div>';
       else if(!h) h='<div class="info-pop">checking… (claims server can be slow)</div>';
+      if(claimDone&&ardfDone) querying=false;
       // Universal "use this spot" — works on ANY tapped point, not just occurrences.
       // Only show once both checks are done, so it doesn't jump around while loading.
       if(claimDone&&ardfDone&&!ardfHtml){
