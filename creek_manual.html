@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Reading Fishhook Creek — Field Manual</title>
+<style>
+:root{
+  --bg:#14110C; --bg-elev:#1E1A13; --bg-card:#241F17; --bg-subtle:#2C2619;
+  --border:#3A3225; --border-strong:#4A3F2D;
+  --ink:#F2EDE0; --ink-soft:#D8D0BE; --ink-muted:#9C9684; --ink-subtle:#6E6857;
+  --gold:#C9A227; --gold-bright:#E8C04A; --gold-faint:#2E2613;
+  --green:#6FA760; --amber:#D29A3A; --rust:#C25A3A; --blue:#5B8AA6;
+  --water:#2C4A5A; --water-line:#5B8AA6; --bedrock:#6E5A3D; --gravel:#4A3F2D;
+  --gold-dot:#E8C04A;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{font-size:16px;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  max-width:760px; margin:0 auto; padding:0 20px 80px;
+}
+.mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
+
+/* Cover */
+.cover{padding:52px 0 30px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+.eyebrow{font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);}
+.cover h1{font-size:2.1rem;font-weight:800;letter-spacing:-0.02em;line-height:1.1;margin:12px 0 10px;}
+.cover .sub{font-size:1rem;color:var(--ink-muted);max-width:52ch;}
+.cover .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+.cover .brand-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--gold),#9A7B1C);
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:#14110C;flex-shrink:0;}
+
+/* Section headers */
+section{padding:30px 0;border-bottom:1px solid var(--border);}
+.sec-num{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--ink-subtle);text-transform:uppercase;}
+h2{font-size:1.4rem;font-weight:800;letter-spacing:-0.015em;line-height:1.2;margin:6px 0 14px;}
+h3{font-size:1.02rem;font-weight:700;color:var(--gold-bright);margin:22px 0 8px;}
+p{margin-bottom:13px;color:var(--ink-soft);}
+p strong{color:var(--ink);font-weight:700;}
+.lead{font-size:1.06rem;color:var(--ink);}
+ul,ol{margin:6px 0 14px 20px;}
+li{margin-bottom:7px;color:var(--ink-soft);}
+li strong{color:var(--ink);}
+a{color:var(--gold-bright);}
+
+/* Callouts */
+.callout{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--gold);
+  border-radius:10px;padding:14px 16px;margin:16px 0;}
+.callout.verified{border-left-color:var(--green);}
+.callout.caution{border-left-color:var(--rust);}
+.callout .tag{font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:6px;display:block;}
+.callout.verified .tag{color:var(--green);}
+.callout.caution .tag{color:var(--rust);}
+.callout p:last-child{margin-bottom:0;}
+.callout .src{font-size:0.76rem;color:var(--ink-subtle);margin-top:8px;}
+
+/* Figures */
+figure{margin:22px 0;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;
+  padding:16px 14px 12px;overflow:hidden;}
+figure svg{width:100%;height:auto;display:block;border-radius:6px;}
+figcaption{font-size:0.82rem;color:var(--ink-muted);margin-top:11px;padding:0 4px;line-height:1.5;}
+figcaption b{color:var(--gold-bright);font-weight:700;}
+
+.key{display:flex;flex-wrap:wrap;gap:10px 16px;margin:10px 4px 0;}
+.key span{display:flex;align-items:center;gap:6px;font-size:0.75rem;color:var(--ink-muted);}
+.key i{width:12px;height:12px;border-radius:3px;flex-shrink:0;display:inline-block;}
+
+.toc{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:20px 0 4px;}
+.toc p{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;}
+.toc ol{margin:0 0 0 4px;list-style:none;}
+.toc li{margin-bottom:9px;counter-increment:toc;display:flex;gap:11px;align-items:baseline;}
+.toc li::before{content:counter(toc,decimal-leading-zero);font-family:"SF Mono",monospace;font-size:0.75rem;
+  color:var(--ink-subtle);font-weight:700;flex-shrink:0;}
+.toc a{color:var(--ink-soft);text-decoration:none;font-weight:600;}
+.toc{counter-reset:toc;}
+
+.pull{font-size:1.12rem;line-height:1.5;color:var(--gold-bright);font-weight:600;
+  border-top:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);
+  padding:16px 0;margin:22px 0;}
+.end{text-align:center;padding:34px 0 10px;color:var(--ink-subtle);font-size:0.8rem;}
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="brand"><div class="brand-icon">Au</div><span class="eyebrow" style="letter-spacing:0.1em;">Field Brain · companion manual</span></div>
+  <span class="eyebrow">Placer prospecting · Mat-Su · Hatcher Pass</span>
+  <h1>Reading Fishhook Creek</h1>
+  <p class="sub">How to read placer ground before you move a single cobble — the general skill, then the specific creek, grounded in the documented geology of the Willow Creek district.</p>
+</div>
+
+<div class="toc">
+  <p>What's inside</p>
+  <ol>
+    <li><a href="#core">The one idea everything hangs on</a></li>
+    <li><a href="#move">How gold moves — flood vs. trickle</a></li>
+    <li><a href="#anatomy">The anatomy of a bend</a></li>
+    <li><a href="#traps">The trap catalogue</a></li>
+    <li><a href="#bedrock">Reading depth to bedrock</a></li>
+    <li><a href="#sample">Sampling to find the pay streak</a></li>
+    <li><a href="#fishhook">Fishhook Creek — the verified story</a></li>
+    <li><a href="#walkup">The walk-up routine</a></li>
+  </ol>
+</div>
+
+<!-- ========== 1 ========== -->
+<section id="core">
+  <span class="sec-num">One</span>
+  <h2>The one idea everything hangs on</h2>
+  <p class="lead">Gold is roughly 19 times heavier than water and about 7 times heavier than the average rock around it. Every rule that follows is a consequence of that single fact.</p>
+  <p>Gold doesn't travel like the gravel it's mixed with. It sinks, it lags behind, it drops out the instant the water loses the energy to carry it, and it works its way down through everything looser than itself until it hits something it can't pass. If you internalize <strong>"gold is trying to stop moving and get to the bottom,"</strong> you can derive most of the rules yourself instead of memorizing them.</p>
+  <p>That's the difference between someone digging random holes and someone reading water. Every time you look at a stretch of creek, the question in your head is: <strong>where did the water slow down, and where did the heavy stuff get trapped?</strong></p>
+</section>
+
+<!-- ========== 2 ========== -->
+<section id="move">
+  <span class="sec-num">Two</span>
+  <h2>How gold moves — flood vs. trickle</h2>
+  <p>Gold enters a creek from an eroding source and is then on a one-way budget: it only moves when water is energetic enough to push it, and each move is shorter than the same-sized pebble would travel, because it's so much denser. Over time this sorts gold downward and concentrates it in predictable traps.</p>
+
+  <h3>The flood does the work</h3>
+  <p>The few days a year of high, brown, roaring water do more geological work than all the calm months combined. This is the most important thing separating real creek readers from everyone else: <strong>you read the creek at low water, but the gold sits where the flood dropped it.</strong> The productive line is often not under today's gentle trickle — it's under the big cobble bar that only has water screaming over it during breakup.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 250" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="w1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3A5F72"/><stop offset="1" stop-color="#223945"/>
+        </linearGradient>
+      </defs>
+      <!-- banks -->
+      <rect x="0" y="0" width="560" height="250" fill="#241F17"/>
+      <!-- flood water (wide, faint) -->
+      <path d="M40 40 Q280 20 520 40 L520 210 Q280 230 40 210 Z" fill="#2C4A5A" opacity="0.35"/>
+      <text x="60" y="34" fill="#5B8AA6" font-size="13" font-family="monospace" font-weight="700">flood stage — where gold is placed</text>
+      <!-- gravel bar -->
+      <path d="M120 150 Q210 120 330 140 Q410 152 470 150 L470 190 Q300 200 120 190 Z" fill="#4A3F2D"/>
+      <text x="250" y="175" fill="#9C9684" font-size="12" font-family="monospace">cobble bar (dry now)</text>
+      <!-- trickle (narrow, bright) -->
+      <path d="M60 200 Q200 188 360 196 Q450 200 500 198 L500 214 Q300 224 60 216 Z" fill="url(#w1)"/>
+      <text x="70" y="240" fill="#7FB0C8" font-size="13" font-family="monospace" font-weight="700">summer trickle — what you see</text>
+      <!-- gold dots on the bar, under flood line -->
+      <circle cx="200" cy="165" r="3.5" fill="#E8C04A"/><circle cx="270" cy="170" r="3.5" fill="#E8C04A"/>
+      <circle cx="330" cy="167" r="3.5" fill="#E8C04A"/><circle cx="390" cy="171" r="3.5" fill="#E8C04A"/>
+      <circle cx="240" cy="176" r="3.5" fill="#E8C04A"/><circle cx="360" cy="176" r="3.5" fill="#E8C04A"/>
+    </svg>
+    <div class="key">
+      <span><i style="background:#2C4A5A;opacity:.5;"></i>Flood water</span>
+      <span><i style="background:#3A5F72;"></i>Summer trickle</span>
+      <span><i style="background:#4A3F2D;"></i>Cobble bar</span>
+      <span><i style="background:#E8C04A;"></i>Gold</span>
+    </div>
+    <figcaption>The trap you'd walk past. The gold sits in the <b>dry cobble bar</b> — placed there by flood water that covered the whole channel — not in the summer trickle where a beginner naturally pans. <b>Mentally raise the water</b> until the whole width is submerged, and read where that flood current slowed.</figcaption>
+  </figure>
+
+  <p>Two energy regimes matter. <strong>Everyday flow</strong> moves light gravel and positions fine gold day to day. <strong>Flood flow</strong> is what actually moves gold and rearranges the creek. To read a creek you have to picture it at ten times its current volume and ask where that force loses its grip.</p>
+</section>
+
+<!-- ========== 3 ========== -->
+<section id="anatomy">
+  <span class="sec-num">Three</span>
+  <h2>The anatomy of a bend</h2>
+  <p>You can't read what you can't name. A bend is the single most legible feature on a creek, because it splits the flow into a fast side and a slow side — and gold drops on the slow side.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="560" height="300" fill="#241F17"/>
+      <!-- the channel (a bend) -->
+      <path d="M-10 60 C 160 60, 180 200, 340 200 C 460 200, 500 120, 570 120
+               L570 180 C 500 180, 470 258, 340 258 C 150 258, 120 118, -10 118 Z"
+            fill="#2C4A5A"/>
+      <!-- thalweg (fast thread) hugging outer bank -->
+      <path d="M-10 82 C 150 82, 165 232, 340 232 C 470 232, 500 150, 570 150"
+            fill="none" stroke="#7FB0C8" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round"/>
+      <!-- point bar (inside bend) -->
+      <path d="M-10 118 C 120 118, 150 258, 340 258 C 250 258, 200 150, 130 138 C 70 130, 20 126 -10 126 Z"
+            fill="#4A3F2D" opacity="0.9"/>
+      <!-- gold concentration at head of point bar -->
+      <circle cx="150" cy="150" r="3.5" fill="#E8C04A"/><circle cx="175" cy="165" r="3.5" fill="#E8C04A"/>
+      <circle cx="200" cy="178" r="3.5" fill="#E8C04A"/><circle cx="165" cy="180" r="3.5" fill="#E8C04A"/>
+      <circle cx="140" cy="168" r="3.5" fill="#E8C04A"/>
+      <!-- labels -->
+      <text x="30" y="95" fill="#7FB0C8" font-size="13" font-family="monospace" font-weight="700">thalweg (fast)</text>
+      <text x="400" y="105" fill="#C25A3A" font-size="13" font-family="monospace" font-weight="700">cut bank →</text>
+      <text x="405" y="122" fill="#C25A3A" font-size="11" font-family="monospace">erosion, deep</text>
+      <text x="120" y="230" fill="#E8C04A" font-size="13" font-family="monospace" font-weight="700">point bar (slow)</text>
+      <text x="150" y="247" fill="#9C9684" font-size="11" font-family="monospace">deposition · easy digging</text>
+      <!-- arrow marking head of bar -->
+      <path d="M175 128 L165 148" stroke="#E8C04A" stroke-width="2" marker-end="url(#ah)"/>
+      <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="4" refY="6" orient="auto">
+        <path d="M0 0 L4 6 L8 0 Z" fill="#E8C04A"/></marker></defs>
+      <text x="120" y="122" fill="#E8C04A" font-size="11" font-family="monospace" font-weight="700">gold drops here (bar head)</text>
+    </svg>
+    <div class="key">
+      <span><i style="background:#7FB0C8;"></i>Thalweg — fast thread</span>
+      <span><i style="background:#C25A3A;"></i>Cut bank — outside</span>
+      <span><i style="background:#4A3F2D;"></i>Point bar — inside</span>
+      <span><i style="background:#E8C04A;"></i>Gold</span>
+    </div>
+    <figcaption>On a bend the current throws its energy to the <b>outside</b> (the cut bank — deep, fast, eroding) and goes slack on the <b>inside</b> (the point bar). Because gold drops at the <em>first</em> slack water it meets, the richest spot is usually the <b>upstream head of the point bar</b>, not its fat middle. The point bar is also the easiest digging — a gentle gravel slope, not a bank to undercut.</figcaption>
+  </figure>
+
+  <p>Key terms, all visible above. The <strong>thalweg</strong> is the fast thread of deepest flow; it wanders bank to bank as the creek bends. The <strong>cut bank</strong> is the eroding outside of the bend — fast and deep, and it doubles as a free cross-section you can read. The <strong>point bar</strong> is the gravel built on the slow inside — your best-odds, easiest-dig target. And the <strong>pay streak</strong> is the concentrated ribbon of gold, usually sitting on or just above bedrock, running roughly parallel to flow.</p>
+</section>
+
+<!-- ========== 4 ========== -->
+<section id="traps">
+  <span class="sec-num">Four</span>
+  <h2>The trap catalogue</h2>
+  <p>Every trap below is really the same idea wearing a different hat: <strong>the water slowed, or the gold hit a barrier.</strong> Learn them as a family and you'll stop needing the list.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="560" height="300" fill="#241F17"/>
+      <!-- straight-ish channel flowing left to right -->
+      <rect x="0" y="70" width="560" height="150" fill="#2C4A5A"/>
+      <!-- flow arrow -->
+      <text x="20" y="60" fill="#9C9684" font-size="12" font-family="monospace">flow →</text>
+      <path d="M20 45 L70 45" stroke="#9C9684" stroke-width="2" marker-end="url(#ah2)"/>
+      <defs><marker id="ah2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+        <path d="M0 0 L8 4 L0 8 Z" fill="#9C9684"/></marker></defs>
+
+      <!-- boulder -->
+      <ellipse cx="150" cy="140" rx="26" ry="22" fill="#6E5A3D"/>
+      <text x="124" y="115" fill="#9C9684" font-size="11" font-family="monospace">boulder</text>
+      <!-- eddy pocket downstream of boulder -->
+      <circle cx="200" cy="150" r="3.5" fill="#E8C04A"/><circle cx="215" cy="140" r="3.5" fill="#E8C04A"/>
+      <circle cx="205" cy="162" r="3.5" fill="#E8C04A"/>
+      <text x="188" y="192" fill="#E8C04A" font-size="10.5" font-family="monospace" font-weight="700">slack pocket</text>
+
+      <!-- bedrock ledge across current -->
+      <rect x="300" y="70" width="18" height="150" fill="#6E5A3D"/>
+      <text x="270" y="64" fill="#9C9684" font-size="11" font-family="monospace">bedrock ledge</text>
+      <!-- gold jammed on upstream face + base -->
+      <circle cx="294" cy="110" r="3.5" fill="#E8C04A"/><circle cx="294" cy="140" r="3.5" fill="#E8C04A"/>
+      <circle cx="294" cy="170" r="3.5" fill="#E8C04A"/><circle cx="294" cy="195" r="3.5" fill="#E8C04A"/>
+      <text x="238" y="245" fill="#E8C04A" font-size="10.5" font-family="monospace" font-weight="700">upstream face traps</text>
+
+      <!-- bedrock crevices (cracks across flow) below -->
+      <g stroke="#E8C04A" stroke-width="0" >
+      </g>
+      <rect x="400" y="200" width="160" height="20" fill="#6E5A3D"/>
+      <line x1="430" y1="200" x2="430" y2="220" stroke="#241F17" stroke-width="4"/>
+      <line x1="470" y1="200" x2="470" y2="220" stroke="#241F17" stroke-width="4"/>
+      <line x1="510" y1="200" x2="510" y2="220" stroke="#241F17" stroke-width="4"/>
+      <circle cx="430" cy="212" r="3" fill="#E8C04A"/><circle cx="470" cy="212" r="3" fill="#E8C04A"/>
+      <circle cx="510" cy="212" r="3" fill="#E8C04A"/>
+      <text x="400" y="245" fill="#E8C04A" font-size="10.5" font-family="monospace" font-weight="700">crevices ⟂ to flow</text>
+      <text x="400" y="260" fill="#9C9684" font-size="10" font-family="monospace">the bank vault</text>
+    </svg>
+    <div class="key">
+      <span><i style="background:#6E5A3D;"></i>Bedrock / boulder</span>
+      <span><i style="background:#2C4A5A;"></i>Water</span>
+      <span><i style="background:#E8C04A;"></i>Gold</span>
+    </div>
+    <figcaption>Three classic traps in one reach. Behind a <b>boulder</b>, a slack pocket forms where heavies drop. A <b>bedrock ledge</b> acts as a natural riffle — gold jams against its upstream face and base. And <b>crevices running across the current</b> are the richest of all: gold rolling along the bottom falls in and can't climb out. Cracks that run <em>with</em> the flow leak gold; cracks <em>across</em> it hold gold.</figcaption>
+  </figure>
+
+  <p>The full family: <strong>inside bends</strong> (slack water on the point bar); <strong>behind boulders and ledges</strong> (slack pockets just downstream, plus the upstream face of a ledge); <strong>bedrock crevices and potholes</strong> — especially cracks perpendicular to flow, the single richest trap; <strong>the upstream head of any bar or tailout</strong>, because gold drops at the first opportunity; <strong>gradient breaks</strong>, where a steep reach flattens and the water abruptly loses carrying capacity; and <strong>confluences</strong>, where a tributary meets slower water and heavies pile up.</p>
+
+  <h3>Benches — the fossil pay streak</h3>
+  <p>Creeks migrate and cut downward over time. A <strong>bench</strong> is an old creek gravel deposit now stranded above the current water level — sometimes well up the hillside. It was once the creek bottom, and it can hold gold that's been sitting there since that old channel was active. Rounded gravel sitting high above the water is the tell; angular gravel is just local slope wash and means little. Benches are the most-overlooked target because most people walk right past them to work the active stream — and for Fishhook, the documented record says the benches held the richest ground (Section 7).</p>
+</section>
+
+<!-- ========== 5 ========== -->
+<section id="bedrock">
+  <span class="sec-num">Five</span>
+  <h2>Reading depth to bedrock</h2>
+  <p>The whole point of reading is to avoid muscling cobble you didn't have to. Since the pay streak sits on bedrock, "how deep is bedrock here?" is the question that decides where you dig. Read it, cheapest-effort first, before you commit.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 280" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="560" height="280" fill="#241F17"/>
+      <!-- cross-section of a channel: overburden over bedrock -->
+      <!-- sky/air -->
+      <!-- water column -->
+      <rect x="40" y="40" width="480" height="40" fill="#2C4A5A" opacity="0.6"/>
+      <text x="48" y="34" fill="#7FB0C8" font-size="12" font-family="monospace">water surface</text>
+      <!-- cobble overburden -->
+      <path d="M40 80 L520 80 L520 150 Q400 165 280 155 Q160 148 40 165 Z" fill="#4A3F2D"/>
+      <text x="210" y="120" fill="#9C9684" font-size="13" font-family="monospace" font-weight="700">cobble overburden</text>
+      <text x="180" y="138" fill="#6E6857" font-size="11" font-family="monospace">(move this out of the way)</text>
+      <!-- pay gravel band -->
+      <path d="M40 165 Q160 148 280 155 Q400 165 520 150 L520 178 Q400 192 280 183 Q160 176 40 190 Z" fill="#6B5A38"/>
+      <text x="150" y="180" fill="#E8C04A" font-size="12" font-family="monospace" font-weight="700">pay gravel + black sand</text>
+      <!-- bedrock, irregular top with crevices -->
+      <path d="M40 190 Q160 176 280 183 Q400 192 520 178 L520 260 L40 260 Z" fill="#6E5A3D"/>
+      <!-- crevices -->
+      <line x1="150" y1="184" x2="150" y2="215" stroke="#241F17" stroke-width="5"/>
+      <line x1="300" y1="183" x2="300" y2="220" stroke="#241F17" stroke-width="5"/>
+      <line x1="430" y1="185" x2="430" y2="212" stroke="#241F17" stroke-width="5"/>
+      <circle cx="150" cy="205" r="3.5" fill="#E8C04A"/><circle cx="300" cy="208" r="3.5" fill="#E8C04A"/>
+      <circle cx="430" cy="203" r="3.5" fill="#E8C04A"/>
+      <text x="215" y="240" fill="#B89A5A" font-size="13" font-family="monospace" font-weight="700">BEDROCK</text>
+      <text x="180" y="255" fill="#9C9684" font-size="10.5" font-family="monospace">clean every crevice to the bottom</text>
+      <!-- probe rod -->
+      <line x1="500" y1="20" x2="500" y2="180" stroke="#C25A3A" stroke-width="3"/>
+      <circle cx="500" cy="180" r="4" fill="#C25A3A"/>
+      <text x="455" y="16" fill="#C25A3A" font-size="11" font-family="monospace" font-weight="700">probe rod</text>
+    </svg>
+    <div class="key">
+      <span><i style="background:#4A3F2D;"></i>Overburden</span>
+      <span><i style="background:#6B5A38;"></i>Pay gravel</span>
+      <span><i style="background:#6E5A3D;"></i>Bedrock</span>
+      <span><i style="background:#E8C04A;"></i>Gold</span>
+    </div>
+    <figcaption>A cross-section of what you're digging toward. Gold works down through the loose <b>overburden</b> until it reaches the <b>gravel–bedrock contact</b> — the pay layer, marked by packed gravel and heavy black sand — then jams into <b>bedrock crevices</b>. A <b>probe rod</b> driven down gives a hard, repeatable stop at true bedrock, so you can map its depth before digging.</figcaption>
+  </figure>
+
+  <p><strong>Read exposed bedrock first.</strong> Walk the stretch and mark every place bedrock shows — in the bed, as ledges, as outcrops. Bedrock runs in a consistent direction and tilt over a short reach, so two or three exposures let you project where it dips just under the gravel — your minimum-overburden dig.</p>
+  <p><strong>Read the creek's shape.</strong> Bedrock is shallow at inside bends, upstream bar heads, just below ledges and boulders, and where the channel narrows. It's deep on outside bends, wide flats, and the middle of big open bars.</p>
+  <p><strong>Read the cut bank.</strong> The outside-bend cut bank is a free vertical slice through the whole deposit — you can often see overburden, then a change in the gravel, then the bedrock line, and read total depth before digging.</p>
+  <p><strong>Probe, then trust the material change.</strong> A steel rod gives a hard, repeatable stop at bedrock (a buried boulder stops in one spot but not 18 inches away). As you near bedrock the material packs tighter, gets wetter and clayier, and the black sand climbs — that's your "you're in the pay zone" signal.</p>
+
+  <div class="callout caution">
+    <span class="tag">True vs false bedrock</span>
+    <p>If the layer that stops your shovel <strong>crumbles</strong> into diggable chunks, or your rod punches through it into more gravel, it's <strong>false bedrock</strong> — a packed clay or hardpan that traps some gold but hides more pay beneath it. True bedrock is continuous solid rock that matches the outcrops nearby. Always test before you call a hole finished.</p>
+  </div>
+</section>
+
+<!-- ========== 6 ========== -->
+<section id="sample">
+  <span class="sec-num">Six</span>
+  <h2>Sampling to find the pay streak</h2>
+  <p>Amateurs dig one hole where it looks good and judge the whole creek by it. Experts sample systematically to find the <em>edges</em> of the pay streak, then follow it. The streak is a ribbon; your job is to map it.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 260" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="560" height="260" fill="#241F17"/>
+      <!-- channel -->
+      <rect x="0" y="30" width="560" height="200" fill="#2C4A5A" opacity="0.5"/>
+      <text x="20" y="22" fill="#9C9684" font-size="12" font-family="monospace">flow →</text>
+      <!-- pay streak ribbon running diagonally -->
+      <path d="M-10 90 Q180 110 320 150 Q450 182 570 190 L570 220 Q450 212 320 180 Q180 140 -10 120 Z"
+            fill="#6B5A38" opacity="0.85"/>
+      <text x="360" y="205" fill="#E8C04A" font-size="12" font-family="monospace" font-weight="700">pay streak</text>
+      <!-- cross-section sample line (bank to bank) -->
+      <line x1="230" y1="30" x2="230" y2="230" stroke="#C25A3A" stroke-width="2" stroke-dasharray="4 4"/>
+      <text x="150" y="48" fill="#C25A3A" font-size="11" font-family="monospace" font-weight="700">test line ⟂ to flow</text>
+      <!-- sample holes with color counts -->
+      <g font-family="monospace" font-size="10" font-weight="700">
+        <circle cx="230" cy="60" r="8" fill="#2C2619" stroke="#6E6857" stroke-width="2"/><text x="245" y="64" fill="#6E6857">0</text>
+        <circle cx="230" cy="105" r="8" fill="#2C2619" stroke="#D29A3A" stroke-width="2"/><text x="245" y="109" fill="#D29A3A">3</text>
+        <circle cx="230" cy="135" r="9" fill="#2C2619" stroke="#E8C04A" stroke-width="2.5"/><text x="246" y="139" fill="#E8C04A">9 ←peak</text>
+        <circle cx="230" cy="165" r="8" fill="#2C2619" stroke="#D29A3A" stroke-width="2"/><text x="245" y="169" fill="#D29A3A">2</text>
+        <circle cx="230" cy="205" r="8" fill="#2C2619" stroke="#6E6857" stroke-width="2"/><text x="245" y="209" fill="#6E6857">0</text>
+      </g>
+    </svg>
+    <div class="key">
+      <span><i style="background:#6B5A38;"></i>Pay streak</span>
+      <span><i style="background:#E8C04A;"></i>High color count</span>
+      <span><i style="background:#6E6857;"></i>Barren</span>
+    </div>
+    <figcaption>Test <b>across</b> the flow, not along it. A line of sample holes bank-to-bank cuts through the streak, and the color count rises to a <b>peak</b> where you hit its center, then falls off on either side. That peak tells you where the ribbon is; sampling up- and downstream then tells you which way it runs. <b>Follow the values</b> — let the color count, not a hunch, decide your next hole.</figcaption>
+  </figure>
+
+  <p>The routine: dig or pan a line of holes running bank to bank, sampling each all the way <strong>to bedrock</strong> (a shallow sample tells you almost nothing). Count the colors in each pan — more colors mean you're near the streak's center, fewer mean you're on its edge. Then test upstream and downstream from your best hole to confirm the streak's direction, and stay on it. You're not mining yet; you're building a little contour map of where the values rise and fall. That map <em>is</em> the pay streak.</p>
+
+  <div class="callout">
+    <span class="tag">This is your app's home turf</span>
+    <p>Following a pay streak is cross-sectional sampling to resolve a signal — exactly the spatial-reasoning your Field Brain evaluation model is built around. Treat the physical creek like a dataset you're sampling to find an edge.</p>
+  </div>
+</section>
+
+<!-- ========== 7 ========== -->
+<section id="fishhook">
+  <span class="sec-num">Seven</span>
+  <h2>Fishhook Creek — the verified story</h2>
+  <p>Everything below is corroborated by USGS, Alaska DGGS, the Alaska Earthquake Center, or NOAA/NWS — not inferred. Three forces built the ground you'll work: a gold source, a seismic engine, and a flood engine, all over a glacial foundation.</p>
+
+  <div class="callout verified">
+    <span class="tag">Verified · the gold source</span>
+    <p>The Hatcher Pass pluton — a zoned ~74-million-year-old quartz-diorite-to-tonalite body — <strong>underlies the headwaters of Willow Creek and Fishhook Creek, and most of the gold deposits occur in these rocks.</strong> Early prospectors worked placer gold specifically around Fishhook Creek by hand. Your placer gold has a proven lode parent right at the top of your own drainage.</p>
+    <p class="src">USGS / DGGS Talkeetna Mountains geology; Willow Creek district records.</p>
+  </div>
+
+  <div class="callout verified">
+    <span class="tag">Verified · the seismic engine</span>
+    <p>Your creek sits on the <strong>Castle Mountain fault</strong>, which runs along the base of Hatcher Pass and is considered one of the most important active faults in all of Southcentral Alaska — the only fault in southern Alaska with both historic seismicity and Holocene surface faulting (it generated the 1984 M5.6 Sutton quake). The region also rode through the 1964 M9.2 megathrust, after which downcutting and bank erosion increased in adjusted areas.</p>
+    <p class="src">Alaska Earthquake Center; USGS OFR 98-480 / OFR 01-504; DGGS PIR 2017-2.</p>
+  </div>
+
+  <p><strong>Why the fault matters to your pan:</strong> active uplift and faulting keep forcing the creek to cut downward. Downcutting is exactly what strands old gold-bearing gravels as <em>benches</em> above the modern channel — the fossil pay streaks from Section 4. The tectonics are actively manufacturing your best-odds, most-overlooked target.</p>
+
+  <div class="callout verified">
+    <span class="tag">Verified · the flood engine</span>
+    <p>Your drainage floods hard and episodically. The Little Susitna at the Hatcher Pass Rd bridge — which Fishhook feeds — has a documented peak crest of <strong>12.45 ft on 21 Sept 2012</strong> and 10.97 ft in Aug 2006, against a moderate-flood stage of 10.9 ft. Regionally, Alaska's biggest non-outburst floods come from snowmelt, rain-on-snow, and atmospheric rivers — with an atmospheric river present on 83% of extreme-flood days.</p>
+    <p class="src">NOAA/NWS gage LSOA2; USGS SIR 2025-5056.</p>
+  </div>
+
+  <p><strong>Why the floods matter to your read:</strong> when Section 2 tells you to "raise the water and read the flood," you're now picturing a real, documented ~12-foot crest — the actual events that positioned the gold in Fishhook's gravels. The trickle you'll stand over in summer never moved a flake.</p>
+
+  <div class="callout verified">
+    <span class="tag">Verified · the glacial foundation</span>
+    <p>The valley was shaped by ice: in the Willow Creek district, <strong>Quaternary glacial deposits and alluvium form the valley floors</strong>, and across the Mat-Su the extent of the Naptowne glaciation largely controls where sand and gravel deposits sit. On a comparable district creek, the record notes <strong>the richest ground was on the benches, not the active channel.</strong></p>
+    <p class="src">USGS Bulletin 933-C / 592-H; Mat-Su Borough Mineral Resources Assessment.</p>
+  </div>
+
+  <p class="pull">Put together: gold enters high from a proven pluton, active faulting and glacial base-level change strand it in benches as the creek downcuts, and episodic floods place it in the traps. Hunt the benches first, read the creek as flood-built, and remember the source is upstream and local — so coarser gold rides nearer the headwaters.</p>
+</section>
+
+<!-- ========== 8 ========== -->
+<section id="walkup">
+  <span class="sec-num">Eight</span>
+  <h2>The walk-up routine</h2>
+  <p>When you reach a stretch, run this before you touch a shovel. This sequence <em>is</em> creek reading.</p>
+  <ol>
+    <li><strong>Walk the whole stretch first.</strong> Don't dig the first tempting spot. Build a picture.</li>
+    <li><strong>Map the bedrock.</strong> Note every outcrop and ledge; establish which way bedrock strikes and dips.</li>
+    <li><strong>Read the bends.</strong> Mark point bars (deposition, easy digging, good odds) and cut banks (free cross-sections).</li>
+    <li><strong>Scan for benches.</strong> Look up the banks for flat steps of rounded gravel above the water — Fishhook's downcutting makes these likely, and the record says they held the richest ground.</li>
+    <li><strong>Find the slack points.</strong> Behind boulders and ledges, at gradient breaks, at confluences, at bar heads and tailouts.</li>
+    <li><strong>Picture the flood.</strong> Raise the water toward that documented ~12-ft crest. Where does the current thread go then? What's underwater and taking the force?</li>
+    <li><strong>Rank spots</strong> by (odds of gold) × (ease of reaching bedrock). A bar head with bedrock 18 inches down beats a cut-bank base under four feet of cobble — especially with kids along.</li>
+    <li><strong>Probe your top 2–3,</strong> confirm bedrock depth, then sample the winner to bedrock, clean the crevices, and pan. Let the color count send you to the next hole.</li>
+  </ol>
+
+  <div class="callout">
+    <span class="tag">The whole thing, one more time</span>
+    <p>Gold is trying to stop and sink. Find where the flood slowed and where the heavy stuff got trapped on or in bedrock, and you've found the gold. Read the flood, not the trickle. Follow the values, don't judge on one hole. Bedrock crevices are the vault; point-bar heads and benches are the easy money.</p>
+  </div>
+</section>
+
+<div class="end">
+  Field Brain companion · Reading Fishhook Creek<br>
+  Geology verified against USGS · Alaska DGGS · Alaska Earthquake Center · NOAA/NWS<br>
+  Research aid only — always verify claim status with BLM before working any ground.
+</div>
+
+</body>
+</html>
