@@ -264,9 +264,14 @@ main { padding: 0 20px; }
         <div class="tiny subtle mono" id="header-sub">Placer prospecting · Mat-Su</div>
       </div>
     </div>
-    <button class="btn ghost sm" onclick="openData()" aria-label="Data">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
-    </button>
+    <div class="row" style="gap:4px;">
+      <button class="btn ghost sm" onclick="openTools()" aria-label="Tools">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      </button>
+      <button class="btn ghost sm" onclick="openData()" aria-label="Data">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -2176,6 +2181,96 @@ function deleteBrief(id) {
   closeModal();
   renderResearch();
   toast('Brief deleted');
+}
+
+// ===========================================================================
+// TOOLS LAUNCHER + SITES->MAP BRIDGE  (integration layer)
+// The kit is four pages that share one origin. Field Brain is the hub; the
+// map, bench hunter, and creek manual are companion tools it launches. Logged
+// sites are pushed to a shared channel so the map can render them as a layer.
+// ===========================================================================
+
+// Write current GPS-tagged sites to a same-origin channel the map can read.
+// localStorage works across pages on the deployed (github-pages) origin; it's
+// wrapped in try/catch so opening the file directly (file://) never throws.
+function syncSitesToMap() {
+  try {
+    const gpsSites = S.sites.filter(s => s.gps).map(s => {
+      const sc = evalScore(s);
+      const pct = Math.round((s.score != null ? s.score : sc.pct) * 100);
+      const [verdict] = scoreVerdict(s.score != null ? s.score : sc.pct);
+      return {
+        id: s.id, name: s.name || 'Prospect',
+        lat: s.gps.lat, lon: s.gps.lon,
+        score: pct, verdict,
+        heightAboveStream: s.gps.heightAboveStream != null ? s.gps.heightAboveStream : null,
+      };
+    });
+    localStorage.setItem('fieldgold_sites', JSON.stringify({ updated: Date.now(), sites: gpsSites }));
+    return gpsSites.length;
+  } catch (e) { return null; }
+}
+
+function openTools() {
+  const gpsCount = S.sites.filter(s => s.gps).length;
+  const synced = syncSitesToMap();
+  openModal(`
+    <h2>Field tools</h2>
+    <p class="small muted" style="margin:10px 0 16px;">
+      Your companion instruments. Each opens in its own view; your logged sites travel to the map automatically.
+    </p>
+
+    <a class="card tappable" href="map.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:10px;">
+      <div class="row between">
+        <div class="row" style="gap:12px;">
+          <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--gold-faint);color:var(--gold-bright);display:flex;align-items:center;justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.5 2V6L9 4m0 16l6-2m-6 2V4m6 14l5.5 2V6L15 4m0 14V4m0 0L9 6"/></svg>
+          </div>
+          <div>
+            <div class="small soft" style="font-weight:700;">Gold map</div>
+            <div class="tiny subtle">ARDF occurrences · claims · terrain${gpsCount ? ` · your ${gpsCount} site${gpsCount===1?'':'s'}` : ''}</div>
+          </div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+      </div>
+    </a>
+
+    <a class="card tappable" href="bench_hunter.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:10px;">
+      <div class="row between">
+        <div class="row" style="gap:12px;">
+          <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--bg-subtle);color:var(--amber);display:flex;align-items:center;justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18l6-6 4 4 8-8"/><path d="M3 18h18"/></svg>
+          </div>
+          <div>
+            <div class="small soft" style="font-weight:700;">Bench hunter</div>
+            <div class="tiny subtle">Read terrain for old-channel benches</div>
+          </div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+      </div>
+    </a>
+
+    <a class="card tappable" href="creek_manual.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:6px;">
+      <div class="row between">
+        <div class="row" style="gap:12px;">
+          <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--bg-subtle);color:var(--blue);display:flex;align-items:center;justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <div>
+            <div class="small soft" style="font-weight:700;">Creek reading manual</div>
+            <div class="tiny subtle">How to read a creek on the ground</div>
+          </div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+      </div>
+    </a>
+
+    <p class="tiny subtle" style="margin-top:14px;line-height:1.5;">
+      ${synced != null
+        ? `${synced} GPS-tagged site${synced===1?'':'s'} synced to the map. Opens in a new tab so you don't lose your place here.`
+        : `Sites sync to the map when opened from the hosted app. Opening files directly can block this — use the deployed page.`}
+    </p>
+  `);
 }
 
 // ===========================================================================
