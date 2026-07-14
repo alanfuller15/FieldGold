@@ -812,9 +812,8 @@ function renderTripPlanner(gpsSites) {
   let benchStops = [];
   if (window.FieldGoldData) {
     benchStops = FieldGoldData.get('bench').map(b => ({
-      id: 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000))),
-      name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?') +
-            (b.nearest != null ? ' (~' + b.nearest + 'm up)' : ''),
+      id: benchId(b),
+      name: benchLabel(b, true),
       gps: { lat: b.lat, lon: b.lon },
       isBench: true,
     }));
@@ -905,13 +904,33 @@ function renderTripPlanner(gpsSites) {
 
 // All routable stops = logged GPS sites + bench candidates from shared record.
 // One source of truth so the planner, Maps handoff, and GPX export agree.
+
+// Honest bench labeling: REM benches (source==='REM') are geomorphic terrace
+// candidates from the lidar REM/TerEx method — labeled as such and distinct
+// from the Bench Hunter's cross-section "Profile N" benches.
+function benchLabel(b, withHeight) {
+  if (b.source === 'REM') {
+    const h = b.nearest != null ? ` (~${b.nearest}m up` : '';
+    const a = b.area_m2 != null ? `, ${(b.area_m2/1000).toFixed(1)}k m²` : '';
+    return `REM terrace candidate ${b.rank != null ? '#' + b.rank : ''}`.trim() +
+           (withHeight && h ? h + a + ')' : '');
+  }
+  return 'Bench — Profile ' + (b.profile != null ? b.profile : '?') +
+         (withHeight && b.nearest != null ? ' (~' + b.nearest + 'm up)' : '');
+}
+function benchId(b) {
+  return b.source === 'REM'
+    ? 'rem-' + (b.rank != null ? b.rank : Math.abs(Math.round(b.lat*1000)))
+    : 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000)));
+}
+
 function allRoutableStops() {
   const gpsSites = S.sites.filter(s => s.gps);
   let benchStops = [];
   if (window.FieldGoldData) {
     benchStops = FieldGoldData.get('bench').map(b => ({
-      id: 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000))),
-      name: 'Bench — Profile ' + (b.profile != null ? b.profile : '?'),
+      id: benchId(b),
+      name: benchLabel(b, false),
       gps: { lat: b.lat, lon: b.lon }, isBench: true,
     }));
   }
