@@ -1542,22 +1542,22 @@ async function buildDayPlan() {
   for (let i = 0; i < ordered.length; i++) {
     const s = ordered[i];
     const kind = s.isBench ? 'Bench candidate' : 'Prospect';
-    let sec = `### ${i+1}. ${s.name}\n`;
-    sec += `- Type: ${kind}\n`;
-    sec += `- Coordinates: ${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}\n`;
-    sec += `- Maps: https://maps.apple.com/?daddr=${s.gps.lat},${s.gps.lon}\n`;
+    const mapsUrl = `https://maps.apple.com/?daddr=${s.gps.lat},${s.gps.lon}`;
+    let rows = `<div class="kv"><span>Type</span><b>${kind}</b></div>`;
+    rows += `<div class="kv"><span>Coordinates</span><b class="mono">${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}</b></div>`;
+    rows += `<div class="kv"><span>Navigate</span><a href="${mapsUrl}">Open in Maps ↗</a></div>`;
     if (s.isBench) {
-      sec += `- On the ground: this is where the profile crosses the creek. Use the Bench Hunter's walk directions (which bank, how far, how high) to reach the shelf. Read the gravel — rounded = old channel, angular = slope wash.\n`;
+      rows += `<p class="ground">On the ground: this is where the profile crosses the creek. Use the Bench Hunter's walk directions (which bank, how far, how high) to reach the shelf. Read the gravel — rounded = old channel, angular = slope wash.</p>`;
     }
     if (online) {
       const [geo, ardf] = await Promise.all([ nearbyGeochem(s.gps, 800), nearbyArdf(s.gps) ]);
-      if (ardf) sec += `- Nearby documented gold (ARDF): ${ardf}\n`;
+      if (ardf) rows += `<div class="hit"><span class="tag gold">gold</span> Documented occurrence nearby (ARDF): ${esc(ardf)}</div>`;
       if (geo && geo.length) {
-        sec += `- Nearby geochem samples: ${geo.map(g=>`${g.lab} (${g.dist}m)`).join(', ')} — pull assays on USGS mrdata before relying on them; many 1980s samples couldn't detect gold at useful levels.\n`;
+        rows += `<div class="hit"><span class="tag blue">geochem</span> Nearby samples: ${geo.map(g=>`${esc(g.lab)} (${g.dist}m)`).join(', ')} <em>— pull real assays on USGS mrdata; many 1980s samples couldn't detect gold at useful levels.</em></div>`;
       }
-      if (!ardf && (!geo || !geo.length)) sec += `- No documented occurrence or geochem sample within range of this stop.\n`;
+      if (!ardf && (!geo || !geo.length)) rows += `<div class="hit muted">No documented occurrence or geochem sample within range.</div>`;
     }
-    stopSections.push(sec);
+    stopSections.push(`<div class="stop"><h3><span class="num">${i+1}</span> ${esc(s.name)}</h3>${rows}</div>`);
   }
 
   const { gear, ppe } = tailoredGear(ordered);
@@ -1565,49 +1565,75 @@ async function buildDayPlan() {
   let totalKm = 0;
   for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
 
-  const md = `# FieldGold — Day Plan
-**Date prepared:** ${date}
-**Stops:** ${ordered.length}  ·  **Straight-line route:** ~${totalKm.toFixed(1)} km
-${online ? '' : '\n> Built offline — nearby-hit lookup skipped. Rebuild with signal to include documented gold and geochem near each stop.\n'}
----
+  const checkList = arr => arr.map(x=>`<label class="chk"><input type="checkbox"><span>${esc(x)}</span></label>`).join('');
 
-## Route (in order)
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FieldGold Day Plan — ${date}</title>
+<style>
+  :root{--bg:#14110C;--card:#1E1A13;--line:#332C1E;--gold:#C9A227;--goldb:#E8C04A;--ink:#F2EDE0;--soft:#C9C2B0;--sub:#9C9684;--blue:#5B8AA6;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55;padding:24px 18px 60px;max-width:760px;margin:0 auto;}
+  h1{font-size:1.6rem;margin:0 0 4px;color:var(--goldb)}
+  .meta{color:var(--sub);font-size:.9rem;margin-bottom:6px}
+  .mono{font-family:ui-monospace,Menlo,monospace}
+  .banner{background:#2E2410;border:1px solid var(--gold);border-radius:8px;padding:10px 12px;font-size:.85rem;color:var(--goldb);margin:14px 0}
+  h2{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px;margin:28px 0 12px}
+  .routelist{list-style:none;padding:0;margin:0}
+  .routelist li{padding:7px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .routelist .mono{color:var(--sub);font-size:.85rem}
+  .note{font-size:.85rem;color:var(--sub);font-style:italic;margin:12px 0 0;line-height:1.5}
+  .stop{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .stop h3{margin:0 0 10px;font-size:1.05rem;display:flex;align-items:center;gap:10px}
+  .num{width:26px;height:26px;border-radius:50%;background:var(--gold);color:#14110C;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;flex-shrink:0}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+  .kv span{color:var(--sub)}
+  .kv a{color:var(--goldb);text-decoration:none;font-weight:600}
+  .ground{font-size:.86rem;color:var(--soft);background:rgba(91,138,166,.08);border-radius:6px;padding:8px 10px;margin:10px 0 0}
+  .hit{font-size:.86rem;color:var(--soft);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+  .hit em{color:var(--sub);font-size:.82rem}
+  .hit.muted{color:var(--sub);font-style:italic}
+  .tag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:10px;margin-right:6px;text-transform:uppercase;letter-spacing:.04em}
+  .tag.gold{background:var(--gold);color:#14110C}
+  .tag.blue{background:var(--blue);color:#0e1a20}
+  .chk{display:flex;align-items:flex-start;gap:10px;padding:7px 0;font-size:.92rem;cursor:pointer}
+  .chk input{width:20px;height:20px;margin-top:1px;accent-color:var(--gold);flex-shrink:0}
+  .foot{margin-top:32px;font-size:.8rem;color:var(--sub);font-style:italic;text-align:center;border-top:1px solid var(--line);padding-top:16px}
+</style></head><body>
+  <h1>FieldGold — Day Plan</h1>
+  <div class="meta">Prepared ${date} · ${ordered.length} stop${ordered.length===1?'':'s'} · ~${totalKm.toFixed(1)} km straight-line</div>
+  ${online ? '' : '<div class="banner">Built offline — nearby-hit lookup skipped. Rebuild with signal to include documented gold and geochem near each stop.</div>'}
 
-${ordered.map((s,i)=>`${i+1}. ${s.name} — ${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}`).join('\n')}
+  <h2>Route (in order)</h2>
+  <ul class="routelist">
+    ${ordered.map((s,i)=>`<li>${i+1}. ${esc(s.name)} <span class="mono">${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}</span></li>`).join('')}
+  </ul>
+  <p class="note">This <b>drives</b> you to each stop's nearest road access, in order — it doesn't walk you onto a bench. For benches, the coordinate is the creek-crossing; use the Bench Hunter's walk directions for the on-foot leg up to the shelf.</p>
 
-The route **drives** you to each stop's nearest road access in order — it does not walk you onto a bench. For benches, the coordinate is the creek-crossing; use the Bench Hunter's walk directions for the on-foot leg.
+  <h2>Stops in detail</h2>
+  ${stopSections.join('')}
 
----
+  <h2>Gear to bring</h2>
+  ${checkList(gear)}
 
-## Stops in detail
+  <h2>PPE & safety (Alaska)</h2>
+  ${checkList(ppe)}
 
-${stopSections.join('\n')}
----
+  <h2>Before you dig — verify</h2>
+  ${checkList([
+    'Confirm claim status for each spot on the map (BLM layer) — data lags reality; check BLM MLRS before filing or digging.',
+    'Confirm land ownership (state rec area vs. private) — much of Hatcher-to-Parks is private.',
+    'Pull real assays for any geochem samples listed above before weighting them.'
+  ])}
 
-## Gear to bring
+  <p class="foot">Generated by FieldGold. Documented data is a research aid — the ground makes the final call.</p>
+</body></html>`;
 
-${gear.map(g=>`- [ ] ${g}`).join('\n')}
-
-## PPE & safety (Alaska)
-
-${ppe.map(p=>`- [ ] ${p}`).join('\n')}
-
----
-
-## Before you dig — verify
-
-- [ ] Confirm claim status for each spot on the map (BLM layer) — data lags reality; check BLM MLRS before filing or digging.
-- [ ] Confirm land ownership (state rec area vs. private) — much of Hatcher-to-Parks is private.
-- [ ] Pull real assays for any geochem samples listed above before weighting them.
-
-*Generated by FieldGold. Documented data is a research aid — the ground makes the final call.*
-`;
-
-  // Download as a .md file
-  const blob = new Blob([md], { type: 'text/markdown' });
+  // Download as a self-contained HTML file — opens formatted in any browser, no rendering step.
+  const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `fieldgold-day-plan-${date}.md`;
+  a.href = url; a.download = `fieldgold-day-plan-${date}.html`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast(online ? 'Day plan saved' : 'Day plan saved (offline — no hit lookup)');
