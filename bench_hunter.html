@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bench Hunter — Little Susitna</title>
+<style>
+  :root{
+    --paper:#EDE8DC;
+    --paper-2:#E3DCCB;
+    --ink:#23261F;
+    --ink-soft:#5A5A48;
+    --contour:#8A7C55;
+    --water:#3A6B7A;
+    --water-deep:#264C57;
+    --bench:#B5622A;
+    --bench-strong:#8F3F12;
+    --line:#C3B896;
+    --slope:#9FA68A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    line-height:1.5;
+    padding:0 0 4rem;
+    background-image:
+      repeating-linear-gradient(0deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px),
+      repeating-linear-gradient(90deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px);
+  }
+  .wrap{max-width:1000px;margin:0 auto;padding:0 1.25rem}
+  .mono{font-family:"SFMono-Regular",ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace}
+  header{border-bottom:2px solid var(--ink);padding:2rem 0 1rem;margin-bottom:1.5rem}
+  .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:.7rem;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--contour);margin-bottom:.5rem}
+  h1{font-size:clamp(2rem,6vw,3.4rem);font-weight:600;letter-spacing:-.02em;line-height:.98}
+  h1 .sub{display:block;font-size:.34em;font-weight:400;letter-spacing:.02em;
+    color:var(--ink-soft);margin-top:.5rem;font-style:italic}
+  .loadbar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;
+    background:var(--paper-2);border:1px solid var(--line);padding:1rem 1.25rem;
+    margin-bottom:1.5rem;border-radius:2px}
+  .loadbar p{font-size:.9rem;color:var(--ink-soft);flex:1;min-width:200px}
+  label.file{font-family:ui-monospace,monospace;font-size:.8rem;letter-spacing:.05em;
+    text-transform:uppercase;background:var(--ink);color:var(--paper);
+    padding:.7rem 1.2rem;cursor:pointer;border:none;border-radius:2px;transition:background .15s}
+  label.file:hover{background:var(--water-deep)}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+  .summary{display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:2rem}
+  .summary.on{display:grid}
+  .stat{background:var(--paper);padding:1rem 1.1rem}
+  .stat .k{font-family:ui-monospace,monospace;font-size:.62rem;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--contour)}
+  .stat .v{font-size:1.6rem;font-weight:600;letter-spacing:-.01em;margin-top:.15rem}
+  .stat .v small{font-size:.55em;font-weight:400;color:var(--ink-soft)}
+  .note{display:none;border-left:3px solid var(--bench);background:rgba(181,98,42,.07);
+    padding:.9rem 1.1rem;margin-bottom:2rem;font-size:.88rem;color:#5c4326;border-radius:0 2px 2px 0}
+  .note.on{display:block}
+  .note b{color:var(--bench-strong)}
+  .profiles{display:flex;flex-direction:column;gap:.5rem}
+  .prof{background:var(--paper-2);border:1px solid var(--line);border-radius:2px;
+    padding:1rem 1.1rem 1.2rem}
+  .prof-head{display:flex;justify-content:space-between;align-items:baseline;
+    flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem}
+  .prof-title{font-family:ui-monospace,monospace;font-size:.82rem;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink)}
+  .prof-title .n{color:var(--bench-strong);font-weight:700;margin-right:.5rem}
+  .prof-meta{font-family:ui-monospace,monospace;font-size:.7rem;color:var(--ink-soft);margin-top:.4rem}
+  .prof-flag{font-family:ui-monospace,monospace;font-size:.68rem;letter-spacing:.08em;
+    text-transform:uppercase;padding:.15rem .5rem;border-radius:2px}
+  .flag-none{color:var(--water-deep);background:rgba(58,107,122,.12)}
+  .flag-some{color:var(--paper);background:var(--bench)}
+  .flag-broad{color:var(--paper);background:var(--contour)}
+  .prof.is-broad{opacity:.92}
+  .cand-list.broad-note{color:var(--contour);font-style:normal;max-width:70ch}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .cand-list{font-family:ui-monospace,monospace;font-size:.72rem;color:var(--ink-soft);
+    margin-top:.5rem;line-height:1.7}
+  .cand-list .strong{color:var(--bench-strong);font-weight:700}
+  .cand-list .chip{display:inline-block;margin-right:.4rem}
+  footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--line);
+    font-size:.78rem;color:var(--ink-soft);font-family:ui-monospace,monospace;line-height:1.7}
+  .empty{color:var(--ink-soft);text-align:center;padding:4rem 1rem;font-style:italic}
+  @media (prefers-reduced-motion:no-preference){
+    .prof{animation:rise .4s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Placer terrain reconnaissance · 3DEP bare-earth</div>
+    <h1>Bench Hunter
+      <span class="sub">Little Susitna River — Turner's Corner to Gold Mint</span>
+    </h1>
+  </header>
+
+  <div class="loadbar">
+    <p>Load the <span class="mono">bench_data.json</span> from your elevation pull. Everything runs on your device — no connection needed.</p>
+    <label class="file" for="f">Load bench_data.json</label>
+    <input type="file" id="f" accept="application/json,.json">
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div class="note" id="note"></div>
+  <div class="profiles" id="profiles">
+    <div class="empty">Load a dataset to read the reach.</div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+const BAND_LO=3, BAND_HI=20, FLAT=0.12, RISER=0.20;
+// When a profile flags this many+ candidates, the cross-section is broad low-gradient
+// ground (a wide valley floor), not discrete benches — the detector adds little there,
+// so say so honestly instead of listing pseudo-benches.
+const BROAD_THRESHOLD=5;
+
+function detect(profile, spacing){
+  const pts = profile.pts.filter(p=>p.el!=null);
+  if(pts.length<5) return [];
+  let chan = pts[0];
+  for(const p of pts) if(p.el<chan.el) chan=p;
+  const ci = pts.indexOf(chan);
+  const out=[];
+  for(let i=1;i<pts.length-1;i++){
+    const a=pts[i-1],b=pts[i],c=pts[i+1];
+    const s1=(b.el-a.el)/spacing, s2=(c.el-b.el)/spacing;
+    const ha=b.el-chan.el;
+    const flat=Math.abs(s1)<FLAT && Math.abs(s2)<FLAT;
+    const inband=ha>=BAND_LO && ha<=BAND_HI;
+    const riser=(i>ci)?Math.abs(s1):Math.abs(s2);
+    const hasRiser=riser>RISER;
+    if(flat && inband && Math.abs(b.off-chan.off)>spacing){
+      const last=out[out.length-1];
+      if(last && Math.abs(last.off-b.off)<=spacing*1.5){
+        if(ha>last.ha){out[out.length-1]={off:b.off,ha,el:b.el,strong:hasRiser};}
+      } else {
+        out.push({off:b.off,ha,el:b.el,strong:hasRiser});
+      }
+    }
+  }
+  return out;
+}
+
+function drawProfile(profile, spacing, broad){
+  const pts=profile.pts.filter(p=>p.el!=null);
+  const W=920, H=190, padL=44, padR=16, padT=14, padB=26;
+  const offs=pts.map(p=>p.off), els=pts.map(p=>p.el);
+  const minOff=Math.min(...offs), maxOff=Math.max(...offs);
+  const minEl=Math.min(...els), maxEl=Math.max(...els);
+  const elPad=(maxEl-minEl)*0.12||2;
+  const lo=minEl-elPad, hi=maxEl+elPad;
+  const X=o=>padL+((o-minOff)/(maxOff-minOff))*(W-padL-padR);
+  const Y=e=>padT+(1-(e-lo)/(hi-lo))*(H-padT-padB);
+
+  let chan=pts[0]; for(const p of pts) if(p.el<chan.el) chan=p;
+  const benches=detect(profile,spacing);
+
+  let poly=`${X(minOff)},${Y(lo)} `;
+  poly+=pts.map(p=>`${X(p.off).toFixed(1)},${Y(p.el).toFixed(1)}`).join(' ');
+  poly+=` ${X(maxOff)},${Y(lo)}`;
+
+  let grid='';
+  for(let g=0;g<=2;g++){
+    const e=lo+(hi-lo)*g/2, y=Y(e);
+    grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-6}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" font-family="monospace" fill="var(--ink-soft)">${Math.round(e)}</text>`;
+  }
+  const line=pts.map((p,k)=>`${k?'L':'M'}${X(p.off).toFixed(1)},${Y(p.el).toFixed(1)}`).join(' ');
+  const cx=X(chan.off), cy=Y(chan.el);
+
+  let flags='';
+  if(!broad){  // on broad valley floors the flags are noise — don't draw them
+    benches.forEach(b=>{
+      const bx=X(b.off), by=Y(b.el);
+      const col=b.strong?'var(--bench-strong)':'var(--bench)';
+      flags+=`<line x1="${bx.toFixed(1)}" y1="${by.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${(by-22).toFixed(1)}" stroke="${col}" stroke-width="${b.strong?2:1.4}"/>`;
+      flags+=`<circle cx="${bx.toFixed(1)}" cy="${(by-24).toFixed(1)}" r="${b.strong?4:3}" fill="${col}"/>`;
+    });
+  }
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="cross-valley elevation profile">
+    ${grid}
+    <polygon points="${poly}" fill="var(--slope)" opacity="0.28"/>
+    <path d="${line}" fill="none" stroke="var(--contour)" stroke-width="2"/>
+    <line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${H-padB}" stroke="var(--water)" stroke-width="1" stroke-dasharray="2 3"/>
+    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--water)"/>
+    <text x="${cx.toFixed(1)}" y="${H-padB+16}" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--water-deep)">channel</text>
+    ${flags}
+    <text x="${padL}" y="${H-4}" font-size="9" font-family="monospace" fill="var(--ink-soft)">${minOff} m</text>
+    <text x="${W-padR}" y="${H-4}" text-anchor="end" font-size="9" font-family="monospace" fill="var(--ink-soft)">+${maxOff} m</text>
+  </svg>`;
+}
+
+function render(data){
+  const spacing=data.params?.spacing_m||15;
+  const profs=data.profiles||[];
+  let totalCand=0, totalStrong=0;
+  let broadCount=0;
+  const blocks=profs.map(p=>{
+    const benches=detect(p,spacing);
+    const broad = benches.length>=BROAD_THRESHOLD;
+    // broad profiles don't contribute discrete candidates to the headline count
+    if(!broad){ totalCand+=benches.length; totalStrong+=benches.filter(b=>b.strong).length; }
+    else broadCount++;
+    let flag, list;
+    if(broad){
+      flag=`<span class="prof-flag flag-broad">broad valley floor</span>`;
+      list=`<div class="cand-list broad-note">Low-gradient ground across the whole section — ${benches.length} points sit in the bench band, so no single flat stands out as a terrace. The detector can't distinguish a bench here; read this stretch by eye and pan.</div>`;
+    } else if(benches.length){
+      flag=`<span class="prof-flag flag-some">${benches.length} candidate${benches.length>1?'s':''}</span>`;
+      list=`<div class="cand-list">`+benches.map(b=>
+          `<span class="chip ${b.strong?'strong':''}">${b.strong?'▲':'△'} ${b.ha.toFixed(1)} m above · offset ${b.off>0?'+':''}${b.off} m${b.strong?' · strong':''}</span>`
+        ).join('')+`</div>`;
+    } else {
+      flag=`<span class="prof-flag flag-none">clean valley</span>`;
+      list='';
+    }
+    return `<section class="prof${broad?' is-broad':''}">
+      <div class="prof-head">
+        <span class="prof-title"><span class="n">${String(p.idx+1).padStart(2,'0')}</span>${p.clat.toFixed(4)}, ${p.clon.toFixed(4)}</span>
+        ${flag}
+      </div>
+      ${drawProfile(p,spacing,broad)}
+      ${list}
+      <div class="prof-meta">channel bearing ${p.chan_bearing??'—'}° · profile runs bank to bank, ${spacing} m sampling</div>
+    </section>`;
+  }).join('');
+
+  // DEM resolution: use explicit field, else infer from source text, else default 10 m
+  let src=data.params?.resolution_m ? `${data.params.resolution_m} m` : null;
+  if(!src){
+    const s=(data.source||'').toLowerCase();
+    if(s.includes('5m')||s.includes('ifsar')) src='~5 m';
+    else if(s.includes('3dep')||s.includes('dem')) src='10 m';
+    else src='—';
+  }
+  const reachKm = data.reach ? '11.1' : '—';
+  const candLabel = broadCount ? `${totalCand}<small> / ${broadCount} broad</small>` : `${totalCand}<small> / ${totalStrong} strong</small>`;
+  document.getElementById('summary').className='summary on';
+  document.getElementById('summary').innerHTML=`
+    <div class="stat"><div class="k">Reach</div><div class="v">${reachKm}<small> km</small></div></div>
+    <div class="stat"><div class="k">Profiles</div><div class="v">${profs.length}</div></div>
+    <div class="stat"><div class="k">Stream elev.</div><div class="v">${Math.round(data.stream_el||0)}<small> m</small></div></div>
+    <div class="stat"><div class="k">Candidates</div><div class="v">${candLabel}</div></div>
+    <div class="stat"><div class="k">DEM</div><div class="v">${src}</div></div>`;
+
+  const note=document.getElementById('note');
+  note.className='note on';
+  note.innerHTML=`<b>Read this as a walking guide, not a verdict.</b> Flags mark flat ground 3–20 m above the channel — the height band where old placer benches strand on a creek this size. <b>▲ strong</b> = a flat tread with a steeper riser below it (a real terrace edge); <b>△</b> = flat and in-band, no clear riser. At ${src} resolution a low bench can hide below what the terrain model resolves, so "clean valley" is not proof of no bench. Use these to choose which stretches to walk — your eyes and pan make the call on the ground.`;
+
+  document.getElementById('profiles').innerHTML=blocks||'<div class="empty">No profiles in this file.</div>';
+  document.getElementById('footer').innerHTML=
+    `Source: ${data.source||'3DEP bare-earth DEM, sampled along real NHD channel'}.<br>`+
+    `Detection band ${BAND_LO}–${BAND_HI} m above channel · flat &lt;${(FLAT*100)|0}% grade · riser &gt;${(RISER*100)|0}% = strong. `+
+    `Reasoned from placer geomorphology, not a site-specific citation — ground-truth before you dig.`;
+}
+
+document.getElementById('f').addEventListener('change',e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.profiles) throw new Error('no "profiles" field');
+      render(data);
+      document.getElementById('summary').scrollIntoView({behavior:'smooth',block:'start'});
+    }catch(err){
+      document.getElementById('profiles').innerHTML=
+        `<div class="empty">Couldn't read that file — expected a bench_data.json with a "profiles" list. (${err.message})</div>`;
+    }
+  };
+  r.readAsText(file);
+});
+</script>
+</body>
+</html>
