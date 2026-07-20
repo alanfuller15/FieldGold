@@ -2747,6 +2747,17 @@ function dismissOccurrence(id) {
 
 checkPendingOccurrence();
 
+// REACTIVE: when the shared record changes (any tool writes/exports), refresh the
+// visible view automatically — no manual refresh, no step-ordering ritual.
+if (window.FieldGoldData && FieldGoldData.onChange) {
+  FieldGoldData.onChange(function () {
+    var sv = document.getElementById('view-sites');
+    if (sv && sv.classList.contains('active') && typeof renderSites === 'function') renderSites();
+    var rv = document.getElementById('view-research');
+    if (rv && rv.classList.contains('active') && typeof renderResearch === 'function') renderResearch();
+  });
+}
+
 // Register service worker for offline use (fails silently if unsupported or on file://)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

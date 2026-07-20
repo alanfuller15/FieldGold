@@ -1,4 +1,4 @@
-const CACHE = 'fieldgold-v2';
+const CACHE = 'fieldgold-v3';
 
 const SHELL = [
   './',

@@ -40,6 +40,8 @@
   <label class="layer"><input type="checkbox" id="t-sites" checked><span class="swatch" style="background:#6FA760;border:1px solid #E8C04A;"></span>My logged sites (from Field Brain)</label>
   <label class="layer"><input type="checkbox" id="t-bench" checked><span class="swatch" style="background:#D29A3A;border:1px solid #E8C04A;"></span>Bench candidates (from Bench Hunter)</label>
   <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.3;">Alaska = 5m IfSAR, coarser than Lower-48 LiDAR. Shows benches, pits, big workings — not fine trenches.</div>
+  <label class="layer"><input type="checkbox" id="t-rem" checked><span class="swatch" style="background:#5AA9C9;border:1px solid #E8C04A;"></span>REM terrace candidates (lidar)</label>
+  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.3;">Geomorphic terrace targets from lidar REM. NOT confirmed gold — go pan to confirm.</div>
   <div style="border-top:1px solid #4A3F2D;margin:9px 0 7px;"></div>
   <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#6FA760;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Find PROVEN + OPEN ground</button>
   <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Old-timer drainages with documented gold (ARDF) that show no active claim right now. <b style="color:#D29A3A;">Research only — always verify with BLM before acting.</b></div>
@@ -165,7 +167,7 @@ window.addEventListener('load',()=>{
       L.marker([b.lat,b.lon],{icon}).addTo(benchMarkers)
         .bindPopup('<div class="info-pop"><span class="h" style="color:#a8791f;">⛰ Bench candidate</span>'
           +'<b>Profile '+b.profile+'</b><br>'
-          +b.count+' candidate'+(b.count>1?'s':'')+' · nearest '+b.nearest+' m above creek'
+          +((b.count!=null)?(b.count+' candidate'+(b.count>1?'s':'')+' · '):'')+'nearest '+b.nearest+' m above creek'
           +(b.strong?'<br><span style="color:#a8791f;font-weight:700;">has a strong one</span>':'')
           +'<br><span style="font-size:.72rem;color:#6E6857;">Walk the shelf and read the ground — see Bench Hunter.</span></div>');
     });
@@ -178,6 +180,44 @@ window.addEventListener('load',()=>{
     if(e.target.checked){ benchMarkers.addTo(map); loadBenches(); }
     else map.removeLayer(benchMarkers);
   });
+
+  // REM TERRACE CANDIDATES: lidar-derived, source:'REM', own cyan-diamond layer.
+  const remMarkers=L.layerGroup();
+  function loadREM(){
+    remMarkers.clearLayers();
+    let rem=[];
+    if(window.FieldGoldData) rem=FieldGoldData.get('bench').filter(b=>b.source==='REM');
+    if(!rem.length){ log('no REM candidates yet',''); return 0; }
+    rem.forEach(b=>{
+      const icon=L.divIcon({className:'rem-div',iconSize:[16,16],
+        html:'<div style="width:12px;height:12px;background:#5AA9C9;border:2px solid #14110C;transform:rotate(45deg);"></div>'});
+      const ha=(b.area_m2!=null)?(b.area_m2/10000).toFixed(2)+' ha':'';
+      const up=(b.nearest!=null)?b.nearest+' m above river':'';
+      const gold=(b.nearest_gold_m!=null)?'<br>nearest documented gold: '+b.nearest_gold_m+' m':'';
+      L.marker([b.lat,b.lon],{icon}).addTo(remMarkers)
+        .bindPopup('<div class="info-pop"><span class="h" style="color:#2c7a99;">◆ REM terrace candidate</span>'
+          +'<b>'+(b.profile||b.id)+'</b>'+(b.rank?' · rank #'+b.rank:'')+'<br>'
+          +[up,ha].filter(Boolean).join(' · ')+gold
+          +'<br><span style="font-size:.72rem;color:#6E6857;">Lidar geomorphic target — NOT confirmed gold. Walk it and pan to read the ground.</span></div>');
+    });
+    log('REM candidates: '+rem.length+' plotted','ok');
+    return rem.length;
+  }
+  remMarkers.addTo(map);
+  loadREM();
+  document.getElementById('t-rem').addEventListener('change',e=>{
+    if(e.target.checked){ remMarkers.addTo(map); loadREM(); }
+    else map.removeLayer(remMarkers);
+  });
+
+  // REACTIVE: re-read markers whenever the shared record changes (no refresh ritual).
+  if(window.FieldGoldData && FieldGoldData.onChange){
+    FieldGoldData.onChange(function(){
+      if(document.getElementById('t-bench').checked) loadBenches();
+      if(document.getElementById('t-rem').checked) loadREM();
+      if(document.getElementById('t-sites') && document.getElementById('t-sites').checked && typeof loadSites==='function') loadSites();
+    });
+  }
 
   // GEOCHEM SAMPLE MARKERS: NGDB sediment sample points, tappable -> link to official assay page.
   // WFS gives location + lab_id + url; the Au/As values live on the linked USGS page.
