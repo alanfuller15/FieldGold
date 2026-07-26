@@ -9,9 +9,14 @@ Hatcher Pass / Little Susitna area, Alaska. Served from GitHub Pages at
 **This app is used offline, on a phone, in terrain, to decide where a person
 physically walks.** That constrains everything below.
 
-1. **No build step.** No bundler, no npm install, no framework. Plain HTML, CSS
-   and JS that a browser loads directly. If a change would require a build step,
-   the answer is no — propose it in the issue instead of implementing it.
+1. **No build step for the web app.** No bundler, no framework. Plain HTML,
+   CSS and JS that a browser loads directly. If a change would require
+   building the app's own source, the answer is no.
+
+   Exception, scoped: the Capacitor native shell installs npm packages to
+   produce the iOS wrapper. It does not transform app source — `webDir`
+   points at the same files GitHub Pages serves today. This exception covers
+   the shell only. It does not license a bundler or framework for app code.
 2. **No new runtime dependencies from a CDN.** The app must work with no signal.
    Anything fetched at page load is a failure mode at the trailhead.
 3. **Never invent coordinates.** Latitude and longitude values in this repo trace
@@ -475,13 +480,80 @@ Small, one concern, and explicit about what was verified versus assumed. If a
 change touches bench data, say in the PR body which coordinates were compared
 against which source and confirm none moved.
 
-## The `@claude` workflow
+## If you are an agent working in this repo
 
-`.github/workflows/claude.yml` runs with `contents: write` and, at present, no
-`--allowedTools` allowlist. Two consequences worth holding in mind if you are
-that agent:
+Two consequences worth holding in mind:
 
 - You can commit. Prefer opening a pull request over pushing to `main`, so a
   human reads the diff before a phone caches it.
 - The rules above are the whole brief. Nothing else reviews your change before
   it reaches a device used to decide where a person walks.
+
+## Current state
+
+Read `STATE.md` at the start of any work session. It is the source of truth
+for which migration phase is active and what is verified. Do not infer phase
+from conversation history.
+
+## Migration phases
+
+0. Capacitor shell — wrap unchanged, sign, install on device
+1. Consolidate scattered HTML into one routed app
+2. localStorage -> SQLite
+3. Offline tiles -> filesystem + SQLite index
+4. Background GPS
+
+**Ordering constraint: Phase 2 before Phase 3.** The tile index needs real
+tables. Building it on localStorage means rebuilding it.
+
+Do not start a phase before the previous one is marked verified in `STATE.md`.
+
+## Commands
+
+```
+npx cap sync          # after any web asset or plugin change
+npx cap open ios      # opens Xcode
+```
+
+`npx cap sync` is required after every dependency change. Skipping it is the
+most common cause of "the plugin isn't there" confusion.
+
+There is no build step for app code, and there is not going to be one. See
+ground rule 1.
+
+## Verification tiers
+
+Label every factual claim about external systems with one of:
+
+- `[self-tested]` — ran on the dev machine
+- `[fetched]` — retrieved from a live endpoint this session
+- `[externally-verified]` — confirmed on the actual iPhone or in the field
+
+Never present `[self-tested]` as `[externally-verified]`. The first two you can
+produce yourself; the third you cannot, and saying otherwise is how an
+unverified claim gets carried into terrain.
+
+## Network reality
+
+You run locally with normal network access. ARDF, BLM and USGS are reachable —
+fetch them directly rather than asking for a paste, and do not report a failed
+fetch as evidence an endpoint is down without checking it.
+
+What is **not** verifiable here: whether a layer renders on the phone, whether
+tiles survive offline, whether a fix lands in terrain. Those are device checks
+and they belong to Alan.
+
+## Geology data notes
+
+- Bedrock layer is the USGS **Geologic map of Alaska**, not SGMC.
+  SGMC excludes Alaska. This has been gotten wrong before.
+- Working reach: Little Susitna River, near Turner's Corner / Hatcher Pass.
+
+## Conventions
+
+- One phase per branch, one commit per verified step.
+- Read-only tooling by default. Anything that writes to the repo or to
+  device storage gets called out explicitly before it runs.
+- Prefer editing existing files over creating new ones.
+- If a step needs a decision from Alan, stop and ask. Do not pick a default
+  and proceed.

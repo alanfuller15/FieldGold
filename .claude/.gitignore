@@ -1,0 +1,2 @@
+# Compaction snapshots — local only, can contain full transcripts
+.claude/backups/
