@@ -3,18 +3,33 @@
 <title>Load REM Benches — FieldGold</title>
 <style>
  body{background:#14110C;color:#F2EDE0;font-family:-apple-system,system-ui,sans-serif;
-   max-width:640px;margin:0 auto;padding:32px 20px;line-height:1.6}
- h1{color:#E8C04A;font-size:1.4rem} .gold{color:#E8C04A}
+   max-width:680px;margin:0 auto;padding:32px 20px;line-height:1.6}
+ h1{color:#E8C04A;font-size:1.4rem} h2{font-size:1.05rem;margin:26px 0 8px}
+ .gold{color:#E8C04A}
  .card{background:#1E1A13;border:1px solid #332C1E;border-radius:10px;padding:16px;margin:14px 0}
  button{background:#C9A227;color:#14110C;border:0;border-radius:8px;padding:12px 20px;
-   font-weight:700;font-size:1rem;cursor:pointer;margin-top:8px}
- .warn{background:#2E2410;border:1px solid #C9A227;border-radius:8px;padding:12px;font-size:.9rem;color:#E8C04A}
+   font-weight:700;font-size:1rem;cursor:pointer;margin:8px 8px 0 0}
+ button.ghost{background:transparent;color:#C9A227;border:1px solid #C9A227}
+ .warn{background:#2E2410;border:1px solid #C9A227;border-radius:8px;padding:12px;
+   font-size:.9rem;color:#E8C04A;margin:14px 0}
+ .stop{background:#2E1512;border:1px solid #C0392B;color:#F0A79E}
  code{background:#0d0b08;padding:1px 5px;border-radius:3px}
  .n{color:#9C9684;font-size:.85rem}
+ ul{padding-left:20px} li{margin:5px 0}
+ .row{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid #241F16}
+ .row:last-child{border-bottom:0}
+ .rk{color:#9C9684;font-size:.8rem;min-width:26px}
+ .nm{font-weight:700;min-width:66px}
+ .tag{font-size:.72rem;padding:2px 7px;border-radius:4px;white-space:nowrap}
+ .t-clean{background:#16301B;color:#7BD88F;border:1px solid #2C5C36}
+ .t-unchecked{background:#2B2617;color:#D8C07B;border:1px solid #5C4F2C}
+ .t-avoid{background:#2E1512;color:#F0A79E;border:1px solid #5C2C28}
+ .d{font-size:.82rem;color:#9C9684;margin:2px 0 0 96px}
 </style></head><body>
 <h1>Load REM Terrace Candidates</h1>
-<p>This adds <span class="gold">20 REM-derived bench candidates</span> to your
-FieldGold shared record, alongside your existing Bench Hunter benches.</p>
+<p>Adds <span class="gold">20 REM-derived bench candidates</span> to your FieldGold
+shared record, <b>each carrying its DNR land status</b>. As of 2026-07-25 every one
+of the 20 has been checked; none are left unknown.</p>
 
 <div class="warn">
  <b>Honest about what these are:</b> geomorphically-derived terrace candidates —
@@ -25,28 +40,667 @@ FieldGold shared record, alongside your existing Bench Hunter benches.</p>
  ground makes the call.
 </div>
 
-<div class="card">
- <p>Ranked by area + height + documented-gold proximity (geochem is sparse on this
- reach, so ranking is mostly area + height — see each candidate's <code>gold m</code>).</p>
- <button onclick="load()">Add 20 REM benches to my record</button>
- <p id="status" class="n"></p>
+<div class="warn stop">
+ <b>All 20 are now land-status checked. 12 of them are not ground to work.</b>
+ This list used to be ranked by terrace area alone, which put never-checked ground
+ at #1. It is now ranked by <b>land status first</b>, geometry second.
+ <b>8 of 20 came back clean</b> — but two of those eight (REM-7 and REM-19) are
+ <b>outside</b> the Hatcher Pass Public Use Area and so do <b>not</b> get the PUA's
+ recreational-panning permission. The other <b>12 are flagged AVOID</b>: one inside
+ Mineral Closing Order 549, six inside LLO 5, five inside pending application
+ ADL 229824.
+ <br><br>
+ <b>Two of the eight clean are checked more deeply than the other six.</b> REM-2,
+ REM-13 and REM-7 went through a full 16-layer battery on 2026-07-21. REM-1, REM-5,
+ REM-11, REM-19 and REM-20 went through an 8-layer Tier-1 battery on 2026-07-25 —
+ every one of those CLEAN calls was re-fetched independently rather than taken on
+ trust, but eight rarer layers (native allotment, Mental Health Trust, federal
+ action, easement, land disposal, management agreement, agreement/settlement,
+ restricted-use authorization) were <b>not run on any of them</b>. That is why the
+ shallower five rank below the deeper three even where their geometry is better.
 </div>
 
-<p class="n">This augments — it won't remove your Bench Hunter benches. REM benches
-are tagged <code>source: REM</code> and labeled <code>REM-1..N</code> so they're distinct.
-To remove them later, use the database tools in the main app.</p>
+<div class="card">
+ <button onclick="load('all')">Load all 20 with status</button>
+ <button class="ghost" onclick="load('clean')">Load only the 8 clean</button>
+ <p id="status" class="n"></p>
+ <p class="n">Safe to re-run: entries upsert by <code>id</code>, so this <b>replaces</b>
+ any older copies already on your device rather than duplicating them. If you loaded
+ the old unranked list before, running this once fixes it.</p>
+</div>
+
+<h2>What you'd be loading</h2>
+<div class="card" id="list"></div>
+
+<div class="warn">
+ <b>Two questions still open — neither is answered by this page.</b>
+ <ul>
+  <li><b>No bench sits inside a state mining claim — but claims are near.</b>
+      All 20 points were queried against DNR <code>ME112</code> (active state
+      mining claims) and all 20 came back empty. That is the register that
+      governs this ground; the BLM federal layer on the map is not. What is
+      <b>not</b> known is how near the nearest claim is: there are <b>22 active
+      claims</b> in the reach and <b>3</b> in the box holding REM-1, REM-11,
+      REM-19 and REM-20. Proximity was never measured. Do not read "no claim on
+      the point" as "nothing around you."</li>
+  <li><b>Claims can be staked at any time.</b> The clean result is dated
+      <b>2026-07-21</b>. Re-run the claim check the week you travel; a bench that was
+      clear in July can be staked in August.</li>
+  <li><b>LLO 5 and MCO 549 govern mineral-RIGHTS acquisition.</b> Whether they also
+      bar <i>recreational hand panning</i> inside the Public Use Area is unresolved
+      — DNR's PUA fact sheet allows panning "anywhere within the boundaries...
+      except for several valid mining claims." This now blocks <b>six</b>
+      candidates: REM-3, REM-4, REM-10, REM-12, REM-15 and REM-18. Put
+      <b>REM-18</b> to DNR Division of Mining, Land &amp; Water (907-269-8600)
+      specifically — it is inside LLO 5 <i>and</i> inside the PUA, so it is the one
+      point whose answer settles all six.</li>
+  <li><b>A pending application is not a closure.</b> REM-8, REM-9, REM-16 and
+      REM-17 are clean on every mineral layer and inside the PUA. Their only hit is
+      ADL 229824 (Fishhook Renewable Energy LLC), status "ADDTL INFO REQUESTED
+      (10)" — a <i>pending</i> industrial/commercial lease application. They are
+      flagged AVOID on exposure alone, for consistency with REM-6, not because the
+      ground is closed. Ask DMLW about pending applications on the same call: if
+      the answer is permissive, REM-8 (36,644 m², 5.2 m above the channel) belongs
+      near the top of this list, not near the bottom.</li>
+ </ul>
+</div>
+
+<p class="n">REM benches are tagged <code>source: REM</code> and labeled
+<code>REM-1..N</code> so they stay distinct from your Bench Hunter benches, which
+this page never touches.</p>
 
 <script src="fieldgold-data.js"></script>
 <script>
-const REM_BENCHES = [{"kind": "bench", "id": "rem-bench-1", "lat": 61.77256, "lon": -149.20759, "nearest": 14.0, "profile": "REM-1", "source": "REM", "area_m2": 59888, "height_sd_m": 3.3, "nearest_gold_m": null, "rank": 1, "score": 0.46, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-2", "lat": 61.72047, "lon": -149.23426, "nearest": 5.9, "profile": "REM-2", "source": "REM", "area_m2": 46483, "height_sd_m": 2.8, "nearest_gold_m": null, "rank": 2, "score": 0.433, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-3", "lat": 61.70343, "lon": -149.23852, "nearest": 7.9, "profile": "REM-3", "source": "REM", "area_m2": 864, "height_sd_m": 0.3, "nearest_gold_m": 643, "rank": 3, "score": 0.428, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-4", "lat": 61.70348, "lon": -149.23747, "nearest": 8.7, "profile": "REM-4", "source": "REM", "area_m2": 1002, "height_sd_m": 0.4, "nearest_gold_m": 664, "rank": 4, "score": 0.423, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-5", "lat": 61.71518, "lon": -149.23229, "nearest": 3.9, "profile": "REM-5", "source": "REM", "area_m2": 1002, "height_sd_m": 0.3, "nearest_gold_m": 665, "rank": 5, "score": 0.423, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-6", "lat": 61.75312, "lon": -149.23328, "nearest": 10.6, "profile": "REM-6", "source": "REM", "area_m2": 905, "height_sd_m": 0.8, "nearest_gold_m": 651, "rank": 6, "score": 0.42, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-7", "lat": 61.74385, "lon": -149.23236, "nearest": 6.0, "profile": "REM-7", "source": "REM", "area_m2": 40026, "height_sd_m": 2.8, "nearest_gold_m": null, "rank": 7, "score": 0.401, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-8", "lat": 61.75663, "lon": -149.22915, "nearest": 5.2, "profile": "REM-8", "source": "REM", "area_m2": 36644, "height_sd_m": 1.6, "nearest_gold_m": null, "rank": 8, "score": 0.384, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-9", "lat": 61.75472, "lon": -149.22742, "nearest": 17.7, "profile": "REM-9", "source": "REM", "area_m2": 951, "height_sd_m": 0.5, "nearest_gold_m": 628, "rank": 9, "score": 0.356, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-10", "lat": 61.69466, "lon": -149.24903, "nearest": 9.2, "profile": "REM-10", "source": "REM", "area_m2": 30540, "height_sd_m": 2.1, "nearest_gold_m": null, "rank": 10, "score": 0.353, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-11", "lat": 61.76431, "lon": -149.21701, "nearest": 4.9, "profile": "REM-11", "source": "REM", "area_m2": 920, "height_sd_m": 0.9, "nearest_gold_m": 1040, "rank": 11, "score": 0.341, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-12", "lat": 61.70423, "lon": -149.23742, "nearest": 8.3, "profile": "REM-12", "source": "REM", "area_m2": 17068, "height_sd_m": 1.0, "nearest_gold_m": null, "rank": 12, "score": 0.285, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-13", "lat": 61.73573, "lon": -149.23237, "nearest": 4.6, "profile": "REM-13", "source": "REM", "area_m2": 15738, "height_sd_m": 1.2, "nearest_gold_m": null, "rank": 13, "score": 0.279, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-14", "lat": 61.70224, "lon": -149.23989, "nearest": 4.8, "profile": "REM-14", "source": "REM", "area_m2": 13466, "height_sd_m": 0.8, "nearest_gold_m": null, "rank": 14, "score": 0.267, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-15", "lat": 61.71404, "lon": -149.23074, "nearest": 7.2, "profile": "REM-15", "source": "REM", "area_m2": 13221, "height_sd_m": 1.3, "nearest_gold_m": null, "rank": 15, "score": 0.266, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-16", "lat": 61.75209, "lon": -149.22982, "nearest": 9.2, "profile": "REM-16", "source": "REM", "area_m2": 13057, "height_sd_m": 1.5, "nearest_gold_m": null, "rank": 16, "score": 0.265, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-17", "lat": 61.75055, "lon": -149.23067, "nearest": 8.2, "profile": "REM-17", "source": "REM", "area_m2": 12960, "height_sd_m": 1.8, "nearest_gold_m": null, "rank": 17, "score": 0.265, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-18", "lat": 61.71062, "lon": -149.2329, "nearest": 3.7, "profile": "REM-18", "source": "REM", "area_m2": 11363, "height_sd_m": 0.4, "nearest_gold_m": null, "rank": 18, "score": 0.257, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-19", "lat": 61.76387, "lon": -149.21967, "nearest": 5.9, "profile": "REM-19", "source": "REM", "area_m2": 10437, "height_sd_m": 1.8, "nearest_gold_m": null, "rank": 19, "score": 0.252, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}, {"kind": "bench", "id": "rem-bench-20", "lat": 61.76936, "lon": -149.21246, "nearest": 4.1, "profile": "REM-20", "source": "REM", "area_m2": 8948, "height_sd_m": 0.6, "nearest_gold_m": null, "rank": 20, "score": 0.245, "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required"}];
-function load(){
-  if(!window.FieldGoldData){ document.getElementById('status').textContent =
-    'Error: open this from the same site as FieldGold (alanfuller15.github.io/FieldGold/).'; return; }
-  // AUGMENT: keep existing benches, add REM ones (upsert by id, so re-running is safe)
-  let added=0;
-  REM_BENCHES.forEach(b=>{ FieldGoldData.put(b); added++; });
-  document.getElementById('status').textContent =
-    'Added '+added+' REM terrace candidates. Open the main app -> Sites -> Plan to see them.';
+const REM_BENCHES = [
+ {
+  "kind": "bench",
+  "id": "rem-bench-2",
+  "lat": 61.72047,
+  "lon": -149.23426,
+  "nearest": 5.9,
+  "profile": "REM-2",
+  "source": "REM",
+  "area_m2": 46483,
+  "height_sd_m": 2.8,
+  "nearest_gold_m": null,
+  "geo_score": 0.433,
+  "geo_rank": 2,
+  "rank": 1,
+  "score": 1,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 verified (full 16-layer battery)",
+  "status_detail": "No mineral closing order, no leasehold location order, no active or pending claim, no lease, no park closure. Inside Hatcher Pass Management Area-East, where DNR allows recreational panning with hand pick, shovel and pan. Well log 86093 (720 m S) shows bedrock at 20 ft under 17 ft of sand and gravel \u2014 the best structural setting on the reach for hand work.",
+  "in_pua": true,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 verified (full 16-layer battery)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-13",
+  "lat": 61.73573,
+  "lon": -149.23237,
+  "nearest": 4.6,
+  "profile": "REM-13",
+  "source": "REM",
+  "area_m2": 15738,
+  "height_sd_m": 1.2,
+  "nearest_gold_m": null,
+  "geo_score": 0.279,
+  "geo_rank": 13,
+  "rank": 2,
+  "score": 2,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 verified (full 16-layer battery)",
+  "status_detail": "Same clean result as REM-2 on every layer. Inside Hatcher Pass Management Area-East, so recreational panning is allowed. No well-log control on depth to bedrock here.",
+  "in_pua": true,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 verified (full 16-layer battery)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-7",
+  "lat": 61.74385,
+  "lon": -149.23236,
+  "nearest": 6.0,
+  "profile": "REM-7",
+  "source": "REM",
+  "area_m2": 40026,
+  "height_sd_m": 2.8,
+  "nearest_gold_m": null,
+  "geo_score": 0.401,
+  "geo_rank": 7,
+  "rank": 3,
+  "score": 3,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 verified, but OUTSIDE the Public Use Area",
+  "status_detail": "Clean on all encumbrance layers, and specifically NOT inside ADL 229824. But it falls outside Hatcher Pass Management Area-East, so it does NOT inherit the PUA panning permission \u2014 the permission here is ordinary state-land rules, not the PUA fact sheet. Three well logs within 560 m show 120\u2013215 ft of boulders and gravel with bedrock never reached. Pan the bench gravel; there is no reachable bedrock target.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 verified, but OUTSIDE the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-1",
+  "lat": 61.77256,
+  "lon": -149.20759,
+  "nearest": 14.0,
+  "profile": "REM-1",
+  "source": "REM",
+  "area_m2": 59888,
+  "height_sd_m": 3.3,
+  "nearest_gold_m": null,
+  "geo_score": 0.46,
+  "geo_rank": 1,
+  "rank": 4,
+  "score": 4,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 8-layer check, inside the Public Use Area",
+  "status_detail": "Zero hits on all seven encumbrance layers run (mineral order, leasehold location order, active claim, pending claim, prospecting site, mineral-estate permit/lease, land-estate permit/lease), and inside Hatcher Pass Management Area-East, so recreational panning with hand pick, shovel and pan is allowed. Largest terrace on the whole list at 59,888 m\u00b2, but it sits ~14 m above the channel \u2014 the highest of any candidate \u2014 so it is the oldest surface here and may be a glacial deposit rather than a river terrace. NOT checked against the eight rarer Tier-2 layers (native allotment, Mental Health Trust, federal action, easement, land disposal, management agreement, agreement/settlement, restricted-use authorization).",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 8-layer check, inside the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-5",
+  "lat": 61.71518,
+  "lon": -149.23229,
+  "nearest": 3.9,
+  "profile": "REM-5",
+  "source": "REM",
+  "area_m2": 1002,
+  "height_sd_m": 0.3,
+  "nearest_gold_m": 665,
+  "geo_score": 0.423,
+  "geo_rank": 5,
+  "rank": 5,
+  "score": 5,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 8-layer check, inside the Public Use Area",
+  "status_detail": "Zero hits on all seven encumbrance layers run; inside Hatcher Pass Management Area-East. Small terrace (1,002 m\u00b2) but only 3.9 m above the channel and very flat (height SD 0.3 m) \u2014 the tightest, lowest-standing surface on the list, which is the geometry a young fluvial terrace should have. NOT checked against the eight rarer Tier-2 layers.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 8-layer check, inside the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-11",
+  "lat": 61.76431,
+  "lon": -149.21701,
+  "nearest": 4.9,
+  "profile": "REM-11",
+  "source": "REM",
+  "area_m2": 920,
+  "height_sd_m": 0.9,
+  "nearest_gold_m": 1040,
+  "geo_score": 0.341,
+  "geo_rank": 11,
+  "rank": 6,
+  "score": 6,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 8-layer check, inside the Public Use Area",
+  "status_detail": "Zero hits on all seven encumbrance layers run; inside Hatcher Pass Management Area-East. 920 m\u00b2, 4.9 m above the channel. Note that REM-19, only ~140 m to the southwest, falls OUTSIDE the PUA \u2014 the boundary runs between them, so do not assume the permission carries across the gap. NOT checked against the eight rarer Tier-2 layers.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 8-layer check, inside the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-20",
+  "lat": 61.76936,
+  "lon": -149.21246,
+  "nearest": 4.1,
+  "profile": "REM-20",
+  "source": "REM",
+  "area_m2": 8948,
+  "height_sd_m": 0.6,
+  "nearest_gold_m": null,
+  "geo_score": 0.245,
+  "geo_rank": 20,
+  "rank": 7,
+  "score": 7,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 8-layer check, inside the Public Use Area",
+  "status_detail": "Zero hits on all seven encumbrance layers run; inside Hatcher Pass Management Area-East. Smallest terrace on the list (8,948 m\u00b2 is misleading \u2014 height SD 0.6 m, 4.1 m above channel) and the furthest upstream of the clean set. NOT checked against the eight rarer Tier-2 layers.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 8-layer check, inside the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-19",
+  "lat": 61.76387,
+  "lon": -149.21967,
+  "nearest": 5.9,
+  "profile": "REM-19",
+  "source": "REM",
+  "area_m2": 10437,
+  "height_sd_m": 1.8,
+  "nearest_gold_m": null,
+  "geo_score": 0.252,
+  "geo_rank": 19,
+  "rank": 8,
+  "score": 8,
+  "land_status": "clean",
+  "status_label": "CLEAN \u2014 8-layer check, but OUTSIDE the Public Use Area",
+  "status_detail": "Zero hits on all eight layers run, INCLUDING the park-boundary layer: this point is not inside Hatcher Pass Management Area-East. That is not an encumbrance, but it means the PUA fact sheet's recreational-panning permission does NOT apply here \u2014 the same caveat as REM-7. REM-11 is ~140 m northeast and IS inside the PUA; the boundary runs between the two, and a hand-held GPS fix is not accurate enough to stand on that line with confidence. If you want PUA cover, work REM-11 and leave this one. NOT checked against the eight rarer Tier-2 layers.",
+  "in_pua": false,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. CLEAN \u2014 8-layer check, but OUTSIDE the Public Use Area"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-8",
+  "lat": 61.75663,
+  "lon": -149.22915,
+  "nearest": 5.2,
+  "profile": "REM-8",
+  "source": "REM",
+  "area_m2": 36644,
+  "height_sd_m": 1.6,
+  "nearest_gold_m": null,
+  "geo_score": 0.384,
+  "geo_rank": 8,
+  "rank": 9,
+  "score": 9,
+  "land_status": "avoid",
+  "status_label": "SKIP on exposure \u2014 pending application ADL 229824 (not a closure)",
+  "status_detail": "Clean on every mineral-estate layer. The one hit is ADL 229824 (Fishhook Renewable Energy LLC), case type verbatim \"NEG LEASE NON-COMP (553)\", special code \"INDUSTRL/COMMERCIAL (5015)\", status \"ADDTL INFO REQUESTED (10)\" \u2014 a PENDING application, not an active lease. This point is also inside the PUA, so recreational panning is otherwise allowed. Graded avoid on exposure only, the same call already made for REM-6. Worth raising on the DMLW call: at 36,644 m\u00b2 and 5.2 m above the channel this is the third-best geometry on the list, and it is being set aside for a reason that may not survive one phone call.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. SKIP on exposure \u2014 pending application ADL 229824 (not a closure)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-9",
+  "lat": 61.75472,
+  "lon": -149.22742,
+  "nearest": 17.7,
+  "profile": "REM-9",
+  "source": "REM",
+  "area_m2": 951,
+  "height_sd_m": 0.5,
+  "nearest_gold_m": 628,
+  "geo_score": 0.356,
+  "geo_rank": 9,
+  "rank": 10,
+  "score": 10,
+  "land_status": "avoid",
+  "status_label": "SKIP on exposure \u2014 pending application ADL 229824 (not a closure)",
+  "status_detail": "Same single hit as REM-8: pending ADL 229824, status 10. Inside the PUA. Graded avoid on exposure only. Weak geometry regardless (951 m\u00b2, 17.7 m above the channel \u2014 the highest surface on the list, most likely glacial rather than fluvial).",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. SKIP on exposure \u2014 pending application ADL 229824 (not a closure)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-16",
+  "lat": 61.75209,
+  "lon": -149.22982,
+  "nearest": 9.2,
+  "profile": "REM-16",
+  "source": "REM",
+  "area_m2": 13057,
+  "height_sd_m": 1.5,
+  "nearest_gold_m": null,
+  "geo_score": 0.265,
+  "geo_rank": 16,
+  "rank": 11,
+  "score": 11,
+  "land_status": "avoid",
+  "status_label": "SKIP on exposure \u2014 pending application ADL 229824 (not a closure)",
+  "status_detail": "Same single hit as REM-8: pending ADL 229824, status 10. Inside the PUA. Graded avoid on exposure only. 13,057 m\u00b2, 9.2 m above the channel.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. SKIP on exposure \u2014 pending application ADL 229824 (not a closure)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-17",
+  "lat": 61.75055,
+  "lon": -149.23067,
+  "nearest": 8.2,
+  "profile": "REM-17",
+  "source": "REM",
+  "area_m2": 12960,
+  "height_sd_m": 1.8,
+  "nearest_gold_m": null,
+  "geo_score": 0.265,
+  "geo_rank": 17,
+  "rank": 12,
+  "score": 12,
+  "land_status": "avoid",
+  "status_label": "SKIP on exposure \u2014 pending application ADL 229824 (not a closure)",
+  "status_detail": "Same single hit as REM-8: pending ADL 229824, status 10. Inside the PUA. Graded avoid on exposure only. 12,960 m\u00b2, 8.2 m above the channel.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. SKIP on exposure \u2014 pending application ADL 229824 (not a closure)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-6",
+  "lat": 61.75312,
+  "lon": -149.23328,
+  "nearest": 10.6,
+  "profile": "REM-6",
+  "source": "REM",
+  "area_m2": 905,
+  "height_sd_m": 0.8,
+  "nearest_gold_m": 651,
+  "geo_score": 0.42,
+  "geo_rank": 6,
+  "rank": 13,
+  "score": 13,
+  "land_status": "avoid",
+  "status_label": "SKIP \u2014 inside a pending application",
+  "status_detail": "Clean on every hard encumbrance, BUT the point falls inside ADL 229824 (Fishhook Renewable Energy LLC), status 10 \u2014 a PENDING application, case type verbatim \"NEG LEASE NON-COMP (553)\". Not an active lease, so it does not close the ground today. Skipped on exposure, not prohibition: ground inside a live application footprint can change status without notice. Also outside the PUA.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. SKIP \u2014 inside a pending application"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-3",
+  "lat": 61.70343,
+  "lon": -149.23852,
+  "nearest": 7.9,
+  "profile": "REM-3",
+  "source": "REM",
+  "area_m2": 864,
+  "height_sd_m": 0.3,
+  "nearest_gold_m": 643,
+  "geo_score": 0.428,
+  "geo_rank": 3,
+  "rank": 14,
+  "score": 14,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\" (Leasehold Location Order, Active/Restricted). Minerals are acquirable only by lease, not by staking a claim. Whether LLO 5 bars RECREATIONAL hand panning is UNRESOLVED \u2014 see the open question below.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-4",
+  "lat": 61.70348,
+  "lon": -149.23747,
+  "nearest": 8.7,
+  "profile": "REM-4",
+  "source": "REM",
+  "area_m2": 1002,
+  "height_sd_m": 0.4,
+  "nearest_gold_m": 664,
+  "geo_score": 0.423,
+  "geo_rank": 4,
+  "rank": 15,
+  "score": 15,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\", same as REM-3. Recreational panning status unresolved.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-10",
+  "lat": 61.69466,
+  "lon": -149.24903,
+  "nearest": 9.2,
+  "profile": "REM-10",
+  "source": "REM",
+  "area_m2": 30540,
+  "height_sd_m": 2.1,
+  "nearest_gold_m": null,
+  "geo_score": 0.353,
+  "geo_rank": 10,
+  "rank": 16,
+  "score": 16,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\" (CASE_ID \"LLO 5\", ACTIVE (50), RESTRICTED (RD)). Clean on every other layer run, and NOT inside the PUA. 30,540 m\u00b2 at 9.2 m above the channel \u2014 the best geometry of the six LLO 5 candidates, and the one with most to gain if the DMLW call comes back permissive. Recreational panning status unresolved.",
+  "in_pua": false,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-12",
+  "lat": 61.70423,
+  "lon": -149.23742,
+  "nearest": 8.3,
+  "profile": "REM-12",
+  "source": "REM",
+  "area_m2": 17068,
+  "height_sd_m": 1.0,
+  "nearest_gold_m": null,
+  "geo_score": 0.285,
+  "geo_rank": 12,
+  "rank": 17,
+  "score": 17,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\", same as REM-3. Recreational panning status unresolved.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-15",
+  "lat": 61.71404,
+  "lon": -149.23074,
+  "nearest": 7.2,
+  "profile": "REM-15",
+  "source": "REM",
+  "area_m2": 13221,
+  "height_sd_m": 1.3,
+  "nearest_gold_m": null,
+  "geo_score": 0.266,
+  "geo_rank": 15,
+  "rank": 18,
+  "score": 18,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\" (ACTIVE/RESTRICTED). Clean on every other layer run, and NOT inside the PUA. 13,221 m\u00b2, 7.2 m above the channel. Recreational panning status unresolved.",
+  "in_pua": false,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-18",
+  "lat": 61.71062,
+  "lon": -149.2329,
+  "nearest": 3.7,
+  "profile": "REM-18",
+  "source": "REM",
+  "area_m2": 11363,
+  "height_sd_m": 0.4,
+  "nearest_gold_m": null,
+  "geo_score": 0.257,
+  "geo_rank": 18,
+  "rank": 19,
+  "score": 19,
+  "land_status": "avoid",
+  "status_label": "LLO 5 \u2014 minerals by lease only (and inside the PUA)",
+  "status_detail": "Inside LLO 5 \"Little Susitna River Corridor\" (ACTIVE/RESTRICTED) AND inside Hatcher Pass Management Area-East. That overlap is exactly the unresolved question: the PUA fact sheet allows recreational panning, LLO 5 restricts mineral acquisition to lease. This is the single best point to put to DMLW on the phone, because the answer decides six candidates at once. 11,363 m\u00b2, only 3.7 m above the channel and very flat (height SD 0.4 m) \u2014 the lowest and flattest surface of any candidate on the list.",
+  "in_pua": true,
+  "status_checked": "2026-07-25",
+  "status_depth": "tier1",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-25",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 16 \u2014 DNR ArcGIS point-in-polygon, 8-layer Tier-1 battery, every CLEAN call re-fetched independently, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. LLO 5 \u2014 minerals by lease only (and inside the PUA)"
+ },
+ {
+  "kind": "bench",
+  "id": "rem-bench-14",
+  "lat": 61.70224,
+  "lon": -149.23989,
+  "nearest": 4.8,
+  "profile": "REM-14",
+  "source": "REM",
+  "area_m2": 13466,
+  "height_sd_m": 0.8,
+  "nearest_gold_m": null,
+  "geo_score": 0.267,
+  "geo_rank": 14,
+  "rank": 20,
+  "score": 20,
+  "land_status": "avoid",
+  "status_label": "MCO 549 \u2014 CLOSED to mineral entry",
+  "status_detail": "Inside Mineral Closing Order 549, \"Hatcher Pass / Government Peak Ski Area\". This is the hardest closure of any candidate on the list. Do not work this ground.",
+  "in_pua": false,
+  "status_checked": "2026-07-21",
+  "status_depth": "full",
+  "state_claim": "none",
+  "state_claim_checked": "2026-07-21",
+  "state_claim_register": "DNR ME112 active / ME13 pending, Mapper/Mineral_Estate_Layers",
+  "state_claim_proximity": "unknown",
+  "status_source": "HATCHER_SU_RESEARCH_LOG.md Thread 9/11 \u2014 DNR ArcGIS point-in-polygon, 16-layer battery, positive-control verified",
+  "note": "REM terrace candidate \u2014 geomorphically derived, ground-truth required. MCO 549 \u2014 CLOSED to mineral entry"
+ }
+];
+
+const LABEL = {clean:'CLEAN', unchecked:'NOT CHECKED', avoid:'AVOID'};
+
+function render(){
+  document.getElementById('list').innerHTML = REM_BENCHES.map(b =>
+    '<div class="row"><span class="rk">#'+b.rank+'</span>'+
+    '<span class="nm">'+b.profile+'</span>'+
+    '<span class="tag t-'+b.land_status+'">'+LABEL[b.land_status]+'</span>'+
+    '<span class="n">'+b.lat.toFixed(5)+', '+b.lon.toFixed(5)+'</span></div>'+
+    '<div class="d">'+b.status_label+'</div>').join('');
 }
+
+function load(which){
+  const el = document.getElementById('status');
+  if(!window.FieldGoldData){ el.textContent =
+    'Error: open this from the same site as FieldGold (alanfuller15.github.io/FieldGold/).';
+    return; }
+  const set = which === 'clean'
+    ? REM_BENCHES.filter(b => b.land_status === 'clean')
+    : REM_BENCHES;
+  set.forEach(b => FieldGoldData.put(b));
+  const nAvoid = set.filter(b => b.land_status === 'avoid').length;
+  const nUnch  = set.filter(b => b.land_status === 'unchecked').length;
+  el.textContent = 'Loaded ' + set.length + ' candidates ('
+    + set.filter(b => b.land_status === 'clean').length + ' verified clean, '
+    + nUnch + ' unchecked, ' + nAvoid + ' flagged avoid). '
+    + 'Open the main app -> Sites -> Plan to see them.';
+}
+render();
 </script>
 </body></html>

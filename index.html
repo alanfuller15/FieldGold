@@ -819,6 +819,8 @@ function renderTripPlanner(gpsSites) {
       name: benchLabel(b, true),
       gps: { lat: b.lat, lon: b.lon },
       isBench: true,
+      _status: FieldGoldData.statusOf(b),
+      _statusLabel: b.status_label || FieldGoldData.statusMeta(b).long,
     }));
     remStops = allBench.filter(b => b.source === 'REM').map(b => ({
       id: benchId(b),
@@ -826,6 +828,8 @@ function renderTripPlanner(gpsSites) {
       gps: { lat: b.lat, lon: b.lon },
       isBench: true,
       _area: b.area_m2,
+      _status: FieldGoldData.statusOf(b),
+      _statusLabel: b.status_label || FieldGoldData.statusMeta(b).long,
     }));
   }
   const allStops = gpsSites.concat(benchStops).concat(remStops);
@@ -834,6 +838,11 @@ function renderTripPlanner(gpsSites) {
   const ordered = orderTrip(selected);
   let totalKm = 0;
   for (let i = 0; i < ordered.length - 1; i++) totalKm += distKm(ordered[i].gps, ordered[i+1].gps);
+
+  // What is actually in the route, by land status. Shown above the buttons that
+  // hand these coordinates to Maps or write them into a GPX file.
+  const routeAvoid = ordered.filter(s => s._status === 'avoid');
+  const routeUnchecked = ordered.filter(s => s._status === 'unchecked');
 
   // NEAREST-3 REM candidates to the user's selected logged site(s). The 20 REM
   // benches are pre-computed for the reach; rather than list all 20, surface the
@@ -844,11 +853,24 @@ function renderTripPlanner(gpsSites) {
     if (!selectedSites.length) return Infinity;
     return Math.min(...selectedSites.map(sel => distKm(sel.gps, stop.gps)));
   }
+  //
+  // LAND STATUS FILTERS THIS SUGGESTION. Proximity is not a reason to send
+  // someone to encumbered ground, and this list feeds straight into the route,
+  // the Maps handoff and the GPX export. Avoid-tier candidates are excluded
+  // and the exclusion is STATED below rather than hidden — a suggestion box
+  // that quietly drops entries teaches you to trust it more than it deserves.
   let nearestRem = [];
+  let remHiddenAvoid = 0;
   if (remStops.length && selectedSites.length) {
-    nearestRem = remStops
+    const routable = remStops.filter(s => s._status !== 'avoid');
+    remHiddenAvoid = remStops.length - routable.length;
+    nearestRem = routable
       .map(s => ({ ...s, _dist: nearestSelDist(s) }))
-      .sort((a, b) => a._dist - b._dist)
+      .sort((a, b) => {
+        // clean first, then unchecked; distance breaks ties within a tier.
+        const rank = x => (x._status === 'clean' ? 0 : 1);
+        return (rank(a) - rank(b)) || (a._dist - b._dist);
+      })
       .slice(0, 3);
   }
 
@@ -862,7 +884,7 @@ function renderTripPlanner(gpsSites) {
   const stopRow = (s, isBench) => {
     const on = S.tripSelection.includes(s.id);
     const label = isBench
-      ? `<span class="badge amber">bench</span>`
+      ? statusBadge(s)
       : `<span class="badge ${scoreVerdict(s.score != null ? s.score : evalScore(s).pct)[1]}">${Math.round((s.score != null ? s.score : evalScore(s).pct) * 100)}</span>`;
     return `
       <div class="row between" style="padding:8px;border-radius:8px;cursor:pointer;background:${on ? 'var(--gold-faint)' : 'transparent'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};" onclick="toggleTripSite('${s.id}')">
@@ -894,7 +916,9 @@ function renderTripPlanner(gpsSites) {
       ${remStops.length ? (
         nearestRem.length ? `
         <p class="eyebrow" style="margin:16px 0 4px;">Nearest REM terrace candidates</p>
-        <p class="tiny subtle" style="margin:0 0 10px;">The 3 lidar-derived terraces closest to your selected spot${selected.length>1?'s':''}. Geomorphic candidates — go pan to confirm.</p>
+        <p class="tiny subtle" style="margin:0 0 4px;">The 3 lidar-derived terraces closest to your selected spot${selected.length>1?'s':''}, verified-clean ground first. Geomorphic candidates — go pan to confirm.</p>
+        ${remHiddenAvoid ? `<p class="tiny" style="margin:0 0 4px;color:var(--rust);">${remHiddenAvoid} nearby candidate${remHiddenAvoid===1?' is':'s are'} hidden here — encumbered ground (closing order, lease or park). ${remHiddenAvoid===1?'It is':'They are'} still on the map in red so you can recognise ${remHiddenAvoid===1?'it':'them'}.</p>` : ''}
+        <p class="tiny" style="margin:0 0 10px;color:var(--amber);">A <b>NOT CHECKED</b> tag means nobody has run this one through the DNR check. It is not a mild version of clean.</p>
         <div class="stack" style="gap:6px;">
           ${nearestRem.map(s => {
             const on = S.tripSelection.includes(s.id);
@@ -906,7 +930,7 @@ function renderTripPlanner(gpsSites) {
                 </div>
                 <span class="small soft" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>
               </div>
-              <span class="tiny gold mono" style="flex-shrink:0;">${s._dist.toFixed(1)} km</span>
+              <span class="row" style="gap:6px;flex-shrink:0;">${statusBadge(s)}<span class="tiny gold mono">${s._dist.toFixed(1)} km</span></span>
             </div>`;
           }).join('')}
         </div>
@@ -926,7 +950,7 @@ function renderTripPlanner(gpsSites) {
         ${ordered.map((s, i) => {
           const legKm = i > 0 ? distKm(ordered[i-1].gps, s.gps) : null;
           const badge = s.isBench
-            ? `<span class="badge amber">bench</span>`
+            ? statusBadge(s)
             : `<span class="badge">${Math.round((s.score != null ? s.score : evalScore(s).pct) * 100)}</span>`;
           return `
             ${i > 0 ? `<div class="tiny subtle mono" style="margin:2px 0 2px 14px;">↓ ${legKm.toFixed(1)} km</div>` : ''}
@@ -937,6 +961,16 @@ function renderTripPlanner(gpsSites) {
             </div>
           `;
         }).join('')}
+        ${routeAvoid.length ? `
+          <div style="margin-top:14px;padding:10px 12px;border-radius:8px;border:1px solid var(--rust);background:#2E1810;">
+            <p class="small" style="margin:0 0 4px;color:var(--rust);font-weight:800;">${routeAvoid.length} stop${routeAvoid.length===1?'':'s'} in this route ${routeAvoid.length===1?'is':'are'} on encumbered ground</p>
+            <p class="tiny" style="margin:0;color:var(--rust);line-height:1.5;">${routeAvoid.map(s => esc(s.name) + (s._statusLabel ? ' — ' + esc(s._statusLabel) : '')).join('<br>')}</p>
+            <p class="tiny subtle" style="margin:6px 0 0;line-height:1.5;">The route will still export — the app does not decide where you go. But a closing order is not a suggestion, and this will be in the GPX you hand to onX.</p>
+          </div>
+        ` : ''}
+        ${routeUnchecked.length ? `
+          <p class="tiny" style="margin:10px 0 0;color:var(--amber);line-height:1.5;">${routeUnchecked.length} stop${routeUnchecked.length===1?'' : 's'} in this route ${routeUnchecked.length===1?'has':'have'} <b>never been land-status checked</b>. Check before you drive.</p>
+        ` : ''}
         ${ordered.length >= 1 ? `
           <button class="btn primary" style="margin-top:14px;" onclick="openTripInMaps()">Open route in Maps ↗</button>
           <button class="btn secondary" style="margin-top:8px;" onclick="exportTripGpx()">Export these as GPX (onX, Gaia…)</button>
@@ -975,6 +1009,26 @@ function benchId(b) {
     : 'bench-p' + (b.profile != null ? b.profile : Math.abs(Math.round(b.lat*1000)));
 }
 
+// Land-status badge. Replaces the old flat "bench" tag, which said the same
+// thing about verified-clean ground and ground inside a mineral closing order.
+// Works on either a raw bench record (land_status) or a planner stop (_status).
+function statusBadge(x) {
+  const s = x && x._status ? x._status
+          : (window.FieldGoldData ? FieldGoldData.statusOf(x) : 'unchecked');
+  const tone = s === 'clean' ? 'green' : s === 'avoid' ? 'rust' : 'amber';
+  const text = s === 'clean' ? 'CLEAN' : s === 'avoid' ? 'AVOID' : 'NOT CHECKED';
+  return `<span class="badge ${tone}">${text}</span>`;
+}
+
+// Every avoid-tier stop currently in the trip selection. Called before any
+// action that hands coordinates to something outside this app.
+function avoidStopsInTrip() {
+  const stops = allRoutableStops();
+  return S.tripSelection
+    .map(id => stops.find(s => s.id === id))
+    .filter(s => s && s._status === 'avoid');
+}
+
 function allRoutableStops() {
   const gpsSites = S.sites.filter(s => s.gps);
   let benchStops = [];
@@ -983,6 +1037,8 @@ function allRoutableStops() {
       id: benchId(b),
       name: benchLabel(b, false),
       gps: { lat: b.lat, lon: b.lon }, isBench: true,
+      _status: FieldGoldData.statusOf(b),
+      _statusLabel: b.status_label || FieldGoldData.statusMeta(b).long,
     }));
   }
   return gpsSites.concat(benchStops);
@@ -993,6 +1049,11 @@ function openTripInMaps() {
   const selected = S.tripSelection.map(id => stops.find(s => s.id === id)).filter(Boolean);
   if (!selected.length) { toast('Select stops first'); return; }
   const ordered = orderTrip(selected);
+  // The route card shows the land-status banner, but it can be scrolled off by
+  // the time the button is tapped. Say it again at the moment of handoff —
+  // after this, the coordinates are in Maps and out of this app's reach.
+  const bad = avoidStopsInTrip().length;
+  if (bad) toast(`${bad} stop${bad===1?'':'s'} on this route ${bad===1?'is':'are'} encumbered ground`);
   // Apple Maps supports daddr with multiple "to:" waypoints
   if (ordered.length === 1) {
     const s = ordered[0];
@@ -1450,11 +1511,21 @@ function buildGpx(gpsSites) {
     // honestly rather than running them through the favorability scorer.
     if (s.isBench) {
       const time = new Date().toISOString();
+      // LAND STATUS TRAVELS WITH THE WAYPOINT. Once this file is open in onX or
+      // Gaia there is no FieldGold around it — the tier has to be in the name,
+      // where it cannot be missed, not only in a description nobody expands.
+      const st = s._status || 'unchecked';
+      const prefix = st === 'avoid' ? 'AVOID — ' : st === 'clean' ? '' : 'NOT CHECKED — ';
+      const statusDesc = st === 'avoid'
+        ? `LAND STATUS: AVOID. ${s._statusLabel || 'Encumbered ground.'} Do not work this ground.`
+        : st === 'clean'
+          ? `LAND STATUS: checked, nothing found. ${s._statusLabel || ''} Re-check before the trip — claims can be staked at any time.`
+          : 'LAND STATUS: NEVER CHECKED. This point reflects terrain only. Nobody has run it against DNR closing orders, leases or park boundaries. Check before you go.';
       return `  <wpt lat="${s.gps.lat}" lon="${s.gps.lon}">
     <time>${xmlEsc(time)}</time>
-    <name>${xmlEsc(s.name || 'Bench candidate')}</name>
-    <desc>${xmlEsc('Bench candidate flagged by terrain (Bench Hunter). Walk the shelf and read the ground — rounded gravel = old channel.')}</desc>
-    <sym>Flag, Blue</sym>
+    <name>${xmlEsc(prefix + (s.name || 'Bench candidate'))}</name>
+    <desc>${xmlEsc(statusDesc + ' | Bench candidate flagged by terrain (Bench Hunter). Walk the shelf and read the ground — rounded gravel = old channel.')}</desc>
+    <sym>${st === 'avoid' ? 'Flag, Red' : st === 'clean' ? 'Flag, Green' : 'Flag, Blue'}</sym>
     <type>Bench</type>
   </wpt>`;
     }
@@ -1516,7 +1587,10 @@ function exportTripGpx() {
   if (!selected.length) { toast('Select stops first'); return; }
   const ordered = orderTrip(selected);
   downloadGpx(buildGpx(ordered), 'trip');
-  toast(`Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} as GPX`);
+  const bad = avoidStopsInTrip().length;
+  toast(bad
+    ? `Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} — ${bad} marked AVOID in the file`
+    : `Exported ${ordered.length} waypoint${ordered.length===1?'':'s'} as GPX`);
 }
 
 // ===========================================================================
@@ -1622,6 +1696,15 @@ async function buildDayPlan() {
     rows += `<div class="kv"><span>Coordinates</span><b class="mono">${s.gps.lat.toFixed(5)}, ${s.gps.lon.toFixed(5)}</b></div>`;
     rows += `<div class="kv"><span>Navigate</span><a href="${mapsUrl}">Open in Maps ↗</a></div>`;
     if (s.isBench) {
+      // The day plan is saved and read in the field, often with no signal and
+      // nothing else open. Land status has to be on the page, per stop.
+      const st = s._status || 'unchecked';
+      const stTxt = st === 'avoid'
+        ? `<b style="color:#B2402F;">AVOID — encumbered</b>${s._statusLabel ? ' · ' + esc(s._statusLabel) : ''}. Do not work this ground.`
+        : st === 'clean'
+          ? `<b style="color:#4E9A5F;">Checked — nothing found</b>${s._statusLabel ? ' · ' + esc(s._statusLabel) : ''}. Claims can be staked at any time; re-check close to the trip.`
+          : `<b style="color:#D29A3A;">NEVER CHECKED</b> — nobody has run this against DNR closing orders, leases or park boundaries. Terrain only.`;
+      rows += `<div class="kv"><span>Land status</span><b>${stTxt}</b></div>`;
       rows += `<p class="ground">On the ground: this is where the profile crosses the creek. Use the Bench Hunter's walk directions (which bank, how far, how high) to reach the shelf. Read the gravel — rounded = old channel, angular = slope wash.</p>`;
     }
     if (online) {
@@ -1796,6 +1879,8 @@ Weight your attention toward the features that most strongly predict placer gold
 5. GRADIENT & FLOW ENERGY — read whether this reach transports (too steep/fast) or deposits (a slowing/flattening zone). Deposition zones hold gold.
 6. GRAVEL CHARACTER — sorting and rounding in the active channel; well-rounded, well-sorted gravel means a competent, mature stream that has had time to concentrate.
 
+LAND STATUS IS NOT YOURS TO GUESS. Whether ground is open to mineral entry cannot be read off a photograph — it comes from DNR records. The app prepends a LAND STATUS AT THIS POSITION block to this prompt when it knows something. Treat that block as fact and follow whatever it tells you to do, including when it tells you to withhold pan-placement advice. If no such block is present, land status is UNKNOWN: say so in CAUTION. Never state or imply that ground is open, clear, unclaimed, public, or legal to work, and never suggest a way around a stated encumbrance.
+
 Respond in this exact structure with these headers:
 
 VERDICT: One short line — is this worth sampling? (Promising / Worth a test / Marginal / Poor)
@@ -1808,7 +1893,7 @@ ALSO CHECK: 2-4 secondary spots or features worth sampling, as a short list. If 
 
 LOOK CLOSER AT: Anything in the image you'd want a better photo of, or that's ambiguous but potentially important.
 
-CAUTION: An honest caveat — what the photo can't tell you, or what would change the assessment.
+CAUTION: An honest caveat — what the photo can't tell you, or what would change the assessment. Always include the land-status caveat here unless you have already led with an encumbrance.
 
 INDICATORS: After the prose, output exactly this block so a companion tool can read it. For each, give ONLY a rating of strong, moderate, weak, or unknown based strictly on what the photo shows. Use unknown freely — a photo genuinely cannot judge most of these.
 trap=<strong|moderate|weak|unknown>
@@ -1826,6 +1911,15 @@ function renderPhoto() {
     <p class="small muted" style="margin-bottom:16px;">
       Take or upload a photo of a creek, gravel bar, or outcrop. A vision model reads it like a prospector and tells you where to start. Needs internet + your API key.
     </p>
+
+    ${(window.FieldGoldData && FieldGoldData.get('bench').length === 0) ? `
+    <div class="card" style="margin-bottom:14px;border-color:var(--rust);">
+      <div class="small" style="font-weight:800;color:var(--rust);">No land-status data on this device</div>
+      <div class="tiny soft" style="margin-top:5px;line-height:1.5;">
+        There are no bench records here, so photo analyses cannot be checked against the DNR results at all — every photo will read "not checked", including ones taken on ground we know is encumbered.
+        Open <a class="gold" href="load_rem_benches.html">load_rem_benches.html</a> once, with signal, to load the 20 checked candidates.
+      </div>
+    </div>` : ''}
 
     <div class="card" id="key-card" style="${hasKey ? 'border-color:var(--border);' : 'border-color:var(--gold);'}">
       <div class="row between" onclick="toggleKeyCard()" style="cursor:pointer;">
@@ -1887,6 +1981,10 @@ function renderPhoto() {
               <img src="${p.thumb}" style="width:54px;height:54px;border-radius:8px;object-fit:cover;flex-shrink:0;">
               <div style="flex:1;min-width:0;">
                 <div class="small soft" style="font-weight:700;">${esc(p.verdict || 'Analyzed')}</div>
+                ${(() => { const L = p.land || landContextFor(p.gps);
+                  return L && L.tier === 'near_avoid'
+                    ? `<div class="tiny" style="margin-top:3px;font-weight:800;color:${L.color};">⚠ AVOID — encumbered ground</div>`
+                    : `<div class="tiny" style="margin-top:3px;color:#D29A3A;">land status not checked here</div>`; })()}
                 <div class="tiny subtle" style="margin-top:2px;">${new Date(p.created).toLocaleTimeString()}${p.gps ? ' · 📍' : ''}${p.indicators && Object.keys(p.indicators).length ? ' · ⊞ indicators' : ''}</div>
               </div>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-subtle)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
@@ -1987,9 +2085,39 @@ function handlePhoto(event) {
   event.target.value = ''; // allow re-selecting same file
 }
 
+// Draw the land-status notice for a photo. This is the load-bearing safety
+// control on this screen, NOT the prompt: it is rendered by the app from
+// FieldGoldData, before the model has answered and regardless of what the
+// model eventually says. A model instructed to withhold pan advice may still
+// give it; this banner cannot be argued with.
+function landBanner(ctx) {
+  if (!ctx) return '';
+  return `<div class="card" style="margin:0 0 12px;border-color:${ctx.color};background:${ctx.color}1A;">
+    <div class="small" style="font-weight:800;color:${ctx.color};">${esc(ctx.headline)}</div>
+    <div class="tiny soft" style="margin-top:5px;line-height:1.5;">${esc(ctx.detail)}</div>
+  </div>`;
+}
+
+// Land status for a position, defaulting safely if the data layer is missing.
+function landContextFor(gps) {
+  if (!window.FieldGoldData || !FieldGoldData.contextForPoint) return null;
+  try {
+    return FieldGoldData.contextForPoint(gps ? gps.lat : null, gps ? gps.lon : null);
+  } catch (e) { return null; }
+}
+
 async function analyzePhoto(dataUrl, mediaType) {
   const results = $('photo-results');
+
+  // Snapshot the fix NOW rather than reading window._pendingGps after the
+  // await — a second photo started mid-request would otherwise attach its
+  // location to this one's record.
+  const gps = window._pendingGps || null;
+  window._pendingGps = null;
+  const land = landContextFor(gps);
+
   results.innerHTML = `
+    ${landBanner(land)}
     <div class="card" style="text-align:center;padding:28px;">
       <div class="small soft" style="font-weight:700;">Analyzing photo…</div>
       <div class="tiny subtle" style="margin-top:6px;">Reading the image like a prospector. ~5-15 seconds.</div>
@@ -2018,7 +2146,8 @@ async function analyzePhoto(dataUrl, mediaType) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mt, data: base64 } },
-            { type: 'text', text: VISION_PROMPT },
+            { type: 'text', text: (land && FieldGoldData.landBriefForPrompt
+                                    ? FieldGoldData.landBriefForPrompt(land) : '') + VISION_PROMPT },
           ],
         }],
       }),
@@ -2033,14 +2162,14 @@ async function analyzePhoto(dataUrl, mediaType) {
       else {
         try { const j = await resp.json(); if (j.error && j.error.message) msg += ': ' + j.error.message; } catch(e){}
       }
-      results.innerHTML = `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Analysis failed</p><p class="small soft">${esc(msg)}</p></div>`;
+      results.innerHTML = landBanner(land) + `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Analysis failed</p><p class="small soft">${esc(msg)}</p></div>`;
       return;
     }
 
     const data = await resp.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!text) {
-      results.innerHTML = `<div class="card" style="border-color:var(--amber);"><p class="small soft">The model returned no text. Try another photo.</p></div>`;
+      results.innerHTML = landBanner(land) + `<div class="card" style="border-color:var(--amber);"><p class="small soft">The model returned no text. Try another photo.</p></div>`;
       return;
     }
 
@@ -2071,11 +2200,11 @@ async function analyzePhoto(dataUrl, mediaType) {
       analysis: proseText,
       indicators,
       bench,
-      gps: window._pendingGps || null,
+      gps,
+      land,
       verdict,
       created: new Date().toISOString(),
     };
-    window._pendingGps = null;
     S.photos.unshift(photo);
 
     results.innerHTML = '';
@@ -2084,7 +2213,7 @@ async function analyzePhoto(dataUrl, mediaType) {
     openPhoto(photo.id);
 
   } catch (err) {
-    results.innerHTML = `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Connection failed</p><p class="small soft">Couldn't reach the API. Check your internet connection. (${esc(String(err.message || err))})</p></div>`;
+    results.innerHTML = landBanner(land) + `<div class="card" style="border-color:var(--rust);"><p class="small" style="color:var(--rust);font-weight:700;margin-bottom:6px;">Connection failed</p><p class="small soft">Couldn't reach the API. Check your internet connection. (${esc(String(err.message || err))})</p></div>`;
   }
 }
 
@@ -2104,8 +2233,12 @@ function openPhoto(id) {
   if (!p) return;
   const indKeys = p.indicators ? Object.keys(p.indicators) : [];
   const indLabels = { trap: 'Gold traps', bedrock: 'Bedrock access', blacksand: 'Black sand', gradient: 'Gradient' };
+  // Photos saved before land status existed carry no `land`. Recompute rather
+  // than showing nothing — a missing field must not read as "fine".
+  const land = p.land || landContextFor(p.gps);
   openModal(`
     <img src="${p.thumb}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:280px;object-fit:cover;">
+    ${landBanner(land)}
     ${p.gps ? `<div class="row between" style="margin-bottom:12px;">
       <span class="tiny subtle mono">📍 ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}${p.gps.acc ? ` · ±${Math.round(p.gps.acc)}m` : ''}</span>
       <a class="tiny gold" href="https://maps.apple.com/?ll=${p.gps.lat},${p.gps.lon}&q=Prospect" target="_blank" rel="noopener" style="text-decoration:none;">Open in Maps ↗</a>
@@ -2166,7 +2299,11 @@ function copyPhoto(id) {
   const p = S.photos.find(x => x.id === id);
   if (!p) return;
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(p.analysis).then(() => toast('Analysis copied')).catch(() => toast('Copy failed'));
+    // The land-status line travels with the text. Copied analysis ends up in
+    // notes and messages, where the banner is not there to carry the warning.
+    const L = p.land || landContextFor(p.gps);
+    const body = (L ? L.headline + '\n' + L.detail + '\n\n' : '') + p.analysis;
+    navigator.clipboard.writeText(body).then(() => toast('Analysis copied')).catch(() => toast('Copy failed'));
   } else { toast('Clipboard not available'); }
 }
 
@@ -2597,13 +2734,21 @@ function syncSitesToMap() {
       };
     });
     localStorage.setItem('fieldgold_sites', JSON.stringify({ updated: Date.now(), sites: gpsSites }));
-    // Also write through the shared record so all tools see these sites
+    // Also write through the shared record so all tools see these sites.
+    //
+    // SCOPED, for the same reason bench_hunter.html is: Field Brain owns the
+    // sites IT logged, and nothing else. An unscoped replaceKind('site', ...)
+    // clears every site record on the device — including any a future tool
+    // writes — every time this function runs, which is on every openTools().
+    // That is the exact shape of the bug that silently destroyed the REM
+    // bench records, and it is cheaper to scope it now than to find out later
+    // from an empty list at a trailhead.
     if (window.FieldGoldData) {
       FieldGoldData.replaceKind('site', gpsSites.map(function (s) {
         return { id: s.id, lat: s.lat, lon: s.lon, source: 'fieldbrain',
                  name: s.name, score: s.score, verdict: s.verdict,
                  heightAboveStream: s.heightAboveStream };
-      }));
+      }), { where: function (e) { return e.source === 'fieldbrain'; } });
     }
     return gpsSites.length;
   } catch (e) { return null; }
@@ -2749,6 +2894,16 @@ checkPendingOccurrence();
 
 // REACTIVE: when the shared record changes (any tool writes/exports), refresh the
 // visible view automatically — no manual refresh, no step-ordering ritual.
+//
+// This matters more now than it did before land status existed. The list rows
+// carry a status badge, and the badge is read off the record: a bench that gets
+// checked and moves from NOT CHECKED to AVOID in another tab used to keep
+// showing amber here until somebody happened to reload. Refreshing on change
+// means the screen and the record cannot disagree about a closing order.
+//
+// Guarded because onChange is new — an older cached fieldgold-data.js does not
+// have it, and this page must still render rather than throw on the way to the
+// first row.
 if (window.FieldGoldData && FieldGoldData.onChange) {
   FieldGoldData.onChange(function () {
     var sv = document.getElementById('view-sites');

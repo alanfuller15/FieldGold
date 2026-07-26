@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-<title>FieldGold — Stage 3</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<title>FieldGold — Stage 5 (archived)</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <style>
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
@@ -31,22 +31,26 @@
 </head>
 <body>
 <div id="panel">
+  <div style="background:#B2402F;color:#FFF3EA;border-radius:7px;padding:7px 9px;margin:0 0 8px;font-size:.72rem;line-height:1.35;">
+    <b>ARCHIVED BUILD STAGE — not a field tool.</b> Kept for its build history. This page has <b>no land-status layer</b>: it cannot colour anything by DNR status and knows nothing about your bench candidates. <a href="map.html" style="color:#FFF3EA;font-weight:700;">Use map.html instead. &rsaquo;</a>
+  </div>
   <h1 onclick="document.getElementById('panel').classList.toggle('collapsed')"><span>FieldGold · Mat-Su</span><span class="chev">▾</span></h1>
   <div id="panelbody">
   <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
   <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As)</label>
-  <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>Mining claims — DON'T dig here</label>
+  <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>BLM <b style="color:#E8C04A;">FEDERAL</b> claims only</label>
+  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.35;"><b style="color:#D29A3A;">Blank here does not mean "no claims."</b> Hatcher Pass is <b style="color:#D8D0BE;">state</b> land; state claims are recorded with Alaska DNR and are not on this map. Measured: 1 federal polygon in the whole reach vs 143 in a same-size box near Fairbanks.</div>
   <label class="layer"><input type="checkbox" id="t-terrain"><span class="swatch" style="background:#7a7a7a;"></span>Terrain hillshade (IfSAR 5m)</label>
   <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.3;">Alaska = 5m IfSAR, coarser than Lower-48 LiDAR. Shows benches, pits, big workings — not fine trenches.</div>
   <div style="border-top:1px solid #4A3F2D;margin:9px 0 7px;"></div>
-  <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#6FA760;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Find PROVEN + OPEN ground</button>
+  <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#C9A227;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Scan documented gold occurrences</button>
   <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Old-timer drainages with documented gold (ARDF) that show no active claim right now. <b style="color:#D29A3A;">Research only — always verify with BLM before acting.</b></div>
   <div class="status" id="status"></div>
   </div>
 </div>
 <div id="map"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__lf=1"></script>
+<script src="vendor/leaflet/leaflet.js" onerror="window.__lf=1"></script>
 <script>
 const S=document.getElementById('status');
 function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
@@ -54,7 +58,7 @@ window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
   if(window.innerWidth<=600){ const p=document.getElementById('panel'); if(p) p.classList.add('collapsed'); }
-  if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
+  if(window.__lf||typeof L==='undefined'){log('map library missing: vendor/leaflet/leaflet.js did not load — broken install, not a signal problem','err');return;}
   const map=L.map('map',{center:[61.78,-149.15],zoom:11,zoomControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
@@ -187,7 +191,26 @@ window.addEventListener('load',()=>{
       claimDone=true; render();
     })();
   });
-  // ===== PROVEN + OPEN GROUND (Chris Ralph's old-timer-drainage-claim workflow, automated) =====
+  // ===== DOCUMENTED GOLD OCCURRENCES (was: "PROVEN + OPEN GROUND") =====
+  //
+  // This block used to draw a GREEN circle on every ARDF gold occurrence that
+  // BLM's Alaska FEDERAL mining-claims service came back empty on, captioned
+  // "PROVEN + OPEN candidate".
+  //
+  // A federal claim can only exist on federal land. This reach is STATE land —
+  // GS 1222, state patent 50-87-0076 — and every encumbrance the project has
+  // found here (MCO 549, LLO 5, ADL 229824) is a state instrument held in DNR's
+  // layers, not BLM's. Measured: the federal register holds ONE polygon across
+  // the whole reach envelope and none over the four upper benches, while a
+  // same-size envelope near Fairbanks returns 143. The query works. The zeros
+  // are real. They are just the wrong government's zeros.
+  //
+  // An empty answer from the wrong authority renders exactly like a clean
+  // answer from the right one. That was the bug.
+  //
+  // This page is an ARCHIVED build stage and does not load the shared data
+  // layer, so it cannot colour by real land status. It therefore draws every
+  // occurrence AMBER — unchecked — which is the honest floor, and never green.
   // For gold occurrences (ARDF) currently in view, check each against BLM active claims.
   // Flag: has documented gold BUT not inside an active claim = candidate open ground.
   // HONEST: this is a research aid. Data has lag/gaps. ALWAYS verify with BLM before acting.
@@ -223,7 +246,9 @@ window.addEventListener('load',()=>{
     }catch(e){ log('ARDF fetch failed: '+e.message,'err'); return []; }
   }
 
-  async function isClaimed(lng,lat){
+  // Federal register ONLY. The old name, isClaimed(), is what let a federal
+  // answer be read as the answer. Do not rename it back.
+  async function federalClaimAt(lng,lat){
     const b=map.getBounds(),sz=map.getSize();
     const url='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/identify?'
       +new URLSearchParams({geometry:`${lng},${lat}`,geometryType:'esriGeometryPoint',sr:'4326',
@@ -245,18 +270,28 @@ window.addEventListener('load',()=>{
       const c=f.geometry&&f.geometry.coordinates; if(!c) continue;
       const [lng,lat]=c;
       const name=(f.properties&&(f.properties.site_name||f.properties.name||f.properties.NAME))||'occurrence';
-      const claimedNow=await isClaimed(lng,lat);
-      if(claimedNow===false){
-        open++;
-        L.circleMarker([lat,lng],{radius:9,color:'#6FA760',weight:3,fillColor:'#6FA760',fillOpacity:.35})
-          .addTo(openMarkers)
-          .bindPopup('<div class="info-pop"><span class="h" style="color:#3a7a2a;">⛏ PROVEN + OPEN candidate</span>'
-            +'<b>'+name+'</b>'+(f.properties.comm?' <span style="color:#8a5a1a;">('+f.properties.comm+')</span>':'')+'<br>Documented gold occurrence, no active claim detected here.<br>'
-            +'<span style="color:#C25A3A;font-weight:700;">⚠ Verify with BLM MLRS before driving out or filing. Data lags reality.</span></div>');
-      } else if(claimedNow===true){ claimed++; } else { unknown++; }
+      const fed=await federalClaimAt(lng,lat);
+      if(fed===true){ claimed++; } else if(fed===false){ open++; } else { unknown++; }
+      // Every occurrence is drawn, and every one is AMBER. The old code drew
+      // only the federally-unclaimed ones, which meant the map silently hid
+      // the occurrences it knew the most about.
+      const fedLine = fed===true
+        ? '<span style="color:#B2402F;font-weight:700;">A BLM FEDERAL claim was returned here.</span>'
+        : fed===false
+        ? 'No <b>federal</b> claim returned here. That register covers federal land; this reach is state land, so an empty federal answer is expected and says nothing about whether the ground is claimed.'
+        : 'The federal claim query did not answer (slow or offline).';
+      L.circleMarker([lat,lng],{radius:9,color:'#D29A3A',weight:3,fillColor:'#D29A3A',fillOpacity:.35})
+        .addTo(openMarkers)
+        .bindPopup('<div class="info-pop"><span class="h" style="color:#8a5a1a;">⛏ Documented gold occurrence (ARDF)</span>'
+          +'<b>'+name+'</b>'+(f.properties.comm?' <span style="color:#8a5a1a;">('+f.properties.comm+')</span>':'')
+          +'<div style="margin-top:6px;padding:5px 7px;border-radius:5px;background:#D29A3A;color:#14110C;font-weight:700;">NOT CHECKED — this archived page has no land-status layer</div>'
+          +'<div style="margin-top:6px;font-size:.74rem;color:#5a5344;">'+fedLine+'</div>'
+          +'<span style="color:#C25A3A;font-weight:700;display:block;margin-top:6px;">⚠ State claims and closures are in Alaska Mapper, not on this map. Check there before digging.</span></div>');
     }
-    log('PROVEN+OPEN: '+open+' candidates · '+claimed+' claimed · '+unknown+' unverified','ok');
-    btn.textContent='⛏ Find PROVEN + OPEN ground'; btn.disabled=false;
+    log('occurrences drawn: '+(open+claimed+unknown)+' — all amber, this page has no land-status layer','ok');
+    log('federal register only — claimed '+claimed+' · none returned '+open+' · no answer '+unknown,'warn');
+    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn');
+    btn.textContent='⛏ Scan documented gold occurrences'; btn.disabled=false;
     if(open===0) log('(zoom to a district like Hatcher Pass, then scan)','');
   });
 

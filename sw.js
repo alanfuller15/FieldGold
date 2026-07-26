@@ -1,4 +1,60 @@
-const CACHE = 'fieldgold-v3';
+// BUMP THIS ON EVERY CHANGE TO A CACHED FILE.
+//
+// v4 (2026-07-26): one publication, seven changes. Everything below landed in
+// a single release because the seven change sets it came from were developed
+// against a repo state that never shipped, and were collapsed rather than
+// stacked. There is no v5 through v9 — an earlier draft of this file numbered
+// each change set separately and described a v3 that contained land status.
+// The v3 that actually reached a device contains none of it. That numbering is
+// withdrawn so nobody goes looking for releases that were never published.
+//
+// What a phone still holding v3 shows, change by change:
+//
+//   Land status is absent from the schema entirely. Every bench, site, GPX
+//   waypoint and day plan is drawn and exported with nothing to say whether
+//   the ground is open. This is the condition all seven changes exist to end.
+//
+//   The 20 REM candidates auto-seed with no land status at all and draw as
+//   flat cyan diamonds. Twelve of the twenty sit on encumbered ground — one
+//   inside MCO 549, six inside LLO 5, five inside pending ADL 229824 — and
+//   the map says nothing. A v3 phone does not show these as unchecked; it
+//   shows them as ordinary candidates, which reads as an invitation.
+//
+//   The photo screen has no land-status banner and sends no land status to the
+//   model, so a photo taken on closed ground comes back assessed on its merits.
+//
+//   map.html colours logged sites by TERRAIN SCORE. A site scoring 72+ draws
+//   in the same green the legend calls "DNR-checked, nothing found" — including
+//   one sitting inside MCO 549. A green dot on closed ground, offline, with
+//   nothing on screen to contradict it. Of everything here this is the failure
+//   that most looks like a reassurance.
+//
+//   Leaflet is fetched from cdnjs at runtime and the two cdnjs URLs are in v3's
+//   SHELL. That LOOKS like it works, because those entries were cached on a day
+//   the phone had signal. It hides the fresh install and the cache eviction:
+//   either one leaves a map page with no map library and no network to get one.
+//   Leaflet is now vendored at vendor/leaflet/ and cached from disk.
+//
+//   map.html draws GREEN "PROVEN + OPEN" markers coloured by a query to BLM's
+//   FEDERAL mining-claims service. This reach is STATE land, so that register
+//   is nearly empty here — one polygon across the whole reach, against 143 in
+//   a same-size box near Fairbanks — and its emptiness renders as a green
+//   light. The map asks the wrong government and prints the answer as OPEN.
+//
+//   Nothing on a v3 screen names the STATE claim register. Removing the false
+//   green is not the same as giving a true answer. The map now says it plainly:
+//   22 active state claims sit in this reach, 0 pending, counted 2026-07-25
+//   against DNR ME112 and ME13; none of them contains a bench; how near the
+//   nearest one is was never measured; and the snapshot expires. Honest and
+//   specific beats honest and silent at a trailhead.
+//
+// The five stage maps are NOT in SHELL, and that is a decision rather than an
+// omission. They are archived build stages of map.html; every pixel they draw
+// comes from the network (USGS WMS/WFS, OSM tiles, BLM export), so caching
+// their HTML would produce a page that looks like FieldGold, carries no
+// land-status layer, and shows nothing at all. A browser offline error is the
+// more honest outcome. Each of them now says so on screen in red.
+const CACHE = 'fieldgold-v4';
 
 const SHELL = [
   './',
@@ -6,10 +62,20 @@ const SHELL = [
   './map.html',
   './bench_hunter.html',
   './creek_manual.html',
+  './load_rem_benches.html',
   './manifest.json',
   './fieldgold-data.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+  // Vendored Leaflet — see vendor/leaflet/PROVENANCE.md. The images are not
+  // optional: leaflet.css references them by relative path, and without them
+  // the default marker renders as a broken image. A marker you cannot see, on
+  // ground you cannot dig.
+  './vendor/leaflet/leaflet.css',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/images/marker-icon.png',
+  './vendor/leaflet/images/marker-icon-2x.png',
+  './vendor/leaflet/images/marker-shadow.png',
+  './vendor/leaflet/images/layers.png',
+  './vendor/leaflet/images/layers-2x.png'
 ];
 
 self.addEventListener('install', e => {

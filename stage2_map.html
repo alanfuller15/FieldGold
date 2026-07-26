@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-<title>FieldGold — Stage 2 (gold + geochem)</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<title>FieldGold — Stage 2 (archived)</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <style>
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
@@ -24,6 +24,9 @@
 </head>
 <body>
 <div id="panel">
+  <div style="background:#B2402F;color:#FFF3EA;border-radius:7px;padding:7px 9px;margin:0 0 8px;font-size:.72rem;line-height:1.35;">
+    <b>ARCHIVED BUILD STAGE — not a field tool.</b> Kept for its build history. This page has <b>no land-status layer</b>: it cannot colour anything by DNR status and knows nothing about your bench candidates. <a href="map.html" style="color:#FFF3EA;font-weight:700;">Use map.html instead. &rsaquo;</a>
+  </div>
   <h1>FieldGold · Mat-Su</h1>
   <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
   <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As pathfinders)</label>
@@ -31,14 +34,14 @@
 </div>
 <div id="map"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__lf=1"></script>
+<script src="vendor/leaflet/leaflet.js" onerror="window.__lf=1"></script>
 <script>
 const S=document.getElementById('status');
 function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
 window.onerror=(m,s,l)=>{log('ERR: '+m+' ('+l+')','err');return false;};
 
 window.addEventListener('load',()=>{
-  if(window.__lf||typeof L==='undefined'){log('Leaflet failed to load','err');return;}
+  if(window.__lf||typeof L==='undefined'){log('map library missing: vendor/leaflet/leaflet.js did not load — broken install, not a signal problem','err');return;}
   const map=L.map('map',{center:[61.78,-149.15],zoom:11});
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap'}).addTo(map);
   log('map ready ✓','ok');

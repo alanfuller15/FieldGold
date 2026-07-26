@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-<title>FieldGold — Stage 3</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<title>FieldGold — Map</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <style>
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
@@ -24,7 +24,7 @@
   .layer input{width:15px;height:15px;margin:0;flex-shrink:0;}
   .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
   .status{font-family:monospace;font-size:.67rem;color:#6E6857;margin-top:9px;max-height:64px;overflow:auto;}
-  .ok{color:#6FA760;} .err{color:#C25A3A;}
+  .ok{color:#6FA760;} .err{color:#C25A3A;} .warn{color:#D29A3A;}
   .info-pop{font-size:.8rem;line-height:1.45;max-width:240px;} .info-pop b{color:#14110C;}
   .info-pop .h{font-weight:700;color:#8a5a1a;display:block;margin-top:4px;}
 </style>
@@ -35,22 +35,57 @@
   <div id="panelbody">
   <label class="layer"><input type="checkbox" id="t-ardf" checked><span class="swatch" style="background:#C25A3A;"></span>Gold occurrences (ARDF)</label>
   <label class="layer"><input type="checkbox" id="t-geo" checked><span class="swatch" style="background:#5B8AA6;"></span>Stream geochem (Au/As)</label>
-  <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>Mining claims — DON'T dig here</label>
+  <label class="layer"><input type="checkbox" id="t-claim" checked><span class="swatch" style="background:#C9A227;border:1px solid #E8C04A;"></span>BLM <b style="color:#E8C04A;">FEDERAL</b> claims only</label>
+  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.35;">
+    <b style="color:#D29A3A;">This layer is blank over Hatcher Pass, and that is not the same as "no claims."</b>
+    The reach is <b style="color:#D8D0BE;">state</b> land (GS 1222, patent 50-87-0076). State claims are recorded
+    with Alaska DNR and are <b style="color:#D8D0BE;">not on this map at all</b>. Measured: 1 federal polygon in the
+    whole reach vs 143 in a same-size box near Fairbanks. Check state claims in Alaska Mapper.
+  </div>
+  <div id="state-register" style="font-size:.62rem;color:#9C9684;margin:2px 0 6px 23px;line-height:1.4;
+       border-left:2px solid #5C4F2C;padding-left:8px;">
+    <b style="color:#D8D0BE;">The state register, counted 2026-07-25:</b>
+    <b style="color:#E8C04A;">22</b> active state mining claims (DNR <code>ME112</code>) and
+    <b style="color:#E8C04A;">0</b> pending (<code>ME13</code>) inside this reach — against
+    <b style="color:#E8C04A;">1</b> polygon in the federal layer above.
+    <b style="color:#7BD88F;">None of the 20 bench candidates sits inside one</b>; every point was
+    queried and every one came back empty.
+    <b style="color:#D29A3A;">This map does not draw those 22 claims, and does not know how near
+    the nearest one is to you.</b> That was not measured. Alaska Mapper draws them; this snapshot
+    goes stale the day someone stakes new ground.
+  </div>
   <label class="layer"><input type="checkbox" id="t-terrain"><span class="swatch" style="background:#7a7a7a;"></span>Terrain hillshade (IfSAR 5m)</label>
-  <label class="layer"><input type="checkbox" id="t-sites" checked><span class="swatch" style="background:#6FA760;border:1px solid #E8C04A;"></span>My logged sites (from Field Brain)</label>
-  <label class="layer"><input type="checkbox" id="t-bench" checked><span class="swatch" style="background:#D29A3A;border:1px solid #E8C04A;"></span>Bench candidates (from Bench Hunter)</label>
+  <label class="layer"><input type="checkbox" id="t-sites" checked><span class="swatch" style="background:linear-gradient(90deg,#D29A3A 0 50%,#B2402F 50%);border:1px solid #E8C04A;"></span>My logged sites — coloured by land status</label>
+  <label class="layer"><input type="checkbox" id="t-bench" checked><span class="swatch" style="background:linear-gradient(90deg,#4E9A5F 0 33%,#D29A3A 33% 66%,#B2402F 66%);border:1px solid #E8C04A;"></span>Bench candidates — coloured by land status</label>
+  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.35;">
+    <span style="color:#4E9A5F;font-weight:700;">green</span> = DNR-checked, nothing found ·
+    <span style="color:#D29A3A;font-weight:700;">amber</span> = never checked ·
+    <span style="color:#B2402F;font-weight:700;">red</span> = encumbered, avoid.<br>
+    Amber is not "probably fine" — it means nobody has looked. Tap a diamond for what was found and when.<br>
+    <b style="color:#D8D0BE;">Only the bench diamonds can be green.</b> A DNR check is a point query on a bench
+    candidate; it says nothing about a spot you logged somewhere else, or about an ARDF occurrence. Round
+    site dots and scanned occurrences are never green. Your site's terrain score is in the popup, not in
+    the colour.
+  </div>
+  <label class="layer"><input type="checkbox" id="t-rem" checked><span class="swatch" style="background:linear-gradient(90deg,#4E9A5F 0 33%,#D29A3A 33% 66%,#B2402F 66%);border:2px solid #5AA9C9;"></span>REM terrace candidates (lidar) — also by land status</label>
+  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.35;">
+    Geomorphic terrace targets from lidar REM. NOT confirmed gold — go pan to confirm.
+    The <span style="color:#5AA9C9;font-weight:700;">cyan ring</span> is what makes these
+    the REM set; the fill is the land status, exactly as on the bench diamonds.<br>
+    <b style="color:#D8D0BE;">These used to draw flat cyan.</b> That looked like one uniform
+    layer of candidates, and <b style="color:#B2402F;">12 of the 20 are on encumbered ground</b> —
+    one inside MCO 549, six inside LLO 5, five inside pending ADL 229824.
+  </div>
   <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.3;">Alaska = 5m IfSAR, coarser than Lower-48 LiDAR. Shows benches, pits, big workings — not fine trenches.</div>
-  <label class="layer"><input type="checkbox" id="t-rem" checked><span class="swatch" style="background:#5AA9C9;border:1px solid #E8C04A;"></span>REM terrace candidates (lidar)</label>
-  <div style="font-size:.62rem;color:#6E6857;margin:-2px 0 4px 23px;line-height:1.3;">Geomorphic terrace targets from lidar REM. NOT confirmed gold — go pan to confirm.</div>
   <div style="border-top:1px solid #4A3F2D;margin:9px 0 7px;"></div>
-  <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#6FA760;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Find PROVEN + OPEN ground</button>
-  <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Old-timer drainages with documented gold (ARDF) that show no active claim right now. <b style="color:#D29A3A;">Research only — always verify with BLM before acting.</b></div>
+  <button id="findopen" style="width:100%;padding:9px;border:none;border-radius:7px;background:#C9A227;color:#14110C;font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;">⛏ Scan documented gold occurrences</button>
+  <div style="font-size:.66rem;color:#9C9684;margin-top:5px;line-height:1.35;">Plots ARDF gold occurrences in view and colours each one by <b style="color:#D8D0BE;">land status</b>, same as everything else on this map. <b style="color:#D29A3A;">It does not find open ground.</b> This button used to draw green dots labelled "PROVEN + OPEN" from a <b style="color:#D8D0BE;">federal</b> claims query on <b style="color:#D8D0BE;">state</b> ground — see the note under the claims layer.</div>
   <div class="status" id="status"></div>
   </div>
 </div>
 <div id="map"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__lf=1"></script>
+<script src="vendor/leaflet/leaflet.js" onerror="window.__lf=1"></script>
 <script src="fieldgold-data.js"></script>
 <script>
 const S=document.getElementById('status');
@@ -59,12 +94,40 @@ window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
   if(window.innerWidth<=600){ const p=document.getElementById('panel'); if(p) p.classList.add('collapsed'); }
-  if(window.__lf||typeof L==='undefined'){log('Leaflet failed','err');return;}
+  // Leaflet is VENDORED at vendor/leaflet/leaflet.js — see vendor/leaflet/PROVENANCE.md.
+  // It used to come from cdnjs, which meant no signal => no map at all, which was
+  // confirmed by measurement, not suspected. If this branch fires now it is not a
+  // network problem: the file is missing from the install, so say that instead.
+  if(window.__lf||typeof L==='undefined'){
+    log('map library missing: vendor/leaflet/leaflet.js did not load','err');
+    log('this is a broken install, not a signal problem — re-apply the change set','err');
+    return;
+  }
   const map=L.map('map',{center:[61.78,-149.15],zoom:11,zoomControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
   const streets=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
   const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
   const topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenTopoMap'});
+
+  // BASEMAP TILES ARE STILL A NETWORK DEPENDENCY. Vendoring Leaflet fixed the
+  // library, not the imagery. With no signal you get your benches, your logged
+  // sites, their land-status colours and their popups on a BLANK background.
+  // That is a working map with no picture behind it — not a broken app — and
+  // the difference matters when you are deciding whether to trust the screen.
+  // Say it out loud rather than letting a grey rectangle imply a failure.
+  var baseOk=false, baseSaid=false;
+  function watchBase(lyr,name){
+    lyr.on('load',function(){ if(!baseOk){ baseOk=true; log('basemap ('+name+') ✓','ok'); } });
+    lyr.on('tileerror',function(){
+      if(baseOk||baseSaid) return;
+      baseSaid=true;
+      log('basemap tiles unavailable — no signal','warn');
+      log('your points and their land-status colours are still correct; the '
+        +'background is blank, not wrong','warn');
+    });
+  }
+  [[streets,'Streets'],[satellite,'Satellite'],[topo,'Topo']].forEach(function(p){ watchBase(p[0],p[1]); });
+
   streets.addTo(map);
   L.control.layers({'Streets':streets,'Satellite':satellite,'Topo':topo},null,{position:'topright',collapsed:false}).addTo(map);
   log('map ready ✓','ok');
@@ -113,37 +176,109 @@ window.addEventListener('load',()=>{
   });
 
   // MY SITES: prospects logged in Field Brain, pushed here via same-origin
-  // localStorage. Score-colored markers, tappable for the verdict. Read-only
-  // view of your own data — the bridge is one-way (Field Brain writes, map reads).
+  // localStorage. Read-only view of your own data — the bridge is one-way
+  // (Field Brain writes, map reads).
+  //
+  // WHY THESE ARE NO LONGER COLOURED BY SCORE.
+  //
+  // They used to be: >=72 drew a GREEN dot. Green on this map means "DNR-
+  // checked, nothing found" — it says so in the legend three lines up. So a
+  // site scored 80 on terrain grounds rendered in exactly the colour reserved
+  // for verified-open ground, whether or not anybody had ever run a land
+  // check anywhere near it. This was the last screen in the app that could
+  // show you a green marker sitting inside a mineral closing order.
+  //
+  // Score answers "does this look like a bench worth walking". Land status
+  // answers "may you legally dig here". They are different questions and only
+  // one of them belongs in the colour you read at a glance, in the rain, from
+  // arm's length. The score is still here — as text, in the popup.
+  //
+  // Site markers are therefore coloured by contextForPoint(), which never
+  // returns clean, so a site dot is never green. Amber = nobody checked here.
+  // Rust = encumbered ground is close enough to matter.
   const siteMarkers=L.layerGroup();
-  function scoreColor(pct){ return pct>=72?'#6FA760':pct>=50?'#D29A3A':'#C25A3A'; }
+  function esc(v){
+    return String(v==null?'':v).replace(/[&<>"']/g,function(ch){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+    });
+  }
+  function num(v){ return (typeof v==='number'&&isFinite(v))?v:null; }
+
+  // The legacy `fieldgold_sites` blob is written by an older Field Brain and
+  // has never been through the shared layer's validation. Anything out of it
+  // is treated as hostile input: coordinates checked, strings escaped,
+  // everything else dropped. A record that cannot be placed is COUNTED and
+  // reported, not silently skipped — a site that vanishes off the map without
+  // comment is worse than one that never loaded.
+  function sanitizeSites(raw){
+    const out=[], bad=[];
+    (raw||[]).forEach(function(s){
+      if(!s||typeof s!=='object'){ bad.push('not a record'); return; }
+      const lat=num(s.lat), lon=num(s.lon);
+      if(lat===null||lon===null||lat<-90||lat>90||lon<-180||lon>180){
+        bad.push((s.name?String(s.name).slice(0,24):'unnamed')+': no usable coordinates');
+        return;
+      }
+      out.push({lat:lat, lon:lon, name:s.name, score:num(s.score),
+                verdict:s.verdict, heightAboveStream:num(s.heightAboveStream)});
+    });
+    return {sites:out, bad:bad};
+  }
+
   function loadMySites(){
     siteMarkers.clearLayers();
-    let sites=[];
-    // Prefer the shared record; fall back to the legacy sites key
-    if(window.FieldGoldData){
-      sites=FieldGoldData.get('site');
-    }
-    if(!sites.length){
+    let raw=[], src='shared record';
+    if(window.FieldGoldData) raw=FieldGoldData.get('site');
+    if(!raw.length){
       let payload=null;
       try{ payload=JSON.parse(localStorage.getItem('fieldgold_sites')||'null'); }catch(_){}
-      if(payload&&payload.sites) sites=payload.sites;
+      if(payload&&Array.isArray(payload.sites)){ raw=payload.sites; src='legacy fieldgold_sites blob'; }
     }
+    const clean=sanitizeSites(raw);
+    const sites=clean.sites;
+    clean.bad.forEach(function(why){ log('site dropped — '+why,'warn'); });
     if(!sites.length){
       log('no logged sites yet (log some in Field Brain)','');
       return 0;
     }
+    // No bench data on the device means contextForPoint has nothing to answer
+    // with, and every dot would be amber for the wrong reason. Say so.
+    const haveBenches = !!(window.FieldGoldData && FieldGoldData.get('bench').length);
+    if(!haveBenches) log('no land-status data on this device — site colours mean "unknown", not "unchecked"','warn');
+
+    let avoidCount=0;
     sites.forEach(s=>{
-      const col=scoreColor(s.score);
-      L.circleMarker([s.lat,s.lon],{radius:8,color:'#14110C',weight:2,fillColor:col,fillOpacity:.85})
+      const ctx = (window.FieldGoldData && FieldGoldData.contextForPoint)
+                    ? FieldGoldData.contextForPoint(s.lat,s.lon) : null;
+      const col = ctx ? ctx.color : '#D29A3A';
+      const isAvoid = !!(ctx && ctx.advice===false);
+      if(isAvoid) avoidCount++;
+      L.circleMarker([s.lat,s.lon],{radius:8,color:'#14110C',weight:isAvoid?3:2,
+                                    fillColor:col,fillOpacity:.85})
         .addTo(siteMarkers)
-        .bindPopup('<div class="info-pop"><span class="h" style="color:#3a7a2a;">⛏ Your logged site</span>'
-          +'<b>'+(s.name||'Prospect')+'</b><br>'
-          +'<span style="color:'+col+';font-weight:700;">'+s.score+'/100 · '+(s.verdict||'')+'</span>'
-          +(s.heightAboveStream!=null?'<br>⛰ '+s.heightAboveStream+'m above stream'+(s.heightAboveStream>=3?' (possible old channel)':''):'')
+        .bindPopup('<div class="info-pop"><span class="h" style="color:'+col+';">⛏ Your logged site</span>'
+          +'<b>'+esc(s.name||'Prospect')+'</b><br>'
+          +(ctx
+             ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:.62rem;'
+               +'font-weight:800;letter-spacing:.04em;background:'+col+';color:'+(ctx.ink||'#14110C')+';">'
+               +esc(isAvoid?'AVOID':'NOT CHECKED HERE')+'</span><br>'
+               +'<span style="font-size:.72rem;color:'+col+';">'+esc(ctx.headline)+'</span><br>'
+               +'<span style="font-size:.68rem;color:#9C9684;">'+esc(ctx.detail)+'</span><br>'
+             : '<span style="font-size:.72rem;color:#D29A3A;">Land status unknown — the shared data layer '
+               +'did not load, so nothing on this dot reflects a DNR check.</span><br>')
+          +(s.score!=null
+             ? '<span style="font-size:.72rem;color:#D8D0BE;">Terrain score '+esc(s.score)+'/100'
+               +(s.verdict?' · '+esc(s.verdict):'')+'</span>'
+               +'<br><span style="font-size:.66rem;color:#6E6857;">Score rates the landform, not the '
+               +'legal status. A high score on encumbered ground is still encumbered ground.</span>'
+             : '')
+          +(s.heightAboveStream!=null?'<br>⛰ '+esc(s.heightAboveStream)+'m above stream'
+             +(s.heightAboveStream>=3?' (possible old channel)':''):'')
           +'</div>');
     });
-    log('my sites: '+sites.length+' plotted','ok');
+    log('my sites: '+sites.length+' plotted from the '+src
+        +(avoidCount?' — '+avoidCount+' on or beside encumbered ground':''),
+        avoidCount ? 'warn' : 'ok');
     return sites.length;
   }
   siteMarkers.addTo(map);
@@ -153,25 +288,98 @@ window.addEventListener('load',()=>{
     else map.removeLayer(siteMarkers);
   });
 
+  // ---------------------------------------------------------------------
+  // SHARED POPUP FURNITURE for both diamond layers.
+  //
+  // The bench diamonds and the REM diamonds are two layers with two toggles,
+  // and they say the same things about land status. Written out twice they
+  // would drift, and the way that drift shows up is one layer quietly losing
+  // its claim line or its avoid warning while the other keeps it — with
+  // nothing on screen to say the two disagree. One definition, used by both.
+  // ---------------------------------------------------------------------
+
+  // The claim register is asked separately from the encumbrance battery and is
+  // reported separately. A bench can be CLEAN on every encumbrance layer and
+  // still sit inside somebody's active claim, so this line never disappears
+  // just because the diamond came out green. An undated or absent answer prints
+  // as NOT CHECKED, never as "none".
+  const stateClaimLine = b => {
+    if(!(window.FieldGoldData && FieldGoldData.stateClaimMeta)) return '';
+    const m = FieldGoldData.stateClaimMeta(b);
+    const on = FieldGoldData.stateClaimCheckedOn(b);
+    const when = on ? ' — checked '+on : ' — no check date on this record';
+    const tail = FieldGoldData.stateClaimOf(b)==='none'
+      ? '<br><span style="font-size:.68rem;color:#9C9684;">22 active state claims sit in this reach. '
+        +'How near the nearest one is was never measured — confirm in Alaska Mapper.</span>'
+      : '';
+    return '<br><span style="font-size:.68rem;color:'+m.color+';font-weight:700;">'
+      + m.label + '</span><span style="font-size:.68rem;color:#6E6857;">' + when + '</span>' + tail;
+  };
+
+  const statusBadge = (b,st) =>
+    '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:.62rem;'
+    +'font-weight:800;letter-spacing:.04em;background:'+st.color+';color:'+st.ink+';">'+st.label+'</span>';
+
+  const statusWarn = b => {
+    if(FieldGoldData.isAvoid(b))
+      return '<br><span style="font-size:.72rem;color:#B2402F;font-weight:700;">Do not work this ground. '
+        +'Shown so you can recognise and avoid it, not so you can visit it.</span>';
+    if(FieldGoldData.statusOf(b)==='unchecked')
+      return '<br><span style="font-size:.72rem;color:#D29A3A;">Land status never checked. '
+        +'Check before you go — its position here reflects terrain only.</span>';
+    return '';
+  };
+
+  // A status-coloured diamond. `ring` is the layer's identity — the REM set
+  // gets a cyan one so you can still tell the two layers apart at a glance
+  // without the colour having to carry two meanings at once.
+  const diamond = (st,avoid,ring) => L.divIcon({className:'bench-div',iconSize:[18,18],
+    html:'<div style="width:12px;height:12px;background:'+st.color
+        +';border:2px solid '+(ring||'#14110C')+';transform:rotate(45deg);'
+        +(avoid?'opacity:.95;box-shadow:0 0 0 2px rgba(178,64,47,.35);':'')
+        +'"></div>'});
+
+  const tally = (what,list,cls) => {
+    const c = FieldGoldData.statusCounts(list);
+    log(what+': '+list.length+' plotted ('
+        +c.clean+' clean, '+c.unchecked+' unchecked, '+c.avoid+' avoid)',
+        c.avoid ? 'warn' : (cls||'ok'));
+  };
+
   // BENCH CANDIDATES: flagged by the bench hunter, read from the shared record.
-  // Amber diamond markers, distinct from the round site markers.
+  //
+  // Scoped to source !== 'REM'. The REM candidates have their own toggle and
+  // their own layer below, and before this scoping existed BOTH functions drew
+  // every REM bench: two markers stacked on one coordinate, and whichever drew
+  // last won. That is not a cosmetic bug. The REM layer used to draw flat cyan
+  // with no status at all, so a bench inside MCO 549 would show as an ordinary
+  // candidate on top of the rust diamond that had it right.
   const benchMarkers=L.layerGroup();
   function loadBenches(){
     benchMarkers.clearLayers();
     let benches=[];
-    if(window.FieldGoldData) benches=FieldGoldData.get('bench');
-    if(!benches.length){ log('no bench candidates yet (run the bench hunter)',''); return 0; }
+    if(window.FieldGoldData) benches=FieldGoldData.get('bench').filter(b=>b.source!=='REM');
+    if(!benches.length){ log('no bench-hunter candidates yet (run the bench hunter)',''); return 0; }
+    // Colour the marker by LAND STATUS, not by how good the terrace looks.
+    // Before this, every bench was the same amber diamond, so a candidate
+    // sitting inside a mineral closing order was visually indistinguishable
+    // from one that had been checked and cleared. On a map you read outdoors
+    // that is the difference that matters.
     benches.forEach(b=>{
-      const icon=L.divIcon({className:'bench-div',iconSize:[16,16],
-        html:'<div style="width:12px;height:12px;background:#D29A3A;border:2px solid #14110C;transform:rotate(45deg);"></div>'});
-      L.marker([b.lat,b.lon],{icon}).addTo(benchMarkers)
-        .bindPopup('<div class="info-pop"><span class="h" style="color:#a8791f;">⛰ Bench candidate</span>'
-          +'<b>Profile '+b.profile+'</b><br>'
-          +((b.count!=null)?(b.count+' candidate'+(b.count>1?'s':'')+' · '):'')+'nearest '+b.nearest+' m above creek'
+      const st = FieldGoldData.statusMeta(b);
+      const name = b.profile!=null ? b.profile : '?';
+      L.marker([b.lat,b.lon],{icon:diamond(st,FieldGoldData.isAvoid(b))}).addTo(benchMarkers)
+        .bindPopup('<div class="info-pop"><span class="h" style="color:'+st.color+';">⛰ Bench candidate</span>'
+          +'<b>Profile '+name+'</b> '+statusBadge(b,st)+'<br>'
+          +'<span style="font-size:.72rem;color:'+st.color+';">'+(b.status_label||st.long)+'</span><br>'
+          +(b.count!=null?b.count+' candidate'+(b.count>1?'s':'')+' · ':'')
+          +(b.nearest!=null?'nearest '+b.nearest+' m above creek':'')
           +(b.strong?'<br><span style="color:#a8791f;font-weight:700;">has a strong one</span>':'')
+          +statusWarn(b)
+          +stateClaimLine(b)
           +'<br><span style="font-size:.72rem;color:#6E6857;">Walk the shelf and read the ground — see Bench Hunter.</span></div>');
     });
-    log('bench candidates: '+benches.length+' plotted','ok');
+    tally('bench candidates', benches);
     return benches.length;
   }
   benchMarkers.addTo(map);
@@ -181,7 +389,12 @@ window.addEventListener('load',()=>{
     else map.removeLayer(benchMarkers);
   });
 
-  // REM TERRACE CANDIDATES: lidar-derived, source:'REM', own cyan-diamond layer.
+  // REM TERRACE CANDIDATES: lidar-derived, source:'REM', own toggle and layer.
+  //
+  // Same status colours as the bench diamonds, plus a cyan ring so the set is
+  // still identifiable. The extra fields here — terrace area, height above the
+  // river, distance to the nearest documented gold — are what the REM analysis
+  // produced and the bench hunter did not, so they live on this layer only.
   const remMarkers=L.layerGroup();
   function loadREM(){
     remMarkers.clearLayers();
@@ -189,18 +402,21 @@ window.addEventListener('load',()=>{
     if(window.FieldGoldData) rem=FieldGoldData.get('bench').filter(b=>b.source==='REM');
     if(!rem.length){ log('no REM candidates yet',''); return 0; }
     rem.forEach(b=>{
-      const icon=L.divIcon({className:'rem-div',iconSize:[16,16],
-        html:'<div style="width:12px;height:12px;background:#5AA9C9;border:2px solid #14110C;transform:rotate(45deg);"></div>'});
+      const st = FieldGoldData.statusMeta(b);
       const ha=(b.area_m2!=null)?(b.area_m2/10000).toFixed(2)+' ha':'';
       const up=(b.nearest!=null)?b.nearest+' m above river':'';
       const gold=(b.nearest_gold_m!=null)?'<br>nearest documented gold: '+b.nearest_gold_m+' m':'';
-      L.marker([b.lat,b.lon],{icon}).addTo(remMarkers)
-        .bindPopup('<div class="info-pop"><span class="h" style="color:#2c7a99;">◆ REM terrace candidate</span>'
-          +'<b>'+(b.profile||b.id)+'</b>'+(b.rank?' · rank #'+b.rank:'')+'<br>'
+      L.marker([b.lat,b.lon],{icon:diamond(st,FieldGoldData.isAvoid(b),'#5AA9C9')}).addTo(remMarkers)
+        .bindPopup('<div class="info-pop"><span class="h" style="color:'+st.color+';">◆ REM terrace candidate</span>'
+          +'<b>'+(b.profile||b.id)+'</b>'+(b.rank?' · rank #'+b.rank:'')+' '+statusBadge(b,st)+'<br>'
+          +'<span style="font-size:.72rem;color:'+st.color+';">'+(b.status_label||st.long)+'</span><br>'
           +[up,ha].filter(Boolean).join(' · ')+gold
-          +'<br><span style="font-size:.72rem;color:#6E6857;">Lidar geomorphic target — NOT confirmed gold. Walk it and pan to read the ground.</span></div>');
+          +statusWarn(b)
+          +stateClaimLine(b)
+          +'<br><span style="font-size:.72rem;color:#6E6857;">Lidar geomorphic target — NOT confirmed gold. '
+          +'Walk it and pan to read the ground.</span></div>');
     });
-    log('REM candidates: '+rem.length+' plotted','ok');
+    tally('REM candidates', rem);
     return rem.length;
   }
   remMarkers.addTo(map);
@@ -210,12 +426,16 @@ window.addEventListener('load',()=>{
     else map.removeLayer(remMarkers);
   });
 
-  // REACTIVE: re-read markers whenever the shared record changes (no refresh ritual).
+  // REACTIVE: re-read markers whenever the shared record changes, so a load in
+  // another tab shows up here without a refresh. Guarded because onChange is
+  // new: an older cached fieldgold-data.js has no such function, and this page
+  // must still draw rather than throw on the way to the first marker.
   if(window.FieldGoldData && FieldGoldData.onChange){
     FieldGoldData.onChange(function(){
       if(document.getElementById('t-bench').checked) loadBenches();
       if(document.getElementById('t-rem').checked) loadREM();
-      if(document.getElementById('t-sites') && document.getElementById('t-sites').checked && typeof loadSites==='function') loadSites();
+      const ts=document.getElementById('t-sites');
+      if(ts && ts.checked && typeof loadMySites==='function') loadMySites();
     });
   }
 
@@ -364,10 +584,42 @@ window.addEventListener('load',()=>{
       claimDone=true; render();
     })();
   });
-  // ===== PROVEN + OPEN GROUND (Chris Ralph's old-timer-drainage-claim workflow, automated) =====
-  // For gold occurrences (ARDF) currently in view, check each against BLM active claims.
-  // Flag: has documented gold BUT not inside an active claim = candidate open ground.
-  // HONEST: this is a research aid. Data has lag/gaps. ALWAYS verify with BLM before acting.
+  // ===== DOCUMENTED GOLD OCCURRENCES (was: "PROVEN + OPEN GROUND") =====
+  //
+  // WHAT THIS USED TO DO, AND WHY IT WAS WRONG.
+  //
+  // It walked the ARDF gold occurrences in view, asked BLM's Alaska FEDERAL
+  // mining-claims service whether each one was claimed, and drew a GREEN
+  // #6FA760 circle wherever the answer came back empty, captioned "PROVEN +
+  // OPEN candidate — no active claim detected here."
+  //
+  // The legend on this page says, in these words: green = DNR-checked, nothing
+  // found. BLM is not DNR and does not hold DNR's data. That service's own
+  // description reads "active (recorded or interim) FEDERAL mining claims" —
+  // and a federal claim can only exist on federal land.
+  //
+  // This reach is state land. Our own DNR point queries put the upper benches
+  // on GS 1222, state patented land and mineral estate, patent 50-87-0076.
+  // Every encumbrance this project has ever found here — MCO 549, LLO 5,
+  // ADL 229824 — is a state instrument, and the claim layers that hold them
+  // are DNR's ME112 and ME13.
+  //
+  // Measured, not assumed: the federal layer holds ONE polygon across the
+  // whole reach envelope, and none inside the box containing REM-1/11/19/20.
+  // A same-size envelope near Fairbanks returns 143, so the query works and
+  // the zeros are real. Against that same ground the STATE layers returned
+  // LLO 5 on three points, ADL 229824 on four, MCO 549 on one.
+  //
+  // So the green was not "we checked and it is clear". It was "we asked the
+  // wrong government, and the wrong government has almost nothing to say about
+  // this ground." An empty answer from the wrong authority renders on a screen
+  // exactly like a clean answer from the right one. That is the whole bug.
+  //
+  // The fix is the same one applied to the site layer: the colour comes from
+  // contextForPoint(), which never returns clean, so an occurrence is never
+  // green. The federal claim result still appears — as TEXT, named as federal,
+  // with what it does not cover stated. Same shape as the terrain score: the
+  // information stays, it just stops being the thing you read at a glance.
   const openMarkers = L.layerGroup().addTo(map);
 
   // PROVEN approach (validated in-browser): USGS ARDF WFS 1.1.0 returns GML with ms: tags.
@@ -400,7 +652,10 @@ window.addEventListener('load',()=>{
     }catch(e){ log('ARDF fetch failed: '+e.message,'err'); return []; }
   }
 
-  async function isClaimed(lng,lat){
+  // Returns true / false / null for the FEDERAL register only. The name says
+  // federal because the old name, isClaimed(), is what let a federal answer be
+  // read as the answer. Do not rename it back.
+  async function federalClaimAt(lng,lat){
     const b=map.getBounds(),sz=map.getSize();
     const url='https://gis.blm.gov/akarcgis/rest/services/Minerals/BLM_AK_Federal_Mining_Claims/MapServer/identify?'
       +new URLSearchParams({geometry:`${lng},${lat}`,geometryType:'esriGeometryPoint',sr:'4326',
@@ -413,28 +668,53 @@ window.addEventListener('load',()=>{
 
   document.getElementById('findopen').addEventListener('click',async ()=>{
     const btn=document.getElementById('findopen');
+    const LABEL='⛏ Scan documented gold occurrences';
     btn.textContent='⛏ scanning occurrences…'; btn.disabled=true; openMarkers.clearLayers();
     log('scanning ARDF occurrences in view…');
     const feats=await ardfPointsInView();
-    log('found '+feats.length+' occurrences; checking claims…');
-    let open=0,claimed=0,unknown=0;
+    log('found '+feats.length+' occurrences; colouring by land status…');
+    // EVERY occurrence found gets drawn. The old code drew only the ones the
+    // federal query came back empty on, which meant the map silently hid the
+    // ones it knew most about. Amber and rust are both worth seeing.
+    let drawn=0,rust=0,fedClaimed=0,fedNone=0,fedUnknown=0;
     for(const f of feats){
       const c=f.geometry&&f.geometry.coordinates; if(!c) continue;
       const [lng,lat]=c;
-      const name=(f.properties&&(f.properties.site_name||f.properties.name||f.properties.NAME))||'occurrence';
-      const claimedNow=await isClaimed(lng,lat);
-      if(claimedNow===false){
-        open++;
-        L.circleMarker([lat,lng],{radius:9,color:'#6FA760',weight:3,fillColor:'#6FA760',fillOpacity:.35})
-          .addTo(openMarkers)
-          .bindPopup('<div class="info-pop"><span class="h" style="color:#3a7a2a;">⛏ PROVEN + OPEN candidate</span>'
-            +'<b>'+name+'</b>'+(f.properties.comm?' <span style="color:#8a5a1a;">('+f.properties.comm+')</span>':'')+'<br>Documented gold occurrence, no active claim detected here.<br>'
-            +'<span style="color:#C25A3A;font-weight:700;">⚠ Verify with BLM MLRS before driving out or filing. Data lags reality.</span></div>');
-      } else if(claimedNow===true){ claimed++; } else { unknown++; }
+      const name=esc((f.properties&&(f.properties.site_name||f.properties.name||f.properties.NAME))||'occurrence');
+      // THE COLOUR. contextForPoint never returns clean, so this is amber or
+      // rust and never green. If you are tempted to add a green branch here,
+      // read the block above this function first.
+      // Same guard the site layer uses: if fieldgold-data.js did not load, fall
+      // back to amber and SAY so. Falling back to a default colour silently is
+      // how an unknown becomes a reassurance.
+      const ctx=(window.FieldGoldData&&FieldGoldData.contextForPoint)
+                  ? FieldGoldData.contextForPoint(lat,lng) : null;
+      const col=ctx?ctx.color:'#D29A3A', ink=ctx?(ctx.ink||'#14110C'):'#14110C';
+      if(ctx&&ctx.advice===false) rust++;
+      const fed=await federalClaimAt(lng,lat);
+      if(fed===true) fedClaimed++; else if(fed===false) fedNone++; else fedUnknown++;
+      const fedLine = fed===true
+        ? '<span style="color:#B2402F;font-weight:700;">A BLM FEDERAL claim was returned here.</span>'
+        : fed===false
+        ? 'No <b>federal</b> claim returned here. That register covers federal land; this reach is state land, so an empty federal answer is expected and means nothing about whether the ground is claimed.'
+        : 'The federal claim query did not answer (slow or offline).';
+      drawn++;
+      L.circleMarker([lat,lng],{radius:9,color:col,weight:3,fillColor:col,fillOpacity:.35})
+        .addTo(openMarkers)
+        .bindPopup('<div class="info-pop"><span class="h" style="color:#8a5a1a;">⛏ Documented gold occurrence (ARDF)</span>'
+          +'<b>'+name+'</b>'+(f.properties.comm?' <span style="color:#8a5a1a;">('+esc(f.properties.comm)+')</span>':'')
+          +(ctx
+             ? '<div style="margin-top:6px;padding:5px 7px;border-radius:5px;background:'+col+';color:'+ink+';font-weight:700;">'+esc(ctx.headline)+'</div>'
+               +'<div style="margin-top:4px;">'+esc(ctx.detail)+'</div>'
+             : '<div style="margin-top:6px;color:#D29A3A;font-weight:700;">Land status unknown — the shared data layer did not load, so nothing on this dot reflects a DNR check.</div>')
+          +'<div style="margin-top:6px;font-size:.74rem;color:#5a5344;">'+fedLine+'</div>'
+          +'<span style="color:#C25A3A;font-weight:700;display:block;margin-top:6px;">⚠ State claims and closures are in Alaska Mapper, not on this map. Check there before digging.</span></div>');
     }
-    log('PROVEN+OPEN: '+open+' candidates · '+claimed+' claimed · '+unknown+' unverified','ok');
-    btn.textContent='⛏ Find PROVEN + OPEN ground'; btn.disabled=false;
-    if(open===0) log('(zoom to a district like Hatcher Pass, then scan)','');
+    log('occurrences drawn: '+drawn+' ('+rust+' on or beside encumbered ground)','ok');
+    log('federal register only — claimed '+fedClaimed+' · none returned '+fedNone+' · no answer '+fedUnknown,'warn');
+    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn');
+    btn.textContent=LABEL; btn.disabled=false;
+    if(drawn===0) log('(zoom to a district like Hatcher Pass, then scan)','');
   });
 
 });
