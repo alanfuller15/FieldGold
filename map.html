@@ -11,15 +11,47 @@
 <style>
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
-  #panel{position:absolute;z-index:1000;top:10px;left:10px;background:rgba(30,26,19,.95);
-    border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;max-width:300px;}
+  /* z-index 1200, not 1000. Leaflet's own .leaflet-top/.leaflet-bottom containers
+     are z-index:1000 (see vendor/leaflet/leaflet.css) — the 800 on .leaflet-control
+     only orders controls WITHIN those containers. At 1000 the panel tied with them,
+     and #map comes after #panel in the DOM, so the tie broke Leaflet's way and the
+     zoom/layers controls painted ON TOP of the land-status warnings. Measured
+     2026-07-26 at 390x664: 21 sample points inside warning text were covered by a
+     control. Rules 4 and 5 say those notices are the point; a notice you cannot
+     read is a notice that was removed. */
+  #panel{position:absolute;z-index:1200;top:10px;left:10px;background:rgba(30,26,19,.95);
+    border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;
+    /* The panel is taller than the viewport and #map fills the screen, so the body
+       never scrolled. Everything below the fold was physically unreachable: measured
+       102 of 256 warning-text sample points on a 390x664 phone, 118 of 250 on a
+       375x553 one. The panel scrolls itself now. */
+    max-height:calc(100vh - 20px);overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    /* border-box, or max-height clamps the CONTENT box and the panel still
+       overruns a short window by padding + border. Measured at 1280x620: 624px
+       tall against a 620px viewport. max-width is 328 rather than 300 to keep
+       the rendered width identical to before (300 content + 26 padding + 2
+       border) — this is a box-model change, not a redesign. */
+    box-sizing:border-box;max-width:328px;}
   #panel h1{font-size:.95rem;margin:0;color:#E8C04A;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;}
   #panel h1 .chev{font-size:.8rem;color:#9C9684;transition:transform .2s;}
   #panelbody{margin-top:8px;}
   #panel.collapsed #panelbody{display:none;}
   #panel.collapsed h1 .chev{transform:rotate(-90deg);}
   #panel.collapsed{max-width:none;}
-  @media(max-width:600px){ #panel{max-width:none;right:auto;} }
+  @media(max-width:600px){
+    #panel{max-width:none;right:auto;}
+    /* On a phone the expanded panel is a reading surface, not an overlay — it was
+       already covering most of the map, just badly, with the controls punching
+       through it. Make it deliberate: a full-screen scrollable sheet. Collapsing it
+       (tap the title) gives the whole map and every control back. */
+    #panel:not(.collapsed){left:0;right:0;top:0;bottom:0;max-height:none;
+      border:0;border-radius:0;background:#1E1A13;padding:11px 13px 30px;}
+    /* Sticky title so the collapse chevron stays reachable at any scroll depth —
+       otherwise reading to the bottom traps you away from the map. */
+    #panel:not(.collapsed) h1{position:sticky;top:0;z-index:1;margin:0 0 4px;padding:7px 0;
+      background:#1E1A13;}
+  }
   .layer{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#D8D0BE;margin:6px 0;cursor:pointer;}
   .layer input{width:15px;height:15px;margin:0;flex-shrink:0;}
   .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}

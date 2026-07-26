@@ -1,12 +1,40 @@
 // BUMP THIS ON EVERY CHANGE TO A CACHED FILE.
 //
+// v5 (2026-07-26): map.html only — the panel reachability fix.
+//
+// A phone still holding v4 has the DEFECT, and holds it permanently. The fetch
+// handler below is cache-first with no revalidation: `caches.match` returns the
+// stored copy and never asks the network. `./map.html` is in SHELL. So a v4
+// device serves its own cached map.html forever, and publishing the fix to
+// GitHub Pages changes NOTHING on the device that already installed. Bumping
+// this line is not bookkeeping — it is the entire delivery mechanism.
+//
+// What a phone still holding v4 shows:
+//
+//   The land-status warnings in the map panel are partly unreadable and partly
+//   unreachable. #panel was z-index:1000 and so are Leaflet's .leaflet-top /
+//   .leaflet-bottom containers, so the tie broke by DOM order in Leaflet's
+//   favour and the zoom and layers controls painted ON TOP of the warnings —
+//   21 measured sample points at 390x664. Separately #panel had no max-height
+//   and no scroller, and #map is a full-viewport absolute element so the body
+//   never scrolls either: 102 of 256 warning sample points on a 390x664 phone
+//   and 118 of 250 on a 375x553 one could not be brought on screen by any
+//   gesture. Rules 4 and 5 say those notices are the point. A notice you
+//   cannot reach has been removed, and close to half of them had been.
+//
+//   Both defects are desktop-clean — 0 of 256 unreachable at 1440x900 — which
+//   is why they shipped. tests/test_panel_reachability.py is the tripwire.
+//
 // v4 (2026-07-26): one publication, seven changes. Everything below landed in
 // a single release because the seven change sets it came from were developed
 // against a repo state that never shipped, and were collapsed rather than
-// stacked. There is no v5 through v9 — an earlier draft of this file numbered
-// each change set separately and described a v3 that contained land status.
-// The v3 that actually reached a device contains none of it. That numbering is
-// withdrawn so nobody goes looking for releases that were never published.
+// stacked. An earlier draft of this file numbered each change set separately as
+// v5 through v9 and described a v3 that contained land status. The v3 that
+// actually reached a device contains none of it. That numbering is withdrawn so
+// nobody goes looking for releases that were never published. READ THIS
+// CAREFULLY IF YOU ARE DOING VERSION ARCHAEOLOGY: the v5 above is a real,
+// published release and has nothing to do with the withdrawn v5. Versions are
+// sequential from v4 onward and the withdrawn numbers are simply not reused.
 //
 // What a phone still holding v3 shows, change by change:
 //
@@ -54,7 +82,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v4';
+const CACHE = 'fieldgold-v5';
 
 const SHELL = [
   './',

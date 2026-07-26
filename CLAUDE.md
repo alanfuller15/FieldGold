@@ -65,7 +65,7 @@ physically walks.** That constrains everything below.
 | `sw.js`, `manifest.json`, `icon-*.png` | PWA shell — offline caching and install |
 | `tools/build_loader.py` | **generator.** Holds the STATUS table — the land-status call for all 20 candidates with the reasoning for each — and writes **two** files from that one payload: `load_rem_benches.html` in place, and the `REM_BENCHES` seed array inside `fieldgold-data.js` between its BEGIN/END GENERATED markers. See "one payload, two files" below |
 | `vendor/leaflet/` | **vendored Leaflet 1.9.4** — not written here; see `PROVENANCE.md` |
-| `tests/` | **ten suites.** `test_land_status.js`, `test_photo_land_context.js` (node); `test_app_land_status.py`, `test_photo_app.py`, `test_map_sites.py`, `test_offline_map.py`, `test_seed_drift.py`, `test_stage_maps.py`, `test_state_claims.py`, `test_reactive_refresh.py` (playwright) — **nine of the ten** take `--mutate` to prove they can fail. `test_app_land_status.py` does not, and that gap is open. Note `test_offline_map.py` inverts its exit code under `--mutate` (caught → 0, survived → 1); the others exit 1 on any failure. Read the convention before wiring a runner. A mutation whose `replace()` matches nothing must abort with exit 2 rather than report a pass — a test that cannot fail is not evidence |
+| `tests/` | **twelve suites, 488 assertions.** `test_land_status.js`, `test_photo_land_context.js` (node); `test_app_land_status.py`, `test_photo_app.py`, `test_map_sites.py`, `test_offline_map.py`, `test_seed_drift.py`, `test_stage_maps.py`, `test_state_claims.py`, `test_reactive_refresh.py`, `test_sw_lifecycle.py`, `test_panel_reachability.py` (playwright) — **eleven of the twelve** take `--mutate`, **63 mutants, all caught.** `test_app_land_status.py` does not, and that gap is open. **The exit convention is split and this file got it wrong twice** — verified empirically 2026-07-26 by running all 63. Inverting (caught → 0, survived → 1): `test_offline_map.py`, `test_sw_lifecycle.py`, `test_reactive_refresh.py`, `test_seed_drift.py`, `test_panel_reachability.py`. Exit 1 on any failure: `test_map_sites.py`, `test_photo_app.py`, `test_stage_maps.py`, `test_state_claims.py`, and both `.js` suites. **Do not read this table — run one known mutant per suite and observe the code.** Whatever a runner assumes, half the suites report the opposite, and the failure mode is a runner that prints green over a survived mutant. A mutation whose `replace()` matches nothing must abort with exit 2 rather than report a pass — but see below: exit 2 does not catch everything |
 
 ## The shared data layer
 
@@ -338,12 +338,136 @@ If you upgrade Leaflet, the SRI hashes must be updated in **both**
 `vendor/leaflet/PROVENANCE.md` and `tests/test_offline_map.py`, and `sw.js`
 bumped. The suite failing until you do that is the intended behaviour.
 
+### A notice you cannot reach has been removed
+
+Rules 4 and 5 say never soften a land-status warning and always state
+uncertainty on screen. **Layout is a way of deleting text**, and until
+2026-07-26 nothing in this repo was watching for it. Alan reported from his
+phone that the Leaflet controls were painting over the panel; measuring it
+found two independent defects, both of which had shipped green through eleven
+suites.
+
+- **The z-index tie.** `#panel` was `z-index:1000`. So are Leaflet's
+  `.leaflet-top`/`.leaflet-bottom` **containers** (`vendor/leaflet/leaflet.css`
+  line 141). The `z-index:800` on `.leaflet-control` only orders controls
+  *within* those containers and does not apply here — a static read of the 800
+  is how this was got wrong the first time. A tie breaks by DOM order, `#map`
+  is declared after `#panel`, so Leaflet won and the zoom and layers controls
+  painted **on top of** the land-status warnings. 21 sample points inside
+  warning text were covered on a 390x664 phone. `#panel` is now `1200`.
+- **The unreachable tail.** `#panel` had no `max-height` and no scroller, and
+  `#map` is a full-viewport absolute element so the body never scrolls.
+  Everything below the fold was *physically unreachable*: 102 of 256 warning
+  sample points on a 390x664 phone, 118 of 250 on a 375x553 one. The panel
+  scrolls itself now, and under 600px the expanded panel is a full-screen sheet
+  with a sticky title so the collapse control stays reachable at any depth.
+
+Two things to know before you touch this CSS:
+
+- **`max-height` clamps the CONTENT box.** With `box-sizing:content-box`,
+  padding + border + `top` push the element past the viewport anyway — measured
+  at 624px against a 620px window. `#panel` is `box-sizing:border-box` with
+  `max-width:328px` (300 content + 26 padding + 2 border) so the rendered width
+  is unchanged from before; that number is a box-model translation, not a
+  redesign.
+- **`el.scrollTop = n` succeeds on an `overflow-y:hidden` element in Chromium.**
+  A reachability walk that only sets `scrollTop` proves the text is
+  *programmatically addressable*, not that a finger can get to it — the
+  `no-overflow` mutant survived on exactly that. Gate the scroll range on
+  computed `overflow-y` before you believe a green.
+
+`tests/test_panel_reachability.py` is the tripwire. It renders each map page at
+two phone viewports, a desktop, and a deliberately short 1280x620 window (above
+the mobile breakpoint, shorter than the content), expands the panel — the
+collapsed panel measures nothing — and hit-tests every point inside warning
+text at every reachable scroll offset with `elementFromPoint`, because rect
+maths says two boxes intersect and only a hit test says which one **won**.
+`#status` is excluded from the scope: it is the run log and has its own 64px
+scroller, so scrolling the panel can never reach its lower lines.
+
+**The five stage maps still carry the old `z-index:1000` and no `max-height`.**
+They pass because their panels currently *fit* (254–455px in a 664px viewport),
+not because they were fixed. Add three sentences to one of them and the suite
+goes red. That is the intended behaviour; fix the CSS then, do not raise the
+threshold.
+
+### The mutant that applies cleanly and does not matter
+
+The abort discipline — a mutation whose `replace()` matches nothing must exit 2
+— was written to catch mutants that go stale when the code moves. It does catch
+those, seven times so far. **It does not catch a mutant that applies perfectly
+and violates nothing.**
+
+`test_stage_maps.py --mutate stale-cache` was one, found 2026-07-26. It rewrote
+the cache version to `fieldgold-v7`. It was written when the assertion pinned a
+literal version, so v9 → v7 tripped it. When that assertion was later
+generalised to `int(version) > PUBLISHED` with `PUBLISHED = 3` — the right fix,
+for the right reason — v7 stopped violating anything, because 7 > 3. The
+mutation still applied. The file still changed. Nothing aborted. The suite
+reported 109 passed, 0 failed and exited 0, and for that suite exit 0 under
+`--mutate` means **survived**.
+
+It is now `fieldgold-v3`: the version actually on the device, which is both what
+"stale cache" means and the one value that violates the claim.
+
+Two rules follow.
+
+- **Every mutant must violate the assertion it targets, not merely differ from
+  the current value.** When you generalise an assertion, re-read every mutant
+  that aimed at it. Generalising is usually right; it silently disarms mutants.
+- **Run the mutants and read the exit code against the suite's own convention.**
+  Nothing else finds this class. Exit 2 finds stale mutants; only actually
+  running them finds dead ones.
+
 ## Changing the service worker
 
-`sw.js` caches the app shell. If you add or rename a file, the cache version must
-be bumped or field devices will keep serving the old copy — silently, and exactly
+`sw.js` caches the app shell. **If you change the CONTENTS of any file in
+`SHELL`, the cache version must be bumped** — not just when you add or rename
+one. That wording used to read "add or rename", and on 2026-07-26 it very nearly
+shipped the panel reachability fix to a phone that would never have seen it:
+`map.html` was edited, no file was added, and by the letter of the old sentence
+no bump was needed.
+
+Look at the `fetch` handler before you decide otherwise. It is **cache-first
+with no revalidation** — `caches.match(e.request).then(hit => { if (hit) return
+hit; ... })`. It never asks the network about a file it already holds. `SHELL`
+contains `./map.html`. So a device holding `fieldgold-vN` serves its own stored
+`map.html` **forever**, and publishing a fix to GitHub Pages changes nothing at
+all on that device. The `activate` handler deletes every cache whose key is not
+the current `CACHE`, which means **the version string is the entire delivery
+mechanism.** Bumping it is not bookkeeping.
+
+Field devices will otherwise keep serving the old copy silently, and exactly
 when the user has no signal to notice. Treat a stale service worker as a
 correctness bug, not a nuisance.
+
+**Versions are sequential from v4 and withdrawn numbers are not reused.** The
+note above `const CACHE` in `sw.js` explains that an early draft numbered change
+sets as v5–v9 and withdrew them; the v5 published on 2026-07-26 is a real
+release and is unrelated. Nothing pins the number any more — `test_state_claims.py`,
+`test_stage_maps.py` and `test_offline_map.py` all read it and assert only that
+it is past v3, the last version that reached a device without land status. Pinning
+it made correct bumps fail, which teaches the next person to edit the assertion
+instead of thinking.
+
+`tests/test_sw_lifecycle.py` covers the takeover itself: it stands up the tree
+under one cache version, registers the worker, swaps the server's document root
+to the current tree, and asserts the new worker installs, the new cache is
+POPULATED, the old one is deleted, and the page ends up controlled. Two things
+it learned the hard way, both worth knowing before you touch it:
+
+- **`caches.open(CACHE)` creates the cache before `addAll` fetches anything.**
+  So a total install failure leaves a correctly-named EMPTY cache behind, and
+  any check of the form `'fieldgold-vN' in caches.keys()` passes on a worker
+  that cached nothing at all. Assert on contents.
+- **A local reproduction of a version bump can be defeated by `If-Modified-Since`.**
+  Chromium sends it on the worker's update fetch. `python3 -m http.server`
+  answers it from the file's MTIME, so serving a newer *tree* whose `sw.js` has
+  an *older* timestamp gets a 304 and the update never happens — no error, no
+  console message, nothing on screen. This is why hand-driven DevTools work on
+  2026-07-26 could not get v4 to install. GitHub Pages revalidates on ETag, from
+  the bytes, so it is a harness trap and not a production one. If you reproduce
+  an update locally, serve with caching off.
 
 ## What a good pull request looks like here
 

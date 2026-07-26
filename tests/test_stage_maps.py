@@ -269,8 +269,23 @@ def apply_mutant(root):
         if not cur:
             print("mutant %s: no readable cache version in sw.js" % MUTATE)
             sys.exit(2)
+        # v3, not v7. EIGHTH SIGHTING, and this one is subtler than the seven
+        # before it: the mutant applied cleanly, exited 0, and was DEAD.
+        #
+        # It was written when the assertion below pinned a literal version, so
+        # rewriting v9 to v7 tripped it. When that assertion was generalised to
+        # `int(version) > PUBLISHED` with PUBLISHED = 3 — the right fix, for the
+        # right reason — v7 quietly stopped violating anything, because 7 > 3.
+        # The mutation still ran, still reported, still exited 0, and proved
+        # nothing. No abort fired, because nothing failed to match. The abort
+        # discipline catches a mutant that cannot be APPLIED; it cannot catch a
+        # mutant that applies and does not MATTER. Only running the mutants and
+        # reading rc=0 as "survived" rather than "passed" catches this one.
+        #
+        # v3 is the version actually sitting in the phone's cache, so it is both
+        # what "stale cache" means and the one value that violates the claim.
         edit(root, "sw.js", "const CACHE = 'fieldgold-v%s';" % cur.group(1),
-             "const CACHE = 'fieldgold-v7';")
+             "const CACHE = 'fieldgold-v3';")
     else:
         print("unknown mutant: " + str(MUTATE))
         sys.exit(2)

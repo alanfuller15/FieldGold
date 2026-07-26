@@ -269,7 +269,17 @@ def apply_mutant(root):
     elif MUTATE == "drop-panel":
         edit(root, "map.html", 'id="state-register"', 'id="state-register-hidden" hidden')
     elif MUTATE == "stale-cache":
-        edit(root, "sw.js", "const CACHE = 'fieldgold-v4';", "const CACHE = 'fieldgold-v3';")
+        # Read the current version rather than naming it. Pinned to
+        # 'fieldgold-v4', this mutant began aborting with exit 2 the moment 0009
+        # bumped the cache to v5 — a mutant that cannot be applied is not a
+        # passing mutant, and the abort is the only reason that was noticed.
+        _c = re.search(r"const CACHE = 'fieldgold-v(\d+)';",
+                       (root / "sw.js").read_text())
+        if not _c:
+            print("stale-cache: no cache version to mutate")
+            sys.exit(2)
+        edit(root, "sw.js", "const CACHE = 'fieldgold-v%s';" % _c.group(1),
+             "const CACHE = 'fieldgold-v3';")
     else:
         print("unknown mutant: " + str(MUTATE))
         sys.exit(2)
@@ -643,14 +653,24 @@ def main():
     check("  the panel sits next to the FEDERAL note it corrects",
           0 < map_txt.find("BLM") < panel_i)
 
-    # v4, not v9. The seven change sets were collapsed into one publication,
-    # so the cache version follows the sequence that actually reached a device
-    # (v1, v2, v3) rather than the per-change-set numbering of a stack that was
-    # withdrawn. Any bump past v3 activates; the point of pinning it here is
-    # that SOMEBODY bumped it, deliberately, with the reason written down.
-    check("  sw.js is at fieldgold-v4",
-          "const CACHE = 'fieldgold-v4';" in sw,
-          sw[sw.find("const CACHE"):][:48])
+    # Version READ, not named. This check used to pin the literal string
+    # 'fieldgold-v4', and 0009 is what proved that wrong: bumping the cache to
+    # v5 to actually deliver a map.html fix turned a correct bump into a red
+    # test, which trains the next person to edit the assertion instead of
+    # thinking. test_offline_map.py and test_stage_maps.py had already learned
+    # this and left comments saying so; this was the last pinned one.
+    #
+    # The claim being made is NOT "the version is 4". It is: the sequence that
+    # actually reached a device is v1, v2, v3 — the per-change-set numbering of
+    # the withdrawn stack was never published — so anything past v3 means
+    # somebody bumped it deliberately, and the reason is written down above the
+    # declaration (asserted separately, just below).
+    _cv = re.search(r"const CACHE = 'fieldgold-v(\d+)';", sw)
+    check("  sw.js declares a cache version",
+          bool(_cv), sw[sw.find("const CACHE"):][:48])
+    check("  sw.js is past v3 — the last version that reached a device without land status",
+          bool(_cv) and int(_cv.group(1)) > 3,
+          _cv.group(0) if _cv else None)
     # The whole comment block above the declaration, not a fixed window of it.
     # The note used to be one paragraph per change set and a 700-character
     # window reached all of it; the collapsed note is one release covering seven
