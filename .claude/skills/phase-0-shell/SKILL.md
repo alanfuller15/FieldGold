@@ -5,6 +5,14 @@ description: Runbook for FieldGold migration Phase 0 — wrapping the existing P
 
 # Phase 0 — Capacitor shell
 
+## Where phase status lives
+
+**`STATE.md` at the repo root, not this file.** This runbook says how to
+perform the steps; `STATE.md` records which of them are done, what is verified
+and at which tier, and what is still an open decision. Read it before starting
+and update it as steps land. If the two ever disagree about progress,
+`STATE.md` is right and this file is a procedure that was followed or wasn't.
+
 ## Purpose
 
 Prove the build → sign → install chain end to end. The riskiest unknown in

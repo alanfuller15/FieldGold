@@ -72,6 +72,37 @@ physically walks.** That constrains everything below.
 | `vendor/leaflet/` | **vendored Leaflet 1.9.4** — not written here; see `PROVENANCE.md` |
 | `tests/` | **twelve suites, 489 assertions** — measured 2026-07-26 by running all twelve and summing each suite's own count (30/50 node; 30, 31, 39, 48, 29, 25, 15, 109, 68, 15 python). The figure here read 488. `test_land_status.js`, `test_photo_land_context.js` (node); `test_app_land_status.py`, `test_photo_app.py`, `test_map_sites.py`, `test_offline_map.py`, `test_seed_drift.py`, `test_stage_maps.py`, `test_state_claims.py`, `test_reactive_refresh.py`, `test_sw_lifecycle.py`, `test_panel_reachability.py` (playwright) — **eleven of the twelve** take `--mutate`, **66 mutants** (64 distinct names — `no-banner` and `stale-cache` each appear in two suites). `test_app_land_status.py` does not, and that gap is open. **The "all caught" run covered 63 of them.** Counted off the tree 2026-07-26: 57 mutants at `35adc6f`, 66 at `72e8815`, 66 now. The 63 was never the tree's count — three mutants have never appeared in a verified-all-caught run, and which three is not recorded. The conclusion that the 63 were caught still stands; only the number was wrong. **The exit convention is split and this file got it wrong twice** — verified empirically 2026-07-26 by running those 63. Inverting (caught → 0, survived → 1): `test_offline_map.py`, `test_sw_lifecycle.py`, `test_reactive_refresh.py`, `test_seed_drift.py`, `test_panel_reachability.py`. Exit 1 on any failure: `test_map_sites.py`, `test_photo_app.py`, `test_stage_maps.py`, `test_state_claims.py`, and both `.js` suites. **Do not read this table — run one known mutant per suite and observe the code.** Whatever a runner assumes, half the suites report the opposite, and the failure mode is a runner that prints green over a survived mutant. A mutation whose `replace()` matches nothing must abort with exit 2 rather than report a pass — but see below: exit 2 does not catch everything |
 
+## Every document in this repo
+
+Built from `git ls-files '*.md'` on 2026-07-26, not from memory. Until that
+date nothing pointed at any of these, so a session reading this file never
+learned they existed. A document nothing links to is a document nobody reads.
+
+**Control: any new `.md` gets a line here in the commit that creates it.**
+Rebuild the list with the command above rather than appending from
+recollection — a hand-maintained index drifts exactly the way the counts in
+the tests row did.
+
+| document | lines | role |
+|---|---|---|
+| `CLAUDE.md` | 590 | this file — the whole brief for anyone changing the repo |
+| `STATE.md` | 103 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders |
+| `vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified |
+| `.claude/skills/phase-0-shell/SKILL.md` | 128 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
+
+What this index found when it was first built, both now fixed:
+
+- **`README.md` was a two-line stub** (`# FieldGold` / `Prospecting app`) and
+  was the only document GitHub rendered. The real 173-line README sat at
+  `README_FieldGold.md`, which nothing linked to. Every correction made to it
+  landed in a file no visitor saw. The real one is now `README.md`; the old
+  path is deleted, having had no inbound references.
+- **`STATE.md` and the phase-0 runbook were a pair that did not reference each
+  other.** STATE.md named the next action; the runbook was how to perform it.
+  They now link both ways, and the precedence is stated in both: the runbook
+  is *how*, STATE.md is *how far*.
+
 ## The shared data layer
 
 `fieldgold-data.js` exposes `FieldGoldData` with `get`, `put`, `replaceKind`,

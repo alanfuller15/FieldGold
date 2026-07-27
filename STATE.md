@@ -94,3 +94,10 @@ These were considered and deferred. Do not start them without Alan saying so.
 ## Next action
 
 Phase 0a: move the web assets to `docs/`, then install Capacitor.
+
+The procedure for the Capacitor half is
+**`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
+signing, provisioning, first device install. That file is how; this file is
+how far. Update the tables above as its steps land, and record the tier
+([self-tested] / [fetched] / [externally-verified]) under Verified facts.
+Phase 0a has no runbook — the breakage inventory above is what there is.
