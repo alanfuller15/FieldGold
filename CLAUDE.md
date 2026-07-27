@@ -88,7 +88,7 @@ in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 593 | this file — the whole brief for anyone changing the repo |
+| `CLAUDE.md` | 625 | this file — the whole brief for anyone changing the repo |
 | `STATE.md` | 136 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders |
 | `docs/vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a |
@@ -507,6 +507,38 @@ it learned the hard way, both worth knowing before you touch it:
   2026-07-26 could not get v4 to install. GitHub Pages revalidates on ETag, from
   the bytes, so it is a harness trap and not a production one. If you reproduce
   an update locally, serve with caching off.
+
+## Deploying to GitHub Pages — verify the artifact, not the status
+
+The site is served from **branch `main`, path `/docs`** (flipped from `/` in
+Phase 0a, 2026-07-27). `docs/` holds only web assets so that Capacitor's
+`webDir` can point at it; `tests/` and `tools/` stay at the repo root and must
+never ship in the app bundle.
+
+Two rules, both learned by getting them wrong on 2026-07-27, and both of the
+same shape: **a green-looking field is not the artifact.**
+
+- **A Pages build status of `built` can name an earlier commit.** The Pages
+  API reports `status` for the repository, not for your push. After the Phase
+  0a flip it read `built` with source `/docs` while the live bytes came from
+  the build for the commit *before* the move — so every `docs/`-relative path
+  404'd and the front page was a Jekyll rendering of `README.md`. Polling
+  `status` proved nothing. **Read
+  `/repos/OWNER/REPO/pages/builds/latest --jq .commit` and require it to equal
+  the SHA you pushed** before you call a deploy done.
+- **Pushed does not imply building.** `53edb99` reached `origin/main` and sat
+  15 minutes with no `pages build and deployment` run at all. If no run appears,
+  force one: `gh api -X POST repos/OWNER/REPO/pages/builds`. It completed in
+  about 45 seconds.
+
+Then fetch the assets, cache-busted, and check **content** and not only status
+codes — a 200 can be a Jekyll page wearing your title. The Phase 0a check was
+14 paths plus greps for `VISION_PROMPT` in `index.html`, the scan-button text
+in `map.html`, `Leaflet 1.9.4`, and the `REM_BENCHES` seed.
+
+`docs/.nojekyll` exists so the build is deterministic and Jekyll does not
+process the tree. That is its whole justification. It is **not** there to stop
+`vendor/` being excluded — see the retraction in the commit that added it.
 
 ## What a good pull request looks like here
 
