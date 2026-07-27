@@ -73,9 +73,12 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
 if "--repo" in sys.argv:
-    ROOT = pathlib.Path(sys.argv[sys.argv.index("--repo") + 1]).expanduser().resolve()
+    REPO = pathlib.Path(sys.argv[sys.argv.index("--repo") + 1]).expanduser().resolve()
+# --repo still means the repo root, as it reads. The web root is docs/ under it,
+# so that webDir points at a directory holding only web assets.
+ROOT = REPO / "docs"
 MUTATE = sys.argv[sys.argv.index("--mutate") + 1] if "--mutate" in sys.argv else None
 
 if not (ROOT / "map.html").exists():

@@ -27,7 +27,10 @@ import sys
 import threading
 
 # Resolve the repo from THIS file, not the cwd.
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
+# Web root. The app lives under docs/ so that webDir can point at a directory
+# containing only web assets — tests/ and tools/ must never ship in the bundle.
+ROOT = REPO / "docs"
 MUTATE = sys.argv[sys.argv.index("--mutate") + 1] if "--mutate" in sys.argv else None
 
 PASS, FAILS = 0, []

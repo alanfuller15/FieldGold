@@ -39,6 +39,39 @@ changes to app code.
   native bundle, and at the repo root that sweeps `ios/`, `.git/`, `.claude/`,
   the `.0009-backup-*` directories, `tests/` and `tools/` into the app.
 
+## Phase 0 — open: does `webDir` exclude the stage maps?
+
+**Filed, not solved. This is a Phase 0 decision and it blocks nothing in
+Phase 0a.**
+
+Phase 0a moves `stage1_map_test.html` … `stage5_map.html` into `docs/` along
+with every other web asset, because they are published today and three suites
+load them over HTTP. That puts them inside `webDir`, which means **they will
+ship inside the iOS bundle.**
+
+CLAUDE.md deliberately keeps them out of the `sw.js` SHELL. The reasoning
+there: a cached stage map looks like FieldGold, carries no land-status layer,
+and shows nothing at all — a browser offline error is the more honest outcome.
+`tests/test_stage_maps.py` asserts their absence from SHELL so a future
+"helpful" addition trips a test.
+
+Bundling them reintroduces that risk by a different route. The bundle is not
+the service worker cache — the mechanism is different and the SHELL assertion
+still holds — but a person who reaches one of these pages on a phone cannot
+tell the difference. They carry a red ARCHIVED BUILD STAGE banner, and nothing
+in `index.html` links to them (zero references; direct URL only). That is the
+mitigation that exists today. It was written for a browser bookmark, not for a
+page shipped inside an app icon.
+
+Phase 0 must decide one of:
+
+- ship them and rely on the banner plus their unreachability, or
+- exclude them from `webDir` — which means `webDir` is no longer simply
+  "the directory Pages serves", and something has to enforce the difference.
+
+Do not resolve this by quietly deleting the stage maps. They are the build
+history of `map.html` and CLAUDE.md keeps them on purpose.
+
 ## Phase 0a — move web assets to docs/
 
 A prerequisite that Phase 0 uncovered. Not in the original 0-4 plan.

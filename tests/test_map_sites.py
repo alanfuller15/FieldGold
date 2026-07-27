@@ -45,7 +45,10 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
+# Web root. The app lives under docs/ so that webDir can point at a directory
+# containing only web assets — tests/ and tools/ must never ship in the bundle.
+ROOT = REPO / "docs"
 MUTATE = sys.argv[sys.argv.index("--mutate") + 1] if "--mutate" in sys.argv else None
 
 PASS = 0

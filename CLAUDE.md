@@ -86,9 +86,9 @@ the tests row did.
 | document | lines | role |
 |---|---|---|
 | `CLAUDE.md` | 590 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 103 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `STATE.md` | 136 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders |
-| `vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified |
+| `docs/vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a |
 | `.claude/skills/phase-0-shell/SKILL.md` | 128 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
 
 What this index found when it was first built, both now fixed:

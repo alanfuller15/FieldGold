@@ -30,10 +30,14 @@ import sys
 # running this twice must be a no-op, and there are assertions that fail loudly
 # if it ever stops being one.
 import os
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(_ROOT, "load_rem_benches.html")
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Both generated files are web assets and live under docs/, the directory
+# GitHub Pages serves and the one webDir points at. This generator is dev
+# tooling and stays at the repo root — it must not ship in the app bundle.
+_WEB = os.path.join(_REPO, "docs")
+SRC = os.path.join(_WEB, "load_rem_benches.html")
 DST = SRC
-DATA_JS = os.path.join(_ROOT, "fieldgold-data.js")
+DATA_JS = os.path.join(_WEB, "fieldgold-data.js")
 
 # The generated region in fieldgold-data.js. Everything between these two lines
 # is this script's to write; everything outside them is hand-maintained.

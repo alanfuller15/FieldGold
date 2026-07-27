@@ -66,7 +66,10 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
+# Two roots, and this suite is the reason the split exists. It copytrees the
+# REPO (to carry tools/) and then reads web assets out of docs/ inside it.
+ROOT = REPO / "docs"
 MUTATE = sys.argv[sys.argv.index("--mutate") + 1] if "--mutate" in sys.argv else None
 
 PASS = 0
@@ -210,7 +213,7 @@ def apply_mutant(root):
         # The whole invariant, inverted: an unrecognised value falls through to
         # 'none' instead of 'unchecked'. "We did not ask" now renders as "we
         # asked and the answer was no".
-        edit(root, "fieldgold-data.js",
+        edit(root, "docs/fieldgold-data.js",
              "        s === STATE_CLAIM.UNCHECKED) return s;\n"
              "    return STATE_CLAIM.UNCHECKED;",
              "        s === STATE_CLAIM.UNCHECKED) return s;\n"
@@ -219,7 +222,7 @@ def apply_mutant(root):
         # The tidy-the-popup change: let a clean encumbrance call stand in for
         # a claim check when the claim field is missing. This is the 0006 bug
         # in new clothes, and it is the single most likely future regression.
-        edit(root, "fieldgold-data.js",
+        edit(root, "docs/fieldgold-data.js",
              "    return normalizeStateClaim(entry.state_claim);",
              "    if (entry.state_claim === undefined && entry.land_status === 'clean')\n"
              "      return STATE_CLAIM.NONE;\n"
@@ -227,7 +230,7 @@ def apply_mutant(root):
     elif MUTATE == "drop-date":
         # Keep the tier, drop the shelf life. A 'none' with no date on it is
         # not a result, it is a rumour.
-        edit(root, "map.html",
+        edit(root, "docs/map.html",
              "    const when = on ? ' — checked '+on : ' — no check date on this record';",
              "    const when = '';")
     elif MUTATE == "drop-line":
@@ -236,20 +239,20 @@ def apply_mutant(root):
         # hunter's and the lidar set's, and each calls the shared helper. Both
         # are removed here, because a mutant that removes one and is caught by
         # the other proves nothing about the one it removed.
-        edit(root, "map.html", "          +stateClaimLine(b)\n", "", count=2)
+        edit(root, "docs/map.html", "          +stateClaimLine(b)\n", "", count=2)
     elif MUTATE == "drop-line-rem":
         # Only the REM layer loses it. The lidar set is the one carrying all 20
         # seeded records and 12 of the avoid tier, so this is the deletion that
         # would actually reach a phone — and it is invisible to any check that
         # reads the bench layer and calls that "every bench".
-        edit(root, "map.html",
+        edit(root, "docs/map.html",
              "          +statusWarn(b)\n          +stateClaimLine(b)\n"
              "          +'<br><span style=\"font-size:.72rem;color:#6E6857;\">Lidar",
              "          +statusWarn(b)\n"
              "          +'<br><span style=\"font-size:.72rem;color:#6E6857;\">Lidar")
     elif MUTATE == "fake-proximity":
         # The number nobody measured, printed as though somebody had.
-        edit(root, "map.html",
+        edit(root, "docs/map.html",
              "+'How near the nearest one is was never measured — confirm in Alaska Mapper.</span>'",
              "+'Nearest active state claim: 250 m.</span>'")
     elif MUTATE == "fake-proximity-gen":
@@ -267,18 +270,18 @@ def apply_mutant(root):
         # it, so only a regeneration catches this.
         edit(root, "tools/build_loader.py", '    nb["state_claim"] = "none"\n', "")
     elif MUTATE == "drop-panel":
-        edit(root, "map.html", 'id="state-register"', 'id="state-register-hidden" hidden')
+        edit(root, "docs/map.html", 'id="state-register"', 'id="state-register-hidden" hidden')
     elif MUTATE == "stale-cache":
         # Read the current version rather than naming it. Pinned to
         # 'fieldgold-v4', this mutant began aborting with exit 2 the moment 0009
         # bumped the cache to v5 — a mutant that cannot be applied is not a
         # passing mutant, and the abort is the only reason that was noticed.
         _c = re.search(r"const CACHE = 'fieldgold-v(\d+)';",
-                       (root / "sw.js").read_text())
+                       (root / "docs" / "sw.js").read_text())
         if not _c:
             print("stale-cache: no cache version to mutate")
             sys.exit(2)
-        edit(root, "sw.js", "const CACHE = 'fieldgold-v%s';" % _c.group(1),
+        edit(root, "docs/sw.js", "const CACHE = 'fieldgold-v%s';" % _c.group(1),
              "const CACHE = 'fieldgold-v3';")
     else:
         print("unknown mutant: " + str(MUTATE))
@@ -321,22 +324,26 @@ def claim_slice(popup):
 
 
 def main():
-    root = ROOT
+    # `root` is the REPO root, not the web root — this suite mutates
+    # tools/build_loader.py as well as the web assets, and re-runs the
+    # generator inside a copy of the tree. `web` is what gets SERVED.
+    root = REPO
     if MUTATE:
         tmp = pathlib.Path(tempfile.mkdtemp()) / "repo"
-        shutil.copytree(ROOT, tmp)
+        shutil.copytree(REPO, tmp)
         root = tmp
         apply_mutant(root)
+    web = root / "docs"
 
     print("state-claim register suite  " + str(root)
           + ("  MUTANT=" + MUTATE if MUTATE else ""))
 
-    map_txt = (root / "map.html").read_text(encoding="utf-8")
-    loader_txt = (root / "load_rem_benches.html").read_text(encoding="utf-8")
+    map_txt = (web / "map.html").read_text(encoding="utf-8")
+    loader_txt = (web / "load_rem_benches.html").read_text(encoding="utf-8")
     gen_txt = (root / "tools" / "build_loader.py").read_text(encoding="utf-8")
-    sw = (root / "sw.js").read_text(encoding="utf-8")
+    sw = (web / "sw.js").read_text(encoding="utf-8")
 
-    httpd, port = serve(root)
+    httpd, port = serve(web)
     base = "http://127.0.0.1:%d" % port
 
     with sync_playwright() as p:
@@ -477,14 +484,17 @@ def main():
         check("  ...and geo_score/geo_rank are NOT (they must be inherited)",
               not re.search(r"DERIVED = \([^)]*geo_", gen_txt, re.S))
 
+        # The scratch tree needs BOTH roots: tools/ for the generator and docs/
+        # for what it writes. copytree(root) carries both because root is the
+        # repo root, which is the whole reason this suite keeps them separate.
         scratch = pathlib.Path(tempfile.mkdtemp()) / "regen"
         shutil.copytree(root, scratch)
-        before = (scratch / "load_rem_benches.html").read_bytes()
+        before = (scratch / "docs" / "load_rem_benches.html").read_bytes()
         proc = subprocess.run([sys.executable, "tools/build_loader.py"],
                               cwd=str(scratch), capture_output=True, text=True)
         check("  the generator runs clean against the committed tree",
               proc.returncode == 0, (proc.stderr or proc.stdout)[-300:])
-        after = (scratch / "load_rem_benches.html").read_bytes()
+        after = (scratch / "docs" / "load_rem_benches.html").read_bytes()
         check("  re-running it is a byte-exact no-op (rule 6: never hand-edit)",
               before == after,
               "the committed loader is not what the generator produces")

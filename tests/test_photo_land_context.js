@@ -20,7 +20,8 @@ const vm = require('vm');
 
 // Resolve from THIS file, not the cwd. (Same lesson as tools/build_loader.py:
 // a test that only passes from one directory is a test you stop running.)
-const ROOT = path.dirname(__dirname);
+// Web root: the app lives under docs/ so webDir holds only web assets.
+const ROOT = path.join(path.dirname(__dirname), 'docs');
 const SRC = process.argv.includes('--src')
   ? process.argv[process.argv.indexOf('--src') + 1]
   : path.join(ROOT, 'fieldgold-data.js');

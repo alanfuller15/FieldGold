@@ -21,7 +21,7 @@ const vm = require('vm');
 const path = require('path');
 const SRC = process.argv.includes('--src')
   ? process.argv[process.argv.indexOf('--src') + 1]
-  : path.join(path.dirname(__dirname), 'fieldgold-data.js');
+  : path.join(path.dirname(__dirname), 'docs', 'fieldgold-data.js');
 
 const MUTATE = process.argv.includes('--mutate')
   ? process.argv[process.argv.indexOf('--mutate') + 1]

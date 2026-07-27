@@ -30,7 +30,11 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Two roots, and this suite genuinely needs both: the two generated files are
+# web assets under docs/, the generator that writes them is dev tooling at the
+# repo root and must not ship in the app bundle.
+ROOT = os.path.join(REPO, "docs")
 
 PASS = 0
 FAILS = []
@@ -95,17 +99,22 @@ if "--mutate" in sys.argv:
     if MUTATE not in MUTANTS:
         sys.exit(f"unknown mutant {MUTATE!r}; have: {', '.join(sorted(MUTANTS))}")
 
-# Work on a throwaway copy so a mutant can never touch the real tree.
+# Work on a throwaway copy so a mutant can never touch the real tree. The copy
+# MIRRORS the repo layout — docs/ beside tools/ — because build_loader.py
+# resolves its targets as <its parent's parent>/docs/. A flat scratch dir would
+# leave the generator writing into a directory that does not exist.
 WORK = tempfile.mkdtemp(prefix="fg-seed-drift-")
+WORK_WEB = os.path.join(WORK, "docs")
+os.makedirs(WORK_WEB, exist_ok=True)
 for name in ("load_rem_benches.html", "fieldgold-data.js"):
-    shutil.copy2(os.path.join(ROOT, name), os.path.join(WORK, name))
+    shutil.copy2(os.path.join(ROOT, name), os.path.join(WORK_WEB, name))
 os.makedirs(os.path.join(WORK, "tools"), exist_ok=True)
-shutil.copy2(os.path.join(ROOT, "tools", "build_loader.py"),
+shutil.copy2(os.path.join(REPO, "tools", "build_loader.py"),
              os.path.join(WORK, "tools", "build_loader.py"))
 
 if MUTATE:
     fname, old, new = MUTANTS[MUTATE]
-    target = os.path.join(WORK, fname)
+    target = os.path.join(WORK_WEB, fname)
     text = open(target, encoding="utf-8").read()
     # A mutation that changes nothing is not a mutation; it is a green tick for
     # free. Abort loudly rather than report a pass this suite did not earn.
@@ -116,8 +125,8 @@ if MUTATE:
     open(target, "w", encoding="utf-8").write(text.replace(old, new, 1))
     print(f"[mutant {MUTATE}: {fname}]")
 
-HTML = os.path.join(WORK, "load_rem_benches.html")
-JS = os.path.join(WORK, "fieldgold-data.js")
+HTML = os.path.join(WORK_WEB, "load_rem_benches.html")
+JS = os.path.join(WORK_WEB, "fieldgold-data.js")
 
 print("\n-- the two copies agree --")
 loader, loader_text = extract(HTML, "const")

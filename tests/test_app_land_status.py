@@ -28,7 +28,10 @@ import socketserver
 # any other machine it would have died with "no such file". Green for the wrong
 # reason, then red for a reason that has nothing to do with the app. Both are
 # worse than a failure that means something.
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
+# Web root. The app lives under docs/ so that webDir can point at a directory
+# containing only web assets — tests/ and tools/ must never ship in the bundle.
+ROOT = REPO / "docs"
 PASS, FAILS = 0, []
 
 
