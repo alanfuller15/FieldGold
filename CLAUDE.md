@@ -78,14 +78,17 @@ Built from `git ls-files '*.md'` on 2026-07-26, not from memory. Until that
 date nothing pointed at any of these, so a session reading this file never
 learned they existed. A document nothing links to is a document nobody reads.
 
-**Control: any new `.md` gets a line here in the commit that creates it.**
-Rebuild the list with the command above rather than appending from
-recollection — a hand-maintained index drifts exactly the way the counts in
-the tests row did.
+**Control: any new or moved `.md` gets its line here in the same change.**
+Deliberately not "the same commit" — a pure-rename commit is the case that
+forced the wording: Phase 0a moved `PROVENANCE.md` in a commit that had to stay
+content-free to be reviewable as a move, so the index correction landed in the
+commit after it. Rebuild the list with the command above rather than appending
+from recollection — a hand-maintained index drifts exactly the way the counts
+in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 590 | this file — the whole brief for anyone changing the repo |
+| `CLAUDE.md` | 593 | this file — the whole brief for anyone changing the repo |
 | `STATE.md` | 136 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders |
 | `docs/vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a |
