@@ -7,7 +7,11 @@ so you spend your field time walking the right ground instead of guessing.
 
 Everything runs in your browser at **alanfuller15.github.io/FieldGold**. Add it
 to your home screen and it installs like an app. The field-side tools work with
-no signal.
+no signal — with one qualifier worth knowing before you rely on it: basemap
+tiles come from the network, so offline you get your benches, your logged
+sites, their land-status colours and their popups drawn on a blank background.
+The map says so on screen rather than leaving you with an unexplained grey
+rectangle.
 
 ---
 
@@ -24,9 +28,11 @@ model, and read nine Alaska-tuned geology articles. Export everything to GPX for
 onX, Gaia, or Garmin.
 
 **The gold map** — every documented gold occurrence (USGS ARDF), stream-sediment
-sample (USGS geochem), and mining claim (BLM) in the area, on one map with
-satellite, streets, and topo views. Tap any spot to check it for claims and
-documented gold. Your logged sites and your bench candidates show here too.
+sample (USGS geochem), and **federal** mining claim (BLM) in the area, on one map
+with satellite, streets, and topo views. Tap any spot to check it for documented
+gold and for federal claims — which on this state ground is a near-empty
+register, where blank does not mean "no claims". Your logged sites and your
+bench candidates show here too.
 
 **The bench hunter** — reads the river's terrain and flags old stranded channels
 (benches) worth walking. More on this below, since it's the least obvious piece.
@@ -45,9 +51,14 @@ the map and send it to Field Brain to evaluate. One shared record, one kit.
 The tool never pretends to know more than it does. Every claim is tagged by how
 well it's grounded. A geochem sample that couldn't detect gold at useful levels
 is called a null, not a hit. A bench the terrain flags is called a candidate to
-walk, not a verdict. A claim check says "verify with BLM — data lags reality,"
-because it does. The honesty is the point: it's a research and reasoning aid that
-respects that the ground makes the final call, not the software.
+walk, not a verdict. A claim check names which government it asked: the map
+queries BLM's *federal* register, while the *state* register that actually
+governs this ground — DNR's ME112 active and ME13 pending layers — is a separate
+answer carried on each bench record with the date it was checked, because a
+claim can be staked any day and an undated check is a rumour. Both say "verify
+before acting — data lags reality," because they do. The honesty is the point:
+it's a research and reasoning aid that respects that the ground makes the final
+call, not the software.
 
 ---
 
@@ -110,12 +121,25 @@ because that one's earned.
 **The map needs signal; the field tools don't.** The gold map's live layers
 (ARDF, claims, geochem) fetch from USGS/BLM in real time, so do that research at
 home with a connection. Evaluate, Sites, Knowledge, the bench hunter, and the
-creek manual all work offline once the app is installed. Plan online, prospect
-offline.
+creek manual all work offline once the app is installed. The map itself still
+opens offline and still draws your points and their land-status colours
+correctly — Leaflet is vendored, not fetched — but the basemap tiles are a
+network fetch, so they come up blank. Plan online, prospect offline.
 
-**"Find PROVEN + OPEN ground"** (green button on the map) automates the old-timer
-method: it finds documented gold occurrences that show no active claim right now.
-Research only — always verify with BLM before acting, which the results tell you.
+**"Scan documented gold occurrences"** — the button that used to say "Find
+PROVEN + OPEN ground". It plots ARDF gold occurrences in view and colours each
+one by land status, the same as everything else on the map. **It does not find
+open ground.**
+
+It used to, and that was the bug. It drew green dots labelled "PROVEN + OPEN"
+wherever a BLM claims query came back empty — but BLM's service holds *federal*
+claims, and a federal claim can only exist on federal land. Hatcher Pass is
+state land: GS 1222, state patent 50-87-0076. That register is nearly empty here
+by construction — one polygon across the whole reach envelope, against 143 in a
+same-size box near Fairbanks. The query worked. The zeros were real. They were
+the wrong government's zeros, and an empty answer from the wrong authority
+renders on a phone exactly like a clean answer from the right one. The green is
+gone because it was never earned.
 
 **The bench hunter needs its data file.** It runs on a `bench_data.json` from an
 elevation pull of your reach. Load that file and it reads the whole reach; the
@@ -161,13 +185,16 @@ the historical samples the map shows.
 
 ## The honest state of it
 
-It works. It's deployed, installable, offline-capable, and it's been audited —
+It works. It's deployed, installable, offline-capable with the basemap caveat
+above, and it's been audited —
 no secrets leaked, clean code, honest about its limits. It reads real government
 data, reasons transparently, and gets you to specific walkable ground with honest
 guidance about what only your boots and pan can confirm.
 
 It won't find gold for you. But it'll make sure that when you go looking, you're
-walking documented, open, terrain-informed ground instead of guessing — and that
-you learn the landscape a little better every time you use it.
+walking documented, land-status-checked, terrain-informed ground instead of
+guessing — and that you learn the landscape a little better every time you use
+it. Checked is not the same as open: the app tells you what was asked, of which
+government, and when.
 
 Go read a bench in person. That's what it's for.
