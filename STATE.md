@@ -1,8 +1,10 @@
 # FieldGold — migration state
 
-Last updated: 2026-07-28 (runbook step 4 — Xcode installed and licensed, App
-target open. Signing preconditions recorded as observed-not-changed; step 5 is
-Alan's and has not been started)
+Last updated: 2026-07-28 (first **simulator** build, install, launch and render.
+The app runs and the map draws. The service-worker question flagged below is
+now answered — it does NOT register, and the reason is not the one predicted.
+Step 5 signing is still Alan's and still not started; no physical device has
+run this app)
 
 ## Active phase
 
@@ -23,10 +25,13 @@ changes to app code.
 | Xcode installed | **done** 2026-07-28 — Xcode **26.6**, build **17F113**, at `/Applications/Xcode.app`; `xcode-select -p` points into it [self-tested]. Alan's action, completed |
 | Xcode licence agreed | **done** 2026-07-28 — `sudo xcodebuild -license` accepted by Alan. `xcodebuild -version` and `git status` both exit 0 [self-tested]. Until this landed, **`git` itself was refusing** — see below |
 | Project opens in Xcode (step 4) | **done** 2026-07-28 — window `App — App.xcodeproj`, document loaded, **active scheme `App`** [self-tested]. **`cap open ios` did not achieve this on the first run** — see below |
-| Builds in Xcode | **not started.** No build has been attempted. Xcode currently reports `could not find any valid run destinations for scheme App`, which is expected before an Apple ID is added — do not read the open project as a build |
-| Signing configured | **not started.** Preconditions observed and deliberately not changed — see "Signing preconditions" below. Gated on the Developer Program decision under Open decisions |
-| Installed on device | not started |
-| Launches and renders | not started |
+| Builds for **simulator** | **done** 2026-07-28 — `xcodebuild -scheme App -sdk iphonesimulator` → `** BUILD SUCCEEDED **`, and the artifact was checked, not the exit code: `App.app` exists, `App` is a Mach-O 64-bit arm64 executable, `public/` carries all 20 web assets including the five stage maps and `vendor/leaflet/` [self-tested] |
+| Builds for **device** | **not started.** Unchanged. A device build needs a signing identity and there are none. Do not read the simulator build as this row |
+| Signing configured | **not started.** Preconditions observed — see "Signing preconditions" below. Gated on the Developer Program decision under Open decisions. **The simulator build does not touch this** — see "Simulator builds need no provisioning" |
+| Installed on **simulator** | **done** 2026-07-28 — `simctl install` then `get_app_container` returned a real bundle path, so the install was confirmed by lookup rather than by exit code [self-tested] |
+| Launches and renders on **simulator** | **done** 2026-07-28 — launched to PID with `ps` state `Ss`, `index.html` renders, `map.html` loads and draws. Full findings below [self-tested] |
+| Installed on device | not started — **no physical device has run this app.** The cable path is not carrying data |
+| Launches and renders | not started — device row. The simulator rows above do not satisfy it |
 
 ## Xcode — installed, licensed, project open
 
@@ -103,7 +108,7 @@ Recorded so the state before any signing work is on paper [self-tested]
 | | Observed |
 |---|---|
 | `CODE_SIGN_STYLE` | `Automatic` (both Debug and Release) |
-| `DEVELOPMENT_TEAM` | **absent — not set at all** in `project.pbxproj` |
+| `DEVELOPMENT_TEAM` | was **absent**; as of 2026-07-28 `project.pbxproj` carries `DEVELOPMENT_TEAM = PWCMJWTT6J` on both configs, **uncommitted**, written by Xcode. Not written by this session and not reverted by it |
 | Codesigning identities | **0 valid identities found** (`security find-identity -v -p codesigning`) |
 | Provisioning profiles | directory `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` **does not exist** |
 | `PRODUCT_BUNDLE_IDENTIFIER` | `io.github.alanfuller15.fieldgold` — matches the fixed app identity |
@@ -111,22 +116,159 @@ Recorded so the state before any signing work is on paper [self-tested]
 
 The zero identities and absent profiles directory are consistent with no Apple
 ID having been added under Xcode → Settings → Accounts. That is step 5's first
-action, and it is why the scheme currently resolves no run destinations.
+action, and it is why the scheme currently resolves no run destinations **for a
+device**.
 
-### Untested, and flagged for the first device run
+### Simulator builds need no provisioning — confirmed, not assumed
 
-**Whether the service worker registers under Capacitor's scheme.** Capacitor
-serves the bundle from a custom scheme rather than `https://`, and service
-workers require a secure context. If registration fails, `sw.js` never
-installs, the app runs straight off the bundled files, and the offline
-behaviour on the phone is *not* the offline behaviour in Safari — it may
-actually be better, since the bundle is local, but it will be different and
-the "basemap tiles unavailable" path is the one to watch.
+Checked rather than taken on faith, because the whole point of the rule that
+caught `cap open ios` is that a plausible claim is not a verified one. The
+build was run with **no signing overrides at all** — no `CODE_SIGNING_ALLOWED=NO`,
+no team argument — against a keychain holding **0 valid codesigning identities**
+and with the provisioning-profiles directory still absent. It succeeded, and
+the build log names the mechanism [self-tested] 2026-07-28:
 
-This was **not tested** — it cannot be, without a build. It is recorded here
-so the first device run checks it deliberately instead of discovering it in
-terrain. Do not change `sw.js` to chase this; Phase 0's hard rule is change no
-app code, and a difference found here belongs in this file as an open item.
+```
+Signing Identity:     "Sign to Run Locally"
+/usr/bin/codesign --force --sign - --timestamp=none ...
+```
+
+`--sign -` is **ad-hoc** signing. No profile is consulted and no identity is
+needed. So the two signing errors in Signing & Capabilities are real and still
+block a device build, and they do **not** block the simulator. These are
+independent paths, and a green simulator run says nothing about step 5.
+
+### The service worker does NOT register under Capacitor — answered
+
+This section previously read "untested, flagged for the first device run." It
+is now tested on the simulator [self-tested] 2026-07-28, and **the predicted
+cause was wrong.**
+
+The prediction was that a custom scheme would fail the secure-context
+requirement. Measured inside the running app:
+
+| probe | value |
+|---|---|
+| `location.href` | `capacitor://localhost` |
+| `window.isSecureContext` | **`true`** |
+| `'serviceWorker' in navigator` | **`false`** |
+| `'caches' in window` | `true` |
+| `caches.keys()` | `[]` |
+
+**The context IS secure. `navigator.serviceWorker` simply does not exist.**
+WKWebView does not expose the Service Worker API to a custom-scheme document at
+all, so this never reaches a secure-context check and never produces an error.
+
+The consequence is specific and worth stating, because it is easy to misread as
+a failure: `index.html:2917` guards on `if ('serviceWorker' in navigator)`. That
+test is `false`, so **`register('sw.js')` is never called**. The
+`.catch(() => {})` on the next line never runs — there is no rejection to
+swallow. Nothing errors, nothing logs, and nothing indicates on screen that the
+app's entire offline-caching mechanism is inert. Corroborated from outside the
+webview: the app's WebKit `WebsiteData` directory has folders for `LocalStorage`,
+`IndexedDB` and others, and **no `ServiceWorkers` directory was ever created**.
+
+**This is not a defect in the native shell, and `sw.js` must not be changed to
+chase it.** In the shell the web assets are already local — they are in the app
+bundle, served over `capacitor://` — so offline works *by construction* and does
+not need the cache. What actually changes is the **delivery mechanism**:
+
+- On GitHub Pages, `CACHE`/`SHELL` in `sw.js` is the whole update path, and
+  CLAUDE.md is right that bumping the version is not bookkeeping.
+- In the iOS shell, `sw.js` never runs. Updates arrive **only** through
+  `npx cap sync` plus a new build. Bumping the cache version has **no effect on
+  a phone running the app**, and a stale-shell bug and its fix are now two
+  different problems on two distributions.
+
+That divergence is a Phase 1 item. It is recorded here, not fixed here — Phase 0's
+rule is change no app code.
+
+## What the app actually shows — simulator, 2026-07-28
+
+Environment, stated because it is not a device: **iPhone 17 Pro simulator,
+iOS 26.5 (23F77)**, Xcode 26.6 (17F113), Debug build, `capacitor://localhost`.
+Everything in this section is **[self-tested] on that simulator**. None of it is
+`[externally-verified]`; no physical iPhone has run this app.
+
+**`index.html` renders.** The Field Brain launcher draws: the 0/100 UNFAVORABLE
+score dial, the site-name field, the eight weighted indicator cards, and the
+six-tab bar (Evaluate / Sites / Knowledge / Photo / Research / Kit).
+
+**The seed ran, and the land status survived the trip into the shell.** Read
+back out of the app's own `localStorage` on the simulator, decoded from
+`localstorage.sqlite3`:
+
+| key | value |
+|---|---|
+| `fieldgold_rem_seeded_v2` | present — v2 path taken |
+| `fieldgold_record` | 20 entries, all `kind: bench` |
+| `land_status` | **12 `avoid`, 8 `clean`, 0 `unchecked`** |
+| `state_claim` | `none` ×20 |
+| `state_claim_proximity` | `unknown` ×20 |
+
+That matches the generator payload in `tools/build_loader.py` exactly. The
+encumbered twelve are encumbered in the app.
+
+**`map.html` loads and draws.** Reached at `capacitor://localhost/map.html`,
+title `FieldGold — Map`. Its own status log, read from the live DOM:
+
+```
+map ready ✓ requesting 3 layers… no logged sites yet (log some in Field Brain)
+no bench-hunter candidates yet (run the bench hunter)
+REM candidates: 20 plotted (8 clean, 0 unchecked, 12 avoid)
+basemap (Streets) ✓ claims ✓ geochem samples: 44 ngdbsed ✓
+```
+
+44 vector markers and 48 basemap tile images in the DOM. The panel text is
+intact and uncut, including the BLM warning in full — "This layer is blank over
+Hatcher Pass, and that is not the same as 'no claims'", the 1-vs-143 measurement,
+and the statement that the map does not know how near the nearest state claim is.
+
+**The vendored Leaflet resolves from the bundle.** Inside `map.html`,
+`typeof L === "object"` and **`L.version === "1.9.4"`**. Every bundle asset
+answers over `capacitor://`: `vendor/leaflet/leaflet.js` 200 `text/javascript`,
+`vendor/leaflet/leaflet.css` 200 `text/css`, `map.html` 200 `text/html`,
+`sw.js` 200 `text/javascript`. Note the last one — `sw.js` is fetchable; it is
+simply never registered.
+
+**Caveat on the tiles: the simulator had network.** 48 tiles loaded because the
+Mac was online. This run says **nothing** about the offline path, and the
+"basemap tiles unavailable — no signal" message was therefore never exercised.
+Do not read this section as evidence that offline behaviour is verified.
+
+### Two things seen that are not yet filed as defects
+
+- **The header collides with the status bar.** On the simulator the `index.html`
+  header ("Field Brain · Placer prospecting · Mat-Su") paints underneath the
+  clock and the Dynamic Island — the title and the time overlap, and the
+  subtitle sits under the island. There is no `safe-area-inset` handling,
+  which a browser tab does not need and a native shell does. It is cosmetic on
+  the launcher, but the same absent inset applies to `map.html`'s panel, and
+  that panel carries land-status warnings — which is the failure shape CLAUDE.md
+  already names, "layout is a way of deleting text". Worth a reachability check
+  under Capacitor before Phase 1 closes.
+- **`map.html` is linked `target="_blank" rel="noopener"`** from `openTools()`
+  in `index.html:2766`, as are `bench_hunter.html` and `creek_manual.html`. In a
+  browser that opens a tab. In a native shell `target="_blank"` is handled by the
+  webview's `createWebViewWith` path and may open externally or not at all.
+  **This was not exercised** — the probe loaded `map.html` directly rather than
+  through the link, because driving the real UI needs assistive access this
+  machine has not granted. So "map.html works" is established and "the button
+  that opens map.html works" is **not**. That gap is the one to close first on
+  the device run.
+
+### How the render findings were obtained
+
+The repo was not modified to get them. `docs/` is byte-identical and
+`git status` shows only the pre-existing `project.pbxproj` change. The probe was
+a diagnostic `<script>` appended to `index.html` inside a **copy of the built
+`App.app`** in the session scratchpad, ad-hoc re-signed and installed; results
+were written to `localStorage` and read back off the container's SQLite. The
+clean unmodified build was then reinstalled and relaunched, and the installed
+bundle was confirmed to contain no diagnostic. Recorded because a reader should
+know these numbers came from an instrumented copy, not from the shipping bundle
+reporting on itself — Capacitor does not forward `console` to the system log by
+default, so the shipping bundle cannot report on itself.
 
 ## Verified facts
 
@@ -169,6 +311,28 @@ app code, and a difference found here belongs in this file as an open item.
   `cordova_plugins.js` as extra — 24 files in, 26 out, no omissions. No `.py`
   and no `test_*` anywhere under the bundle, so `tests/` and `tools/` did not
   leak [self-tested] 2026-07-28
+- The App scheme **builds, installs, launches and renders on the iPhone 17 Pro
+  simulator (iOS 26.5)**. Artifact-checked at every step: `App.app` exists with
+  a Mach-O arm64 binary, `simctl get_app_container` resolves the install, the
+  process is alive. `index.html` and `map.html` both render [self-tested]
+  2026-07-28
+- **A simulator build needs no provisioning profile.** Run with zero signing
+  overrides against 0 codesigning identities and no profiles directory, it
+  succeeded via ad-hoc `codesign --sign -` ("Sign to Run Locally"). The two
+  Signing & Capabilities errors block only a *device* build [self-tested]
+  2026-07-28
+- **`navigator.serviceWorker` is absent under `capacitor://localhost`**, while
+  `isSecureContext` is `true` and `caches` exists. `sw.js` therefore never
+  registers in the iOS shell, silently — `index.html`'s `in navigator` guard
+  short-circuits before `register()`. No `ServiceWorkers` directory is ever
+  created in the app's WebKit data [self-tested] 2026-07-28
+- **Vendored Leaflet resolves from the app bundle**: `L.version === "1.9.4"`
+  inside `map.html` at `capacitor://localhost/map.html`, with `leaflet.js` and
+  `leaflet.css` both answering 200 [self-tested] 2026-07-28
+- The v2 seed runs in the shell and the land status is intact on device storage:
+  20 bench records, **12 `avoid` / 8 `clean` / 0 `unchecked`**, `state_claim`
+  `none` ×20, proximity `unknown` ×20 — matching the generator payload
+  [self-tested] 2026-07-28
 - All five stage maps are in the bundle, as the 2026-07-28 decision intends
   [self-tested]
 - All twelve suites still green after the Capacitor install [self-tested]
@@ -407,10 +571,25 @@ Step 5 is two actions, in order, and **both are Alan's**:
    directory, which is also why the scheme resolves no run destinations.
 
 Everything achievable without a signing tier has been done and verified. The
-block does not reach backwards.
+block does not reach backwards — and it reaches less far than it looked. The
+simulator run on 2026-07-28 proved the shell **works**: it builds, installs,
+launches, renders `index.html`, loads `map.html`, resolves the vendored Leaflet
+and seeds all 20 benches with land status intact, none of which needed a
+signing tier. What signing gates is putting it on **Alan's phone**, not
+knowing whether it functions.
 
-**Do not mark "Builds in Xcode" done on the strength of the project being
-open.** No build has been attempted. That row moves when a build runs.
+**Do not mark "Installed on device" or "Launches and renders" done on the
+strength of the simulator run.** Those rows are about a physical iPhone and no
+physical iPhone has run this app. The simulator has its own rows.
+
+Two things the simulator run added to step 5's checklist, both open:
+
+- **Exercise the `target="_blank"` links.** `map.html` was reached directly, not
+  through the Field tools button. Whether that button works in the shell is
+  untested and is the first thing to tap on the device.
+- **Check the safe-area insets.** The header already collides with the status
+  bar on the simulator. `map.html`'s panel carries land-status warnings, and
+  CLAUDE.md's own rule is that layout is a way of deleting text.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
