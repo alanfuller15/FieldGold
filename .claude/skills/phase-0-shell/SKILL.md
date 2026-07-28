@@ -59,6 +59,18 @@ npx cap init
 reverse-DNS and stable — it cannot be changed later without a new app
 identity.
 
+All three can be passed as arguments instead of answering prompts, which is
+what was actually run on 2026-07-28:
+
+```
+npx cap init "FieldGold" "io.github.alanfuller15.fieldgold" --web-dir docs
+```
+
+**Capacitor 8 uses Swift Package Manager, not CocoaPods.** `cap add ios`
+writes `ios/App/CapApp-SPM/Package.swift`; there is no `pod install` step and
+a missing `pod` binary does not block anything here. Older guidance that lists
+CocoaPods as a prerequisite does not apply to this project.
+
 ### 3. Add iOS
 
 ```
@@ -121,6 +133,12 @@ under open items and move on.
 - **Plugin not found** — `npx cap sync` not run after `npm install`.
 - **Signing fails with no team** — Xcode → Settings → Accounts, add the
   Apple ID first.
+- **`npx cap open ios` prints ✔ and exits 0 with no Xcode installed.**
+  Observed on this machine 2026-07-28: "Opening the Xcode workspace... in
+  3.00s", exit 0, nothing opened, no error. It reports on shelling out to
+  `open`, not on the result. Check `xcode-select -p` — if it says
+  `/Library/Developer/CommandLineTools`, Xcode is not installed. The artifact
+  is an Xcode window, not an exit code.
 
 ## On completion
 

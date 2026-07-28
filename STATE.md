@@ -14,14 +14,60 @@ changes to app code.
 
 | Step | State |
 |---|---|
-| Capacitor installed | not started — no `package.json`, no `node_modules/`, no `capacitor.config.*` in the tree [self-tested] 2026-07-28 |
-| `capacitor.config` webDir confirmed | **decided — `"docs"`. Contingency discharged: `docs/` exists and holds only web assets** |
-| Stage maps in `webDir` — ship or exclude | **decided 2026-07-28 — SHIP.** `webDir` is all of `docs/`. See the decision section for what this accepts |
-| iOS platform added | not started — no `ios/` directory [self-tested] 2026-07-28 |
-| Builds in Xcode | not started |
+| Capacitor installed | **done** 2026-07-28 — `@capacitor/core`, `/cli`, `/ios` all **8.4.2**; `capacitor.config.json` written [self-tested] |
+| `capacitor.config` webDir confirmed | **done** — `webDir` is `"docs"`, and `cap sync` demonstrably copied from `docs/` [self-tested] 2026-07-28 |
+| App identity fixed | **done** — `appId` `io.github.alanfuller15.fieldgold`, `appName` `FieldGold`. Alan's choice 2026-07-28. **This cannot change without a new app identity** |
+| Stage maps in `webDir` — ship or exclude | **decided 2026-07-28 — SHIP.** `webDir` is all of `docs/`. Confirmed in the bundle: all five present. See the decision section for what this accepts |
+| iOS platform added | **done** 2026-07-28 — `npx cap add ios` + `npx cap sync` both clean [self-tested] |
+| Builds in Xcode | **BLOCKED — Xcode is not installed on this machine.** Only Command Line Tools. See "Blocked on Xcode" below |
 | Signing configured | not started |
 | Installed on device | not started |
 | Launches and renders | not started |
+
+## Blocked on Xcode
+
+**Steps 2 and 3 of the runbook are done. Step 4 cannot run: Xcode is not
+installed on this machine.** `xcode-select -p` is
+`/Library/Developer/CommandLineTools`, `xcodebuild` errors with "requires
+Xcode", and there is no `Xcode.app` anywhere on disk (`mdfind` and
+`/Applications` both empty) [self-tested] 2026-07-28.
+
+Installing it is Alan's action — it is a multi-gigabyte App Store download
+against his Apple ID. Nothing else in Phase 0 is blocked by anything else.
+
+### `npx cap open ios` reports success with no Xcode installed
+
+Worth knowing before someone reads a green line and believes it. Run on this
+machine, with no Xcode present, the command printed:
+
+```
+✔ Opening the Xcode workspace... in 3.00s
+```
+
+and **exited 0**. Nothing opened. No Xcode process, no App Store process, no
+error. It shells out to `open` and reports on having made the call, not on
+what happened to it.
+
+This is the same shape as the Pages `built` status that named an earlier
+commit, and the same shape as `caches.open()` creating an empty cache that
+`in caches.keys()` then reports as present. **Do not mark "Builds in Xcode"
+done on the strength of `cap open ios` exiting 0.** The artifact is an Xcode
+window with the App target selected; check for that.
+
+### Untested, and flagged for the first device run
+
+**Whether the service worker registers under Capacitor's scheme.** Capacitor
+serves the bundle from a custom scheme rather than `https://`, and service
+workers require a secure context. If registration fails, `sw.js` never
+installs, the app runs straight off the bundled files, and the offline
+behaviour on the phone is *not* the offline behaviour in Safari — it may
+actually be better, since the bundle is local, but it will be different and
+the "basemap tiles unavailable" path is the one to watch.
+
+This was **not tested** — it cannot be, without a build. It is recorded here
+so the first device run checks it deliberately instead of discovering it in
+terrain. Do not change `sw.js` to chase this; Phase 0's hard rule is change no
+app code, and a difference found here belongs in this file as an open item.
 
 ## Verified facts
 
@@ -52,6 +98,26 @@ changes to app code.
   five carry the ARCHIVED BUILD STAGE banner [self-tested] 2026-07-28
 - Vendored `leaflet.css` still hashes to the published SRI — 661 CRLF, 0 bare
   LF, in both worktree and stored blob [self-tested] 2026-07-28
+- Capacitor 8.4.2 installed; `cap init` wrote `capacitor.config.json` with
+  `appId` `io.github.alanfuller15.fieldgold`, `appName` `FieldGold`, `webDir`
+  `docs` [self-tested] 2026-07-28
+- `npx cap add ios` and `npx cap sync` both completed clean. **Capacitor 8 uses
+  Swift Package Manager, not CocoaPods** — `ios/App/CapApp-SPM/Package.swift`
+  is written instead, so the absent `pod` binary is irrelevant to this project
+  [self-tested] 2026-07-28
+- The bundle is `docs/` exactly, plus two shims Capacitor injects.
+  `diff -rq docs ios/App/App/public` reports **only** `cordova.js` and
+  `cordova_plugins.js` as extra — 24 files in, 26 out, no omissions. No `.py`
+  and no `test_*` anywhere under the bundle, so `tests/` and `tools/` did not
+  leak [self-tested] 2026-07-28
+- All five stage maps are in the bundle, as the 2026-07-28 decision intends
+  [self-tested]
+- All twelve suites still green after the Capacitor install [self-tested]
+  2026-07-28
+- Mutation runs are not meaningfully slowed by `node_modules/` (26M) and
+  `ios/` (1.1M) landing in the tree that `test_state_claims.py` copytrees:
+  `--mutate claim-none-default` completes in 3.4s and is still caught
+  [self-tested] 2026-07-28
 
 ## Decisions made
 
@@ -241,15 +307,24 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-**Install Capacitor.** Phase 0a is done, `webDir` is `"docs"` and usable, and
-the stage-map question that was gating it is decided (ship). Nothing blocks
-runbook steps 2–4 — `npm install @capacitor/core @capacitor/cli`, `cap init`,
-`cap add ios`, `cap sync`, `cap open ios`.
+**Install Xcode.** That is the only thing standing between here and a build.
+Runbook steps 2 and 3 are done — Capacitor 8.4.2 is installed, `ios/` is
+scaffolded, `cap sync` copies `docs/` into the bundle correctly. Step 4
+(`cap open ios`) needs an Xcode that is not on this machine, and installing it
+is Alan's action.
 
-**Step 5, signing, is blocked and only step 5.** The Apple Developer Program
-vs free-provisioning decision is Alan's and has not been made; see Open
-decisions. Steps 2–4 can be run and verified without it, so the block does not
-reach backwards. Do not pick a tier to keep moving.
+**Two things are waiting on Alan, and they are independent:**
+
+1. **Install Xcode** — gates step 4 (open the workspace) and everything after.
+2. **Apple Developer Program vs free 7-day provisioning** — gates step 5
+   (signing) only; see Open decisions. Not yet decided. Do not pick a tier to
+   keep moving.
+
+Neither block reaches backwards: everything achievable without Xcode and
+without a signing tier has been done and verified. After Xcode is installed,
+the next command is `npx cap open ios`, and the thing to check is that an
+Xcode window actually appears — see the warning above about that command
+exiting 0 regardless.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,

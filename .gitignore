@@ -1,3 +1,15 @@
 .genesis/
 .0009-backup-*/
 .venv/
+.DS_Store
+
+# Capacitor native shell (Phase 0). node_modules/ is the scoped dependency
+# exception in CLAUDE.md ground rule 1 — it produces the iOS wrapper and is
+# reinstallable from package-lock.json, so it is not tracked.
+node_modules/
+
+# ios/ IS tracked. Capacitor writes its own ios/.gitignore, which excludes the
+# build output AND ios/App/App/public — the copied web assets are regenerated
+# by `npx cap sync` and must not be a second copy of docs/ in git. If those
+# two trees are ever both tracked they will drift, and the bundle is the one
+# nobody looks at.
