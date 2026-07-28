@@ -1,10 +1,11 @@
 # FieldGold — migration state
 
 Last updated: 2026-07-28 (first **simulator** build, install, launch and render.
-The app runs and the map draws. The service-worker question flagged below is
-now answered — it does NOT register, and the reason is not the one predicted.
-Step 5 signing is still Alan's and still not started; no physical device has
-run this app)
+The app runs and the map draws. Two flagged questions are now answered, both
+badly: the service worker does NOT register, and the Field tools
+`target="_blank"` buttons do NOTHING. **Signing is no longer the blocker** —
+the Developer Program is paid and the Apple ID is added; what blocks Phase 0 is
+a Lightning cable that carries data. No physical device has run this app)
 
 ## Active phase
 
@@ -26,8 +27,11 @@ changes to app code.
 | Xcode licence agreed | **done** 2026-07-28 — `sudo xcodebuild -license` accepted by Alan. `xcodebuild -version` and `git status` both exit 0 [self-tested]. Until this landed, **`git` itself was refusing** — see below |
 | Project opens in Xcode (step 4) | **done** 2026-07-28 — window `App — App.xcodeproj`, document loaded, **active scheme `App`** [self-tested]. **`cap open ios` did not achieve this on the first run** — see below |
 | Builds for **simulator** | **done** 2026-07-28 — `xcodebuild -scheme App -sdk iphonesimulator` → `** BUILD SUCCEEDED **`, and the artifact was checked, not the exit code: `App.app` exists, `App` is a Mach-O 64-bit arm64 executable, `public/` carries all 20 web assets including the five stage maps and `vendor/leaflet/` [self-tested] |
-| Builds for **device** | **not started.** Unchanged. A device build needs a signing identity and there are none. Do not read the simulator build as this row |
-| Signing configured | **not started.** Preconditions observed — see "Signing preconditions" below. Gated on the Developer Program decision under Open decisions. **The simulator build does not touch this** — see "Simulator builds need no provisioning" |
+| Builds for **device** | **blocked, and attempted** 2026-07-28 — `xcodebuild -sdk iphoneos` fails at `GatherProvisioningInputs`, exit 65, on "No profiles for `io.github.alanfuller15.fieldgold` were found". Not a decision gap; see the cable blocker [self-tested] |
+| Apple Developer Program | **done** 2026-07-28 — **paid, enrollment approved.** Verified from the machine: `isFreeProvisioningTeam = 0`, `teamType = Individual`, team `PWCMJWTT6J` "Alan Fuller" [self-tested] |
+| Apple ID added in Xcode | **done** 2026-07-28 — one account under `IDE.Identifiers.Prod`; team resolves and is set in the pbxproj [self-tested] |
+| Signing configured | **partly.** Automatic signing on, team set on both configs, and 4 valid `Apple Development` certificates issued 2026-07-28. **What is missing is a provisioning profile**, and it cannot be generated — see the cable blocker |
+| **Data cable** | **BLOCKED — this is the only thing stopping Phase 0.** The iPhone 14 needs Lightning; the USB-A cable + USB-C adapter on hand carries power but not data. Finder does not see the phone, `devicectl list devices` reports `No devices found`. Hardware gap, not a decision |
 | Installed on **simulator** | **done** 2026-07-28 — `simctl install` then `get_app_container` returned a real bundle path, so the install was confirmed by lookup rather than by exit code [self-tested] |
 | Launches and renders on **simulator** | **done** 2026-07-28 — launched to PID with `ps` state `Ss`, `index.html` renders, `map.html` loads and draws. Full findings below [self-tested] |
 | Installed on device | not started — **no physical device has run this app.** The cable path is not carrying data |
@@ -98,26 +102,88 @@ osascript -e 'tell application "Xcode" to get name of active scheme of workspace
 Returned `App.xcodeproj` and `App` [self-tested] 2026-07-28. Empty output means
 nothing opened, whatever the CLI printed.
 
-## Signing preconditions — observed, NOT changed
+## Signing — account and certificates are DONE. The blocker is a cable.
 
-Read off the tree and the keychain while verifying step 4. **Nothing here was
-modified**; step 5 is Alan's and is gated on the Developer Program decision.
-Recorded so the state before any signing work is on paper [self-tested]
-2026-07-28.
+**This section previously said the Developer Program decision was unmade and no
+Apple ID had been added. Both were stale.** Re-verified against the machine
+2026-07-28, every row checked rather than taken on report [self-tested]:
 
-| | Observed |
-|---|---|
-| `CODE_SIGN_STYLE` | `Automatic` (both Debug and Release) |
-| `DEVELOPMENT_TEAM` | was **absent**; as of 2026-07-28 `project.pbxproj` carries `DEVELOPMENT_TEAM = PWCMJWTT6J` on both configs, **uncommitted**, written by Xcode. Not written by this session and not reverted by it |
-| Codesigning identities | **0 valid identities found** (`security find-identity -v -p codesigning`) |
-| Provisioning profiles | directory `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` **does not exist** |
-| `PRODUCT_BUNDLE_IDENTIFIER` | `io.github.alanfuller15.fieldgold` — matches the fixed app identity |
-| `IPHONEOS_DEPLOYMENT_TARGET` | 15.0 |
+| | Observed | Meaning |
+|---|---|---|
+| Developer Program | `isFreeProvisioningTeam = 0`, `teamType = Individual` | **paid, approved** — not a Personal Team |
+| Apple ID | one account under `DVTDeveloperAccountManagerAppleIDLists` → `IDE.Identifiers.Prod` | **added** in Xcode → Settings → Accounts |
+| Team | `PWCMJWTT6J` / "Alan Fuller" | matches the pbxproj exactly |
+| `DEVELOPMENT_TEAM` | `PWCMJWTT6J` on **both** Debug and Release | set — this is the source of the uncommitted `project.pbxproj` change |
+| `CODE_SIGN_STYLE` | `Automatic` (both configs) | automatic signing on |
+| Certificates | **4** × `Apple Development: Alan Fuller (VSSL232H55)`, `OU=PWCMJWTT6J`, all issued 2026-07-28 between 20:24:59Z and 20:52:24Z, all valid to 2027 | issued, current, and the four timestamps are the revoke-and-reissue cycle |
+| Provisioning profiles | `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` **still does not exist** | **no profile has ever been issued** |
+| Physical devices | `xcrun devicectl list devices` → `No devices found`; `xctrace list devices` shows only the Mac | **no iPhone is visible to this Mac** |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `io.github.alanfuller15.fieldgold` | matches the fixed app identity |
+| `IPHONEOS_DEPLOYMENT_TARGET` | 15.0 | |
 
-The zero identities and absent profiles directory are consistent with no Apple
-ID having been added under Xcode → Settings → Accounts. That is step 5's first
-action, and it is why the scheme currently resolves no run destinations **for a
-device**.
+### The blocker is hardware, not a decision
+
+**No data cable.** The iPhone 14 needs Lightning; the USB-A cable plus USB-C
+adapter on hand does not carry data, and Finder does not see the phone. The
+causal chain, and it is a chain rather than a list — each link is why the next
+one holds:
+
+1. No data connection, so **Xcode cannot register the device** with the account.
+2. An iOS App Development profile must name at least one registered device, so
+   **no development provisioning profile can be generated**.
+3. With no profile, **the two Signing & Capabilities errors persist** — and they
+   will persist no matter how many times the certificate is revoked and
+   reissued, because certificates were never the missing piece.
+
+Confirmed by running the device build rather than by reading the Xcode UI
+[self-tested] 2026-07-28. `xcodebuild -sdk iphoneos -destination
+'generic/platform=iOS'` fails at `GatherProvisioningInputs`, exit 65:
+
+```
+error: No profiles for 'io.github.alanfuller15.fieldgold' were found:
+Xcode couldn't find any iOS App Development provisioning profiles
+matching 'io.github.alanfuller15.fieldgold'.
+```
+
+Note **what it does not say.** It does not say the team is unset, and it does
+not say a certificate is missing. It gets past both and fails on the profile.
+That is the signature of this being a device-registration gap.
+
+**What unblocks it is a Lightning cable that carries data.** Nothing in the
+software needs changing, and no further certificate work will help.
+
+### One anomaly, deliberately recorded rather than explained away
+
+`security find-identity -v -p codesigning` reports **0 valid identities**, and
+`codesign --sign "Apple Development: Alan Fuller (VSSL232H55)"` fails with
+`no identity found` — while the four certificates above are demonstrably
+present in `login.keychain-db` and unexpired. An identity is a certificate plus
+its private key, so the CLI is telling us it cannot pair them.
+
+Checked and **not** explained by: the keychain being locked (it is unlocked,
+`no-timeout`), or this shell's sandbox (the same command outside the sandbox
+returns the same 0).
+
+Do **not** copy the old inference from this. The previous version of this file
+read "0 valid identities" as "no Apple ID has been added", and that reading is
+now provably wrong — the account is added and the certificates exist. The most
+likely explanation is that Xcode 26 keeps signing keys where the legacy
+`security` tool cannot enumerate them, which would make `find-identity` simply
+the wrong instrument here. **That is a hypothesis and has not been tested.**
+
+It is also not currently load-bearing: the device build fails at profile
+generation, which happens *before* code signing, so this has not yet had a
+chance to bite. Re-check it once a cable exists and a profile is issued — if
+signing then fails with `no identity found`, this is the reason, and the fix is
+to let Xcode's GUI reissue into the login keychain rather than to chase it from
+the CLI.
+
+**Superseded 2026-07-28.** This paragraph used to read the zero identities and
+absent profiles directory as "no Apple ID has been added". That inference was
+wrong and is retained only so the mistake is not repeated: an added account and
+issued certificates produce exactly the same two observations when no device has
+ever been registered. The scheme resolves no device run destination because
+there is no device — see the blocker above.
 
 ### Simulator builds need no provisioning — confirmed, not assumed
 
@@ -247,6 +313,9 @@ Do not read this section as evidence that offline behaviour is verified.
   that panel carries land-status warnings — which is the failure shape CLAUDE.md
   already names, "layout is a way of deleting text". Worth a reachability check
   under Capacitor before Phase 1 closes.
+- ~~**`map.html` is linked `target="_blank" rel="noopener"`**~~ — **CLOSED
+  2026-07-28, and the answer is bad.** See "The Field tools buttons are dead in
+  the shell" below. Original wording kept underneath for the record.
 - **`map.html` is linked `target="_blank" rel="noopener"`** from `openTools()`
   in `index.html:2766`, as are `bench_hunter.html` and `creek_manual.html`. In a
   browser that opens a tab. In a native shell `target="_blank"` is handled by the
@@ -256,6 +325,79 @@ Do not read this section as evidence that offline behaviour is verified.
   machine has not granted. So "map.html works" is established and "the button
   that opens map.html works" is **not**. That gap is the one to close first on
   the device run.
+
+### The Field tools buttons are dead in the shell
+
+**`target="_blank"` links do nothing under Capacitor. Not "open elsewhere" —
+nothing, silently.** Tested on the simulator 2026-07-28 [self-tested]. This
+affects **all three** Field tools buttons in `openTools()`: `map.html`
+(`index.html:2766`), `bench_hunter.html` (:2781) and `creek_manual.html`
+(:2796).
+
+The mechanism, each link established separately:
+
+1. **The anchor is real and reachable.** In the running app the modal opens,
+   `a[href="map.html"]` is present, `target="_blank"`, `rel="noopener"`,
+   362x72 px, and `elementFromPoint` at its centre returns the anchor itself —
+   nothing is covering it. This is not the panel-occlusion failure.
+2. **`target="_blank"` routes to Capacitor's popup delegate.** Capacitor
+   implements `webView:createWebViewWithConfiguration:forNavigationAction:windowFeatures:`
+   — confirmed in the shipped binary and in
+   `node_modules/@capacitor/ios/Capacitor/Capacitor/WebViewDelegationHandler.swift`.
+   So this is *not* the classic WKWebView case where `target="_blank"` is
+   ignored for want of a delegate.
+3. **That delegate hands the URL to the operating system and opens no webview:**
+
+   ```swift
+   if let url = navigationAction.request.url {
+       UIApplication.shared.open(url, options: [:], completionHandler: nil)
+   }
+   return nil
+   ```
+
+4. **The URL it hands over is `capacitor://localhost/map.html`, and iOS cannot
+   open it.** The app registers no URL scheme — `Info.plist` has no
+   `CFBundleURLTypes`. Asking the OS to perform exactly the operation
+   Capacitor performs fails:
+
+   ```
+   $ xcrun simctl openurl booted "capacitor://localhost/map.html"
+   LSApplicationWorkspaceErrorDomain error 115   (exit 115)
+   $ xcrun simctl openurl booted "https://example.com"
+   (exit 0)
+   ```
+
+   The `https://` control succeeds, so the refusal is about the scheme, not the
+   command.
+
+`return nil` means no new webview is created, and the failed `open` reports
+nothing to the page. **The user taps a card and the app does nothing at all** —
+no navigation, no error, no visible response. That is worse than a broken link,
+because there is nothing on screen to distinguish it from a missed tap.
+
+`map.html` itself is fine and is reachable at
+`capacitor://localhost/map.html` — it was loaded directly and it draws. **The
+file works; the button that opens it does not.**
+
+**Fix in Phase 1, not now** (Phase 0 changes no app code). The likely fix is to
+drop `target="_blank"` on same-origin internal links so they navigate in the
+webview. Note that `target="_blank"` is doing real work on GitHub Pages, where
+these open a tab and the launcher stays put — so this is a genuine divergence
+between the two distributions, the same shape as the service-worker finding,
+and not simply a mistake to delete.
+
+**One link is inferred rather than observed end to end.** Step 1→2 — that a real
+finger tap reaches the delegate — was not exercised. A scripted
+`dispatchEvent(new MouseEvent('click'))` on the anchor produced no navigation,
+no backgrounding, and no `pagehide`/`blur`/`visibilitychange`, and **no
+`capacitor://` open attempt appeared in a system-wide log capture**, which means
+WebKit blocked it upstream for want of a user gesture rather than the delegate
+running and failing. Steps 2, 3 and 4 are verified independently of any gesture,
+so the outcome does not depend on that link — but a real tap has not been
+watched. Closing it needs a genuine HID event: no tap tooling exists on this
+machine (`idb`, `fbsimctl`, `appium` all absent; `simctl` has no tap), so it
+needs either Accessibility permission for **Terminal.app** so AppleScript can
+click the Simulator window, or an XCUITest target.
 
 ### How the render findings were obtained
 
@@ -329,6 +471,20 @@ default, so the shipping bundle cannot report on itself.
 - **Vendored Leaflet resolves from the app bundle**: `L.version === "1.9.4"`
   inside `map.html` at `capacitor://localhost/map.html`, with `leaflet.js` and
   `leaflet.css` both answering 200 [self-tested] 2026-07-28
+- **The Apple Developer Program is paid and approved, and the Apple ID is added.**
+  `isFreeProvisioningTeam = 0`, `teamType = Individual`, team `PWCMJWTT6J`
+  "Alan Fuller"; 4 valid `Apple Development` certificates issued 2026-07-28,
+  `OU=PWCMJWTT6J`, valid to 2027 [self-tested] 2026-07-28
+- **Phase 0's remaining blocker is a data cable, not a decision.** No physical
+  device is visible (`devicectl list devices` → `No devices found`), so no
+  device can be registered, so no provisioning profile can be generated. The
+  device build fails at `GatherProvisioningInputs` on "No profiles ... were
+  found" — past team and certificate resolution [self-tested] 2026-07-28
+- **`target="_blank"` links are dead under Capacitor.** The delegate calls
+  `UIApplication.shared.open()` on a `capacitor://` URL and returns nil; iOS
+  refuses that scheme (`simctl openurl` → LS error 115, vs exit 0 for
+  `https://`). All three Field tools buttons silently do nothing
+  [self-tested] 2026-07-28
 - The v2 seed runs in the shell and the land status is intact on device storage:
   20 bench records, **12 `avoid` / 8 `clean` / 0 `unchecked`**, `state_claim`
   `none` ×20, proximity `unknown` ×20 — matching the generator payload
@@ -539,9 +695,18 @@ Until this lands, the accepted cost recorded under the Phase 0 decision stands.
 
 ## Open decisions
 
-- Apple Developer Program ($99/yr) vs free 7-day provisioning.
-  Free tier requires re-signing weekly — likely unworkable for field use.
-  **Not yet decided.**
+- ~~Apple Developer Program ($99/yr) vs free 7-day provisioning.~~
+  **DECIDED and PAID 2026-07-28 — Developer Program, enrollment approved.**
+  The reasoning was the one this line already carried: free provisioning expires
+  after 7 days, and an app that dies in the field cannot be re-signed from a
+  riverbank. Verified from the machine, not taken on report —
+  `com.apple.dt.Xcode` `IDEProvisioningTeamByIdentifier` reads
+  `isFreeProvisioningTeam = 0`, `teamType = Individual`, `teamID = PWCMJWTT6J`,
+  `teamName = "Alan Fuller"` [self-tested]. A free Personal Team would read
+  `isFreeProvisioningTeam = 1`; this is the paid membership.
+
+**No open decisions remain in Phase 0.** What blocks it now is hardware — see
+Next action.
 
 ## Deliberately not built yet
 
@@ -553,24 +718,29 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-**Runbook step 5 — signing. It is Alan's, and it is the only thing moving.**
+**Buy a Lightning cable that carries data. That is the whole list.**
 
-Steps 2, 3 and 4 are done: Capacitor 8.4.2 installed, `ios/` scaffolded,
-`cap sync` copying `docs/` into the bundle correctly, Xcode installed and
-licensed, and the App target open with scheme `App` selected.
+Everything else in step 5 is done. The Developer Program is paid and approved,
+the Apple ID is added, the team is set on both build configurations, automatic
+signing is on, and four valid development certificates exist. None of it can
+produce a provisioning profile, because a profile must name a registered device
+and no device can be registered over a cable that carries no data.
 
-Step 5 is two actions, in order, and **both are Alan's**:
+**Do not spend another round on certificates.** Four have been issued and
+revoked already; the build does not fail on certificates. It fails on the
+profile, and it will keep failing on the profile until the phone can be seen.
 
-1. **Decide Apple Developer Program ($99/yr) vs free 7-day provisioning.** See
-   Open decisions — still undecided. The 7-day expiry means the app dies in the
-   field with no way to re-sign from a riverbank. **Do not pick a tier to keep
-   moving.**
-2. **Add the Apple ID** under Xcode → Settings → Accounts, then App target →
-   Signing & Capabilities → team. Nothing can be signed before this: there are
-   0 codesigning identities on this machine and no provisioning profiles
-   directory, which is also why the scheme resolves no run destinations.
+Once a working cable exists, in order:
 
-Everything achievable without a signing tier has been done and verified. The
+1. Connect the iPhone 14 and confirm **Finder sees it** — that is the check
+   that the cable carries data, and it is cheaper than discovering it in Xcode.
+2. Trust the Mac on the phone, then let Xcode register the device.
+3. Re-run the device build. If it now fails with `no identity found` rather
+   than a profile error, that is the keychain anomaly recorded above, not a new
+   problem — let Xcode's GUI reissue the certificate.
+4. Then, and only then, the device rows in the status table can move.
+
+Everything achievable without a physical device has been done and verified. The
 block does not reach backwards — and it reaches less far than it looked. The
 simulator run on 2026-07-28 proved the shell **works**: it builds, installs,
 launches, renders `index.html`, loads `map.html`, resolves the vendored Leaflet
@@ -584,6 +754,9 @@ physical iPhone has run this app. The simulator has its own rows.
 
 Two things the simulator run added to step 5's checklist, both open:
 
+- ~~**Exercise the `target="_blank"` links.**~~ **DONE 2026-07-28 — they are
+  dead.** All three Field tools buttons do nothing in the shell. Phase 1 item;
+  see "The Field tools buttons are dead in the shell". Original text kept below.
 - **Exercise the `target="_blank"` links.** `map.html` was reached directly, not
   through the Field tools button. Whether that button works in the shell is
   untested and is the first thing to tap on the device.
