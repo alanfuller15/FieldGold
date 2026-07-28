@@ -99,8 +99,8 @@ in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 642 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 191 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `CLAUDE.md` | 649 | this file — the whole brief for anyone changing the repo |
+| `STATE.md` | 260 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
 | `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |
 | `.claude/skills/phase-0-shell/SKILL.md` | 128 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
@@ -356,6 +356,13 @@ and opened from a bookmark there was nothing on screen saying otherwise. Each
 now carries a red **ARCHIVED BUILD STAGE — not a field tool** banner at the top
 of the panel. Do not remove it, and do not develop these pages further; fix
 `map.html` instead.
+
+**They DO ship inside the iOS bundle, by decision, and that is not the same
+question as the SHELL.** `webDir` is all of `docs/`, so Capacitor copies these
+five into the app. Alan decided that 2026-07-28; `STATE.md` records the
+reasoning, what the decision accepts, and the Phase 1 item that revisits it.
+Do not read the SHELL exclusion below as "stage maps are kept off devices" —
+it is narrower than that, and the two mechanisms are independent.
 
 **They are deliberately NOT in the `sw.js` SHELL, and that is a decision, not an
 omission.** Every pixel they draw comes from the network — USGS WMS/WFS, OSM

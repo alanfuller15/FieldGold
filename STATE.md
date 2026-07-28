@@ -16,7 +16,7 @@ changes to app code.
 |---|---|
 | Capacitor installed | not started — no `package.json`, no `node_modules/`, no `capacitor.config.*` in the tree [self-tested] 2026-07-28 |
 | `capacitor.config` webDir confirmed | **decided — `"docs"`. Contingency discharged: `docs/` exists and holds only web assets** |
-| Stage maps in `webDir` — ship or exclude | **OPEN. Blocks nothing above it, but decide before the first device install.** See the section below |
+| Stage maps in `webDir` — ship or exclude | **decided 2026-07-28 — SHIP.** `webDir` is all of `docs/`. See the decision section for what this accepts |
 | iOS platform added | not started — no `ios/` directory [self-tested] 2026-07-28 |
 | Builds in Xcode | not started |
 | Signing configured | not started |
@@ -68,12 +68,43 @@ changes to app code.
   native bundle, and at the repo root that sweeps `ios/`, `.git/`, `.claude/`,
   the `.0009-backup-*` directories, `tests/` and `tools/` into the app.
 
-## Phase 0 — open: does `webDir` exclude the stage maps?
+## Phase 0 — DECIDED 2026-07-28: `webDir` ships the stage maps
 
-**Still filed, still not solved — and now it is the only thing standing between
-here and `cap init`.** Phase 0a is done, so the "blocks nothing in Phase 0a"
-caveat this section used to carry has expired. Nothing forces the decision
-until `webDir` is written into a config, but that is the next keystroke.
+**Decision: ship them. `webDir` stays `"docs"` — the whole directory, no
+exclusions, no prune.** Made by Alan 2026-07-28. The reasoning, the cost this
+accepts, and the follow-on filed for Phase 1 are all below. Read the cost
+section before you decide this was free.
+
+### Why ship
+
+Phase 0's hard rule is **change no app code**, and its purpose is to isolate
+Apple-toolchain friction from everything else. Adding a bundle-prune mechanism
+to this phase means that when something fails, the failure could be Capacitor
+or it could be the prune — and Phase 0 exists precisely so that question has
+one possible answer.
+
+The mitigation being relied on is the banner plus zero inbound links. That is
+**the same mitigation already considered adequate on the public site**, which
+serves these five pages today at `alanfuller15.github.io/FieldGold/`.
+
+### What this decision ACCEPTS
+
+Recorded plainly so this is not read back as a null result. It is not.
+
+**For the duration of Phase 0, a page that can mislead is reachable by typed
+URL on a phone in terrain.** A stage map looks like FieldGold, carries no
+land-status layer, and draws nothing. A person who reaches one cannot tell it
+from the real map failing. That is a real cost, accepted deliberately, in
+exchange for a clean answer to "did the toolchain work" on the first device
+install.
+
+It is bounded by three things and by nothing else: the red ARCHIVED BUILD
+STAGE banner on all five, zero inbound links from any shipped app page, and
+the fact that reaching one requires typing a URL that nothing in the app
+displays. If any of those three stops being true, this decision must be
+revisited rather than inherited.
+
+### Background
 
 Phase 0a **moved** `stage1_map_test.html` … `stage5_map.html` into `docs/`
 along with every other web asset, because they are published today and three
@@ -101,11 +132,9 @@ reachable by typed URL only. `tests/test_stage_maps.py` still asserts their
 absence from the `sw.js` SHELL, and `tests/test_panel_reachability.py` still
 covers all five, so both remain load-bearing whichever way the decision goes.
 
-Phase 0 must decide one of:
-
-- ship them and rely on the banner plus their unreachability, or
-- exclude them from `webDir` — which means `webDir` is no longer simply
-  "the directory Pages serves", and something has to enforce the difference.
+The branch not taken was to exclude them from `webDir`. That option is not
+discarded — it moves to Phase 1 as its own item, below. See "Phase 1 — enforce
+the bundle/Pages divergence".
 
 Do not resolve this by quietly deleting the stage maps. They are the build
 history of `map.html` and CLAUDE.md keeps them on purpose.
@@ -162,6 +191,40 @@ relative), the `sw.js` SHELL (all `./`-relative), and the service worker
 registration. Served URLs are identical after the move, so the move alone
 does not require a cache version bump.
 
+## Phase 1 — enforce the bundle/Pages divergence
+
+**Filed 2026-07-28, not started. This is an item, not a note.** It is the
+branch Phase 0 did not take, deferred with a reason rather than dropped.
+
+Excluding the stage maps from the iOS bundle means **`webDir` stops being "the
+directory Pages serves"**. Once those two trees are allowed to differ, nothing
+in this repo currently notices if they differ in some *other* way — a file
+dropped from the bundle by accident reads exactly like a file excluded on
+purpose. So the work is two parts and neither is optional:
+
+1. **A mechanism** — a copy step or a post-`sync` prune. `webDir` cannot simply
+   be repointed at a subdirectory, because the stage maps must keep being
+   served by Pages and keep being loadable over HTTP by
+   `tests/test_stage_maps.py`, `tests/test_panel_reachability.py` and the other
+   suites that fetch them.
+2. **A test asserting the bundle and the Pages tree diverge exactly as intended
+   and no further** — enumerating both trees and requiring the difference to be
+   precisely the five stage maps. Without this, the mechanism is unguarded and
+   the first silent drop ships.
+
+**Untested here:** Capacitor's ignore behaviour for `webDir` contents. Whether
+`cap copy` honours any exclusion mechanism at all was not verified on this
+machine, and the plan above assumes it may not. Establish that before designing
+around it.
+
+**Why Phase 1 is the right home.** Phase 1 consolidates the scattered HTML into
+one routed app. That is the change which legitimately decides what is
+reachable — reachability becomes a property of the router rather than of which
+files happen to sit in a directory. Bolting an exclusion onto the wrapper
+answers the same question in a weaker place.
+
+Until this lands, the accepted cost recorded under the Phase 0 decision stands.
+
 ## Open decisions
 
 - Apple Developer Program ($99/yr) vs free 7-day provisioning.
@@ -178,9 +241,15 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-**Resolve the stage-map question above, then install Capacitor.** Phase 0a is
-done; `webDir` is `"docs"` and usable. The stage-map decision is Alan's to make
-and is the last thing outstanding before `cap init`.
+**Install Capacitor.** Phase 0a is done, `webDir` is `"docs"` and usable, and
+the stage-map question that was gating it is decided (ship). Nothing blocks
+runbook steps 2–4 — `npm install @capacitor/core @capacitor/cli`, `cap init`,
+`cap add ios`, `cap sync`, `cap open ios`.
+
+**Step 5, signing, is blocked and only step 5.** The Apple Developer Program
+vs free-provisioning decision is Alan's and has not been made; see Open
+decisions. Steps 2–4 can be run and verified without it, so the block does not
+reach backwards. Do not pick a tier to keep moving.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
