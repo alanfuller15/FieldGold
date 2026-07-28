@@ -720,6 +720,10 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 **Buy a Lightning cable that carries data. That is the whole list.**
 
+*Session residue from the 2026-07-28 simulator run is at the end of this file —
+read it before re-testing anything, particularly before spending a round on
+certificates or on GUI automation.*
+
 Everything else in step 5 is done. The Developer Program is paid and approved,
 the Apple ID is added, the team is set on both build configurations, automatic
 signing is on, and four valid development certificates exist. None of it can
@@ -771,3 +775,139 @@ how far. Update the tables above as its steps land, and record the tier
 ([self-tested] / [fetched] / [externally-verified]) under Verified facts.
 Phase 0a had no runbook — the breakage inventory above was what there was, and
 it is now closed history.
+
+## Session residue — 2026-07-28, simulator run
+
+Reasoning that produced the entries above and is not recoverable from them.
+Nothing here repeats a conclusion; read the sections above for those.
+
+### Test the mechanism, not the gesture — the method that unblocked this session
+
+The `target="_blank"` question looked blocked. Answering it seemed to need a
+real finger tap, there is no tap tooling on this machine (`idb`, `idb_companion`,
+`fbsimctl`, `appium` all absent; `simctl` has no tap verb), and a scripted
+`dispatchEvent(new MouseEvent('click'))` is not a user gesture — WebKit blocked
+it upstream, which was confirmed rather than assumed: a **system-wide** log
+capture across the click showed **no `capacitor://` open attempt at all**, so
+the delegate never ran.
+
+What broke it open was reading Capacitor's handler and noticing the chain had a
+**second half that needs no gesture**:
+
+```swift
+UIApplication.shared.open(url)   // capacitor://localhost/map.html
+return nil
+```
+
+`simctl openurl booted "capacitor://localhost/map.html"` asks the OS to perform
+*exactly that call*. It fails with `LSApplicationWorkspaceErrorDomain 115`, and
+an `https://` control returns 0 — so the refusal is the scheme, not the harness.
+The gesture only governs whether the delegate is *reached*; it has no bearing on
+what the delegate *achieves*, and the second half is where the failure lives.
+
+**Generalise this before reaching for automation.** When something seems to need
+a real tap, split the chain at the point where it leaves the webview and hands
+off to the OS or the native layer. The native half is almost always drivable
+from the CLI — `simctl openurl`, `simctl launch`, `simctl push`, a direct
+`xcodebuild` — and it is usually the half that decides the outcome. A missing
+tap blocks far less than it first appears.
+
+### The Accessibility grant was considered and declined
+
+The one route to a genuine HID tap was granting Accessibility to **Terminal.app**
+(`/System/Applications/Utilities/Terminal.app`, established by walking the
+parent-process chain — it is the host, not `claude`). Alan offered it.
+
+Declined, for a stated cost: macOS commonly requires quitting and reopening an
+app after that toggle, and quitting Terminal **ends the Claude Code session**.
+That is a real price for one inferred link, and steps 2–4 of the chain were
+already verified without it — the delegate's behaviour, the URL it constructs,
+and the OS's refusal of that URL. The outcome does not depend on the unobserved
+link, only the completeness of the walk-through does.
+
+**If a later session wants it anyway:** System Settings → Privacy & Security →
+Accessibility → enable Terminal. Then AppleScript can address the Simulator
+window (`tell application "System Events" to tell process "Simulator"`), which
+currently fails with `-1719 osascript is not allowed assistive access`. Worth it
+only if something genuinely gesture-gated turns up — a popup, a permission
+prompt, a drag. It was not worth it for this.
+
+### `find-identity` — hypothesis, and the exact trigger to re-check it
+
+`security find-identity -v -p codesigning` → **0 identities**, and
+`codesign --sign "Apple Development: Alan Fuller (VSSL232H55)"` →
+`no identity found`, while four unexpired certificates for that exact common
+name sit in `login.keychain-db`. An identity is a certificate **plus its private
+key**, so the tooling cannot pair them.
+
+Ruled out by test, not by reasoning: the keychain being locked (it reports
+`no-timeout` and unlocked), and this shell's sandbox (the same command run with
+the sandbox disabled returns the same 0).
+
+**The hypothesis — untested — is that Xcode 26 stores signing keys in the
+data-protection keychain, which the legacy `security` CLI cannot enumerate.**
+If so, `find-identity` is simply the wrong instrument and nothing is wrong.
+
+**Re-check trigger, and it is specific:** once a cable exists and a provisioning
+profile has been issued, run the device build. If it fails with
+**`no identity found`** — as opposed to a profile error — *this is why*. Do not
+treat it as a new problem, and do not chase it from the CLI. The fix is to let
+Xcode's GUI reissue the certificate into the login keychain. Until a profile
+exists this cannot bite, because the build fails at `GatherProvisioningInputs`,
+which runs *before* code signing. That ordering is the reason it was left open
+rather than pursued.
+
+### The pbxproj change is intentional, and has now survived two commits on purpose
+
+`ios/App/App.xcodeproj/project.pbxproj` carries `DEVELOPMENT_TEAM = PWCMJWTT6J`
+on both Debug and Release. Xcode wrote it when Alan selected the team. It is
+**uncommitted by decision**, and has now been **excluded from two commits with
+the reason stated in each** — `0265738` (PR #1) and `cd42c73` (PR #2), in both
+the commit message and the PR body.
+
+**A third session must not "clean it up".** It is neither drift nor a stray
+edit: it is the one piece of runbook step 5 that has landed, and it belongs to
+the commit that completes signing — the one that can only be written once a
+device has been registered. Reverting it would silently undo a real
+configuration change and make the next Xcode session redo it. Committing it
+early would attach step 5's only artifact to a documentation commit and make the
+signing history unreadable.
+
+The correct move is to leave it alone until the cable arrives, then commit it
+**with** the profile and the first device install, as one coherent step-5
+change.
+
+### Threads deliberately not pulled
+
+- **Offline behaviour was never exercised.** The Mac had network throughout, so
+  48 basemap tiles loaded and `map.html`'s "basemap tiles unavailable — no
+  signal" path never ran. This is the single most field-relevant untested thing
+  about the shell, and it is now *more* interesting than before: with `sw.js`
+  inert, the shell's offline story rests entirely on bundle-local assets and has
+  never been observed. Testable on the simulator without a cable — toggle the
+  host's network, or use Network Link Conditioner — and it was left only for
+  scope.
+- **Safe-area insets** were observed failing on the launcher header and not
+  measured on `map.html`'s panel, which is the one that carries land-status
+  warnings. `tests/test_panel_reachability.py` already exists and hit-tests
+  warning text at phone viewports; it does not know about Capacitor's insets.
+  Extending it is the obvious move and was out of Phase 0's scope.
+- **The stage maps ship in the bundle and were not opened on the simulator.**
+  They carry the ARCHIVED banner, so this is low-risk, but "present in the
+  bundle" is all that has been verified about them under Capacitor.
+
+### Method note for whoever instruments the app next
+
+Capacitor **does not** forward `console` to the system log by default, so the
+shipping bundle cannot report on itself and `log stream` will show nothing from
+page JS. Two things that do work, both used here: write results to
+`localStorage` and read the container's `localstorage.sqlite3` off disk (values
+are **UTF-16LE**, and the payload lives under key `fieldgold_record` as
+`{updated, entries}`); or render into a fixed full-screen `<pre>` and screenshot
+with `simctl io booted screenshot`. The pattern that keeps this legitimate is to
+append the diagnostic to a **copy** of the built `App.app` in the scratchpad,
+ad-hoc re-sign it (`codesign --force --sign -`), install, read, then reinstall
+the clean build and confirm the diagnostic is absent from the installed bundle.
+`docs/` is never touched. Note also that a project hook blocks the Write tool
+outside the repo — Alan authorised the scratchpad write explicitly, which is the
+remedy the hook itself names.
