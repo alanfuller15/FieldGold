@@ -58,25 +58,36 @@ physically walks.** That constrains everything below.
 
 ## Layout
 
+Since Phase 0a (2026-07-27) **every web asset lives under `docs/`** and nothing
+else does; `tests/` and `tools/` stay at the repo root and must never ship in
+the app bundle. Paths below are written out in full, because the bare filenames
+this table used to carry sent sessions looking at the repo root for files that
+had moved.
+
 | file | role |
 |---|---|
-| `index.html` | entry point / launcher |
-| `fieldgold-data.js` | shared data layer — `localStorage` key `fieldgold_record` |
-| `load_rem_benches.html` | loads the 20 REM bench candidates with land status |
-| `bench_hunter.html` | bench working view |
-| `creek_manual.html` | reference text |
-| `map.html` | **the map.** The only field map screen |
-| `stage1_map_test.html` … `stage5_map.html` | **archived build stages** of `map.html`, kept for history. Not field tools — see below |
-| `sw.js`, `manifest.json`, `icon-*.png` | PWA shell — offline caching and install |
-| `tools/build_loader.py` | **generator.** Holds the STATUS table — the land-status call for all 20 candidates with the reasoning for each — and writes **two** files from that one payload: `load_rem_benches.html` in place, and the `REM_BENCHES` seed array inside `fieldgold-data.js` between its BEGIN/END GENERATED markers. See "one payload, two files" below |
-| `vendor/leaflet/` | **vendored Leaflet 1.9.4** — not written here; see `PROVENANCE.md` |
+| `docs/index.html` | entry point / launcher |
+| `docs/fieldgold-data.js` | shared data layer — `localStorage` key `fieldgold_record` |
+| `docs/load_rem_benches.html` | loads the 20 REM bench candidates with land status |
+| `docs/bench_hunter.html` | bench working view |
+| `docs/creek_manual.html` | reference text |
+| `docs/map.html` | **the map.** The only field map screen |
+| `docs/stage1_map_test.html` … `docs/stage5_map.html` | **archived build stages** of `map.html`, kept for history. Not field tools — see below |
+| `docs/sw.js`, `docs/manifest.json`, `docs/icon-*.png` | PWA shell — offline caching and install |
+| `docs/.nojekyll` | empty marker — keeps the Pages build deterministic. See the deploy section |
+| `tools/build_loader.py` | **generator.** Holds the STATUS table — the land-status call for all 20 candidates with the reasoning for each — and writes **two** files from that one payload: `docs/load_rem_benches.html` in place, and the `REM_BENCHES` seed array inside `docs/fieldgold-data.js` between its BEGIN/END GENERATED markers. See "one payload, two files" below |
+| `docs/vendor/leaflet/` | **vendored Leaflet 1.9.4** — not written here; see `docs/vendor/leaflet/PROVENANCE.md` |
+| `.claude/verify.sh` | **the verification gate.** Runs all twelve suites plainly and refuses to report green over a suite it could not run |
 | `tests/` | **twelve suites, 489 assertions** — measured 2026-07-26 by running all twelve and summing each suite's own count (30/50 node; 30, 31, 39, 48, 29, 25, 15, 109, 68, 15 python). The figure here read 488. `test_land_status.js`, `test_photo_land_context.js` (node); `test_app_land_status.py`, `test_photo_app.py`, `test_map_sites.py`, `test_offline_map.py`, `test_seed_drift.py`, `test_stage_maps.py`, `test_state_claims.py`, `test_reactive_refresh.py`, `test_sw_lifecycle.py`, `test_panel_reachability.py` (playwright) — **eleven of the twelve** take `--mutate`, **66 mutants** (64 distinct names — `no-banner` and `stale-cache` each appear in two suites). `test_app_land_status.py` does not, and that gap is open. **The "all caught" run covered 63 of them.** Counted off the tree 2026-07-26: 57 mutants at `35adc6f`, 66 at `72e8815`, 66 now. The 63 was never the tree's count — three mutants have never appeared in a verified-all-caught run, and which three is not recorded. The conclusion that the 63 were caught still stands; only the number was wrong. **The exit convention is split and this file got it wrong twice** — verified empirically 2026-07-26 by running those 63. Inverting (caught → 0, survived → 1): `test_offline_map.py`, `test_sw_lifecycle.py`, `test_reactive_refresh.py`, `test_seed_drift.py`, `test_panel_reachability.py`. Exit 1 on any failure: `test_map_sites.py`, `test_photo_app.py`, `test_stage_maps.py`, `test_state_claims.py`, and both `.js` suites. **Do not read this table — run one known mutant per suite and observe the code.** Whatever a runner assumes, half the suites report the opposite, and the failure mode is a runner that prints green over a survived mutant. A mutation whose `replace()` matches nothing must abort with exit 2 rather than report a pass — but see below: exit 2 does not catch everything |
 
 ## Every document in this repo
 
-Built from `git ls-files '*.md'` on 2026-07-26, not from memory. Until that
-date nothing pointed at any of these, so a session reading this file never
-learned they existed. A document nothing links to is a document nobody reads.
+Built from `git ls-files '*.md'` on 2026-07-26 and rebuilt with the same
+command on 2026-07-28, not from memory. Until the first of those dates nothing
+pointed at any of these, so a session reading this file never learned they
+existed. A document nothing links to is a document nobody reads. The 2026-07-28
+rebuild found **no orphans** — five documents, five rows, no `.md` in the tree
+that this table does not name.
 
 **Control: any new or moved `.md` gets its line here in the same change.**
 Deliberately not "the same commit" — a pure-rename commit is the case that
@@ -88,10 +99,10 @@ in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 625 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 136 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
-| `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders |
-| `docs/vendor/leaflet/PROVENANCE.md` | 111 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a |
+| `CLAUDE.md` | 642 | this file — the whole brief for anyone changing the repo |
+| `STATE.md` | 191 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
+| `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |
 | `.claude/skills/phase-0-shell/SKILL.md` | 128 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
 
 What this index found when it was first built, both now fixed:
@@ -356,7 +367,7 @@ shipping.
 
 ### Leaflet is vendored, the tiles are not
 
-`vendor/leaflet/` holds Leaflet 1.9.4 — see `vendor/leaflet/PROVENANCE.md` for
+`docs/vendor/leaflet/` holds Leaflet 1.9.4 — see `docs/vendor/leaflet/PROVENANCE.md` for
 where the bytes came from and how they were verified against a publisher
 independent of the one that served them. Every map page loads it by relative
 path. Do not repoint any page at a CDN: rule 2 above forbids it, and the
@@ -374,8 +385,14 @@ qualifier: a grey rectangle that goes unexplained reads as a broken app, and a
 person who thinks the app is broken stops trusting the colours too.
 
 If you upgrade Leaflet, the SRI hashes must be updated in **both**
-`vendor/leaflet/PROVENANCE.md` and `tests/test_offline_map.py`, and `sw.js`
+`docs/vendor/leaflet/PROVENANCE.md` and `tests/test_offline_map.py`, and `sw.js`
 bumped. The suite failing until you do that is the intended behaviour.
+
+Note the two path conventions, because they look inconsistent and are not:
+`tests/test_offline_map.py` serves `docs/` as its document root, so the
+`vendor/leaflet/...` strings inside it are **web-root-relative and correct**.
+Prose in this file and in `PROVENANCE.md` describes files on disk, so it carries
+the `docs/` prefix. Do not "fix" one to match the other.
 
 ### A notice you cannot reach has been removed
 
@@ -387,7 +404,7 @@ found two independent defects, both of which had shipped green through eleven
 suites.
 
 - **The z-index tie.** `#panel` was `z-index:1000`. So are Leaflet's
-  `.leaflet-top`/`.leaflet-bottom` **containers** (`vendor/leaflet/leaflet.css`
+  `.leaflet-top`/`.leaflet-bottom` **containers** (`docs/vendor/leaflet/leaflet.css`
   line 141). The `z-index:800` on `.leaflet-control` only orders controls
   *within* those containers and does not apply here — a static read of the 800
   is how this was got wrong the first time. A tie breaks by DOM order, `#map`

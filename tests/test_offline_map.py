@@ -50,9 +50,13 @@ MUTATE = sys.argv[sys.argv.index("--mutate") + 1] if "--mutate" in sys.argv else
 
 # Published on leafletjs.com's download page — an independent publisher from
 # npm, which is the whole point of the cross-check. See
-# vendor/leaflet/PROVENANCE.md. If you upgrade Leaflet these must be updated
-# from that page BY HAND; a hash copied out of the file you are trying to
-# verify is not a verification.
+# docs/vendor/leaflet/PROVENANCE.md. If you upgrade Leaflet these must be
+# updated from that page BY HAND; a hash copied out of the file you are trying
+# to verify is not a verification.
+#
+# The keys below are WEB-ROOT-relative and are correct as written: ROOT is
+# REPO/"docs", so "vendor/leaflet/..." resolves under it. Only prose about
+# files on disk carries the docs/ prefix. Do not add it here.
 SRI = {
     "vendor/leaflet/leaflet.js":  "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=",
     "vendor/leaflet/leaflet.css": "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=",

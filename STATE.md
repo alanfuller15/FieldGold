@@ -1,6 +1,7 @@
 # FieldGold — migration state
 
-Last updated: 2026-07-26
+Last updated: 2026-07-28 (reconciliation pass — every row below re-checked
+against the tree, not carried forward from the previous version)
 
 ## Active phase
 
@@ -13,9 +14,10 @@ changes to app code.
 
 | Step | State |
 |---|---|
-| Capacitor installed | not started |
-| `capacitor.config` webDir confirmed | decided — `"docs"`, contingent on Phase 0a |
-| iOS platform added | not started |
+| Capacitor installed | not started — no `package.json`, no `node_modules/`, no `capacitor.config.*` in the tree [self-tested] 2026-07-28 |
+| `capacitor.config` webDir confirmed | **decided — `"docs"`. Contingency discharged: `docs/` exists and holds only web assets** |
+| Stage maps in `webDir` — ship or exclude | **OPEN. Blocks nothing above it, but decide before the first device install.** See the section below |
+| iOS platform added | not started — no `ios/` directory [self-tested] 2026-07-28 |
 | Builds in Xcode | not started |
 | Signing configured | not started |
 | Installed on device | not started |
@@ -27,13 +29,40 @@ changes to app code.
 <!-- Example: Apple Developer Program enrolled [externally-verified] 2026-07-26 -->
 
 - SessionStart hook fires and injects STATE.md [externally-verified] 2026-07-25
+- Every web asset lives under `docs/`; `tests/` and `tools/` remain at the repo
+  root. 20 tracked files under `docs/`, none outside it that the app serves
+  [self-tested] 2026-07-28
+- All twelve suites pass against the moved tree. `bash .claude/verify.sh` →
+  "VERIFY PASSED — all 12 suites ran and passed" [self-tested] 2026-07-28
+- 489 assertions, re-counted by running each suite and reading its own total:
+  30/50 node; 30, 31, 39, 48, 29, 25, 15, 109, 68, 15 python. Identical to the
+  2026-07-26 measurement recorded in CLAUDE.md [self-tested] 2026-07-28
+- GitHub Pages source is branch `main`, path `/docs`, and
+  `pages/builds/latest.commit` is `ac215fd` — equal to `origin/main` HEAD, so
+  the live bytes are this commit's and not an earlier build's [fetched]
+  2026-07-28
+- Live site serves the moved tree: `index.html`, `map.html`,
+  `fieldgold-data.js`, `vendor/leaflet/leaflet.js` and `stage3_map.html` all
+  200, byte counts equal to the local files, and `VISION_PROMPT` /
+  "Scan documented gold occurrences" present in the served HTML [fetched]
+  2026-07-28
+- Nothing in the shipped app pages links to a stage map — zero matches for
+  `stage[0-9]` across `index.html`, `map.html`, `bench_hunter.html`,
+  `creek_manual.html`, `load_rem_benches.html`, `sw.js`, `manifest.json`. All
+  five carry the ARCHIVED BUILD STAGE banner [self-tested] 2026-07-28
+- Vendored `leaflet.css` still hashes to the published SRI — 661 CRLF, 0 bare
+  LF, in both worktree and stored blob [self-tested] 2026-07-28
 
 ## Decisions made
 
-- **`webDir` is `"docs"`.** GitHub Pages currently serves branch `main` at
-  path `/`, and there is no `docs/` directory yet — so this value is not
-  usable until Phase 0a moves the web assets. Pages maps `docs/` onto the
-  site root, so the public URL is unchanged by that move.
+- **`webDir` is `"docs"`.** As of Phase 0a this is usable: `docs/` exists,
+  holds only web assets, and GitHub Pages serves branch `main` at path
+  `/docs`. The public URL is unchanged — Pages maps `docs/` onto the site
+  root, which the live check on 2026-07-28 confirmed.
+
+  *(This entry previously read "there is no `docs/` directory yet — so this
+  value is not usable until Phase 0a moves the web assets." That was true when
+  written and stopped being true on 2026-07-27.)*
 
   `"."` was rejected. `webDir` is the directory Capacitor copies into the
   native bundle, and at the repo root that sweeps `ios/`, `.git/`, `.claude/`,
@@ -41,13 +70,15 @@ changes to app code.
 
 ## Phase 0 — open: does `webDir` exclude the stage maps?
 
-**Filed, not solved. This is a Phase 0 decision and it blocks nothing in
-Phase 0a.**
+**Still filed, still not solved — and now it is the only thing standing between
+here and `cap init`.** Phase 0a is done, so the "blocks nothing in Phase 0a"
+caveat this section used to carry has expired. Nothing forces the decision
+until `webDir` is written into a config, but that is the next keystroke.
 
-Phase 0a moves `stage1_map_test.html` … `stage5_map.html` into `docs/` along
-with every other web asset, because they are published today and three suites
-load them over HTTP. That puts them inside `webDir`, which means **they will
-ship inside the iOS bundle.**
+Phase 0a **moved** `stage1_map_test.html` … `stage5_map.html` into `docs/`
+along with every other web asset, because they are published today and three
+suites load them over HTTP. They now sit inside `webDir`, which means that on
+today's configuration **they will ship inside the iOS bundle.**
 
 CLAUDE.md deliberately keeps them out of the `sw.js` SHELL. The reasoning
 there: a cached stage map looks like FieldGold, carries no land-status layer,
@@ -59,9 +90,16 @@ Bundling them reintroduces that risk by a different route. The bundle is not
 the service worker cache — the mechanism is different and the SHELL assertion
 still holds — but a person who reaches one of these pages on a phone cannot
 tell the difference. They carry a red ARCHIVED BUILD STAGE banner, and nothing
-in `index.html` links to them (zero references; direct URL only). That is the
-mitigation that exists today. It was written for a browser bookmark, not for a
-page shipped inside an app icon.
+in the app links to them. That is the mitigation that exists today. It was
+written for a browser bookmark, not for a page shipped inside an app icon.
+
+Both halves of that mitigation re-verified against the tree 2026-07-28
+[self-tested]: all five files contain `ARCHIVED BUILD STAGE`, and `stage[0-9]`
+has **zero** matches across `index.html`, `map.html`, `bench_hunter.html`,
+`creek_manual.html`, `load_rem_benches.html`, `sw.js` and `manifest.json` —
+reachable by typed URL only. `tests/test_stage_maps.py` still asserts their
+absence from the `sw.js` SHELL, and `tests/test_panel_reachability.py` still
+covers all five, so both remain load-bearing whichever way the decision goes.
 
 Phase 0 must decide one of:
 
@@ -72,22 +110,36 @@ Phase 0 must decide one of:
 Do not resolve this by quietly deleting the stage maps. They are the build
 history of `map.html` and CLAUDE.md keeps them on purpose.
 
-## Phase 0a — move web assets to docs/
+## Phase 0a — move web assets to docs/ — **COMPLETE 2026-07-27**
 
 A prerequisite that Phase 0 uncovered. Not in the original 0-4 plan.
 
-Phase 0 cannot set a safe `webDir` until the web assets sit in a directory
-that contains only web assets. Phase 0a does that move and nothing else.
+Phase 0 could not set a safe `webDir` until the web assets sat in a directory
+that contains only web assets. Phase 0a did that move and nothing else.
 
-Ordering: after Phase 0's `webDir` decision, before Phase 1.
+| Step | State | Evidence |
+|---|---|---|
+| Move web assets into `docs/` | **done** — `11e8dcf`, pure renames | 20 tracked files under `docs/` [self-tested] 2026-07-28 |
+| Flip Pages source `/` -> `/docs` | **done** | `pages.source` = `{branch: main, path: /docs}` [fetched] 2026-07-28 |
+| Repoint test suites at the new web root | **done** — `2bcc960` | all 10 python suites define `REPO` then `ROOT = REPO / "docs"`; both `.js` suites join `'docs'`; two suites (`test_state_claims.py`, `test_seed_drift.py`) carry a genuine REPO/WEB split as predicted [self-tested] 2026-07-28 |
+| Repoint `tools/build_loader.py` | **done** — `2bcc960` | `SRC`/`DST`/`DATA_JS` all under `_WEB` [self-tested] 2026-07-28 |
+| Full suite green | **done** | `bash .claude/verify.sh` → all 12 ran and passed; 489 assertions [self-tested] 2026-07-28 |
 
-| Step | State |
-|---|---|
-| Move web assets into `docs/` | not started |
-| Flip Pages source `/` -> `/docs` | not started |
-| Repoint test suites at the new web root | not started |
-| Repoint `tools/build_loader.py` | not started |
-| Full suite green | not started |
+Deploy verified beyond the status field, per CLAUDE.md's rule that a `built`
+status can name an earlier commit: `pages/builds/latest.commit` = `ac215fd` =
+`origin/main` HEAD, and the served assets match the local bytes with content
+greps hitting [fetched] 2026-07-28.
+
+Two follow-ons landed after the move and are also complete: `docs/.nojekyll`
+(`53edb99`), and `ac215fd` which **retracted** that commit's stated reason —
+the claim that Jekyll's default excludes would drop `vendor/` was untested and
+wrong. The file stays for determinism; the justification was corrected rather
+than the file removed.
+
+Retained below for history — this was the pre-move inventory, and every item on
+it was addressed by `2bcc960`. Kept because it records *why* two suites needed a
+REPO/WEB split rather than a one-line constant change, which is not obvious from
+the diff.
 
 Known to break on the move (inspected 2026-07-26, no changes made):
 
@@ -126,11 +178,14 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-Phase 0a: move the web assets to `docs/`, then install Capacitor.
+**Resolve the stage-map question above, then install Capacitor.** Phase 0a is
+done; `webDir` is `"docs"` and usable. The stage-map decision is Alan's to make
+and is the last thing outstanding before `cap init`.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
 signing, provisioning, first device install. That file is how; this file is
 how far. Update the tables above as its steps land, and record the tier
 ([self-tested] / [fetched] / [externally-verified]) under Verified facts.
-Phase 0a has no runbook — the breakage inventory above is what there is.
+Phase 0a had no runbook — the breakage inventory above was what there was, and
+it is now closed history.
