@@ -81,9 +81,60 @@ npx cap sync
 
 ### 4. Open Xcode
 
+**Launch Xcode.app by hand once before running this.** On a machine where
+Xcode has never been opened, `cap open ios` loses the document to the
+first-run flow — see below.
+
 ```
 npx cap open ios
 ```
+
+**This command carries no information about whether it worked.** Read
+`node_modules/@capacitor/cli/dist/ios/open.js`:
+
+```js
+await open(config.ios.nativeXcodeProjDirAbs, { wait: false });
+await wait(3000);
+```
+
+`wait: false` means it never learns the result, and the `3000` is a hardcoded
+constant. **The "in 3.00s" is a fixed timer, not a measurement** — that exact
+string prints whether Xcode opens the project, ignores it, or isn't installed
+at all. Exit 0 and the ✔ are equally uninformative.
+
+**Observed 2026-07-28 [self-tested], with Xcode 26.6 installed and licensed:**
+`npx cap open ios` printed `✔ Opening the Xcode workspace... in 3.00s`, exited
+0, and **did not open the project**. Xcode launched cold to `Welcome to Xcode`
++ `What's New in Xcode` with zero documents loaded. Re-issuing the same open
+against an already-running Xcode loaded it in ~2s. The first-run flow swallows
+the document; nothing reports that.
+
+**Ignore the word "workspace" in that message.** Capacitor 8 branches on the
+package manager and the SPM path opens `App.xcodeproj`:
+
+```js
+if ((await config.ios.packageManager) == 'SPM') {
+  await open(config.ios.nativeXcodeProjDirAbs, { wait: false });
+} else {
+  await open(await config.ios.nativeXcodeWorkspaceDirAbs, { wait: false });
+}
+```
+
+The message text is the same on both branches. **The absent
+`ios/App/App.xcworkspace` is correct, not a defect** — it is a CocoaPods
+artifact and this project has no CocoaPods. Do not go looking for it, and do
+not try to generate one.
+
+**Verify the artifact, not the exit code.** The artifact is an Xcode window
+with the App target selected. Checked without touching the GUI:
+
+```
+osascript -e 'tell application "Xcode" to get name of documents'
+osascript -e 'tell application "Xcode" to get name of active scheme of workspace document 1'
+```
+
+Expected: `App.xcodeproj` and `App`. Empty output means nothing opened,
+whatever the CLI printed.
 
 ### 5. Signing
 
@@ -133,12 +184,25 @@ under open items and move on.
 - **Plugin not found** — `npx cap sync` not run after `npm install`.
 - **Signing fails with no team** — Xcode → Settings → Accounts, add the
   Apple ID first.
-- **`npx cap open ios` prints ✔ and exits 0 with no Xcode installed.**
-  Observed on this machine 2026-07-28: "Opening the Xcode workspace... in
-  3.00s", exit 0, nothing opened, no error. It reports on shelling out to
-  `open`, not on the result. Check `xcode-select -p` — if it says
-  `/Library/Developer/CommandLineTools`, Xcode is not installed. The artifact
-  is an Xcode window, not an exit code.
+- **`npx cap open ios` prints ✔ and exits 0 when nothing opened.** Observed
+  twice on this machine 2026-07-28, from two different causes: once with no
+  Xcode installed, once with Xcode 26.6 installed but never launched. Identical
+  output both times — "Opening the Xcode workspace... in 3.00s", exit 0, no
+  error. See step 4: the duration is a hardcoded timer and the call is made
+  with `wait: false`, so **there is no failure this command can report.**
+  Diagnose by cause: `xcode-select -p` returning
+  `/Library/Developer/CommandLineTools` means Xcode is not installed; an Xcode
+  sitting on `Welcome to Xcode` with no documents means the first-run flow ate
+  the document — just open the project again. The artifact is an Xcode window,
+  not an exit code.
+- **`git` fails with "You have not agreed to the Xcode license agreements."**
+  Not a repo problem. macOS `git` is a Command Line Tools shim and every
+  invocation refuses until the licence is accepted, which reads at a glance
+  like a broken checkout — the SessionStart hook reported `not a git repo`
+  [self-tested] 2026-07-28. `xcodebuild` fails the same way. Fix with
+  `sudo xcodebuild -license` (needs an admin password, so it is Alan's action).
+  This blocks committing as well as building, and it is independent of the
+  Developer Program decision.
 
 ## On completion
 

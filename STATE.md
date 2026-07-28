@@ -1,7 +1,8 @@
 # FieldGold — migration state
 
-Last updated: 2026-07-28 (reconciliation pass — every row below re-checked
-against the tree, not carried forward from the previous version)
+Last updated: 2026-07-28 (runbook step 4 — Xcode installed and licensed, App
+target open. Signing preconditions recorded as observed-not-changed; step 5 is
+Alan's and has not been started)
 
 ## Active phase
 
@@ -19,40 +20,98 @@ changes to app code.
 | App identity fixed | **done** — `appId` `io.github.alanfuller15.fieldgold`, `appName` `FieldGold`. Alan's choice 2026-07-28. **This cannot change without a new app identity** |
 | Stage maps in `webDir` — ship or exclude | **decided 2026-07-28 — SHIP.** `webDir` is all of `docs/`. Confirmed in the bundle: all five present. See the decision section for what this accepts |
 | iOS platform added | **done** 2026-07-28 — `npx cap add ios` + `npx cap sync` both clean [self-tested] |
-| Builds in Xcode | **BLOCKED — Xcode is not installed on this machine.** Only Command Line Tools. See "Blocked on Xcode" below |
-| Signing configured | not started |
+| Xcode installed | **done** 2026-07-28 — Xcode **26.6**, build **17F113**, at `/Applications/Xcode.app`; `xcode-select -p` points into it [self-tested]. Alan's action, completed |
+| Xcode licence agreed | **done** 2026-07-28 — `sudo xcodebuild -license` accepted by Alan. `xcodebuild -version` and `git status` both exit 0 [self-tested]. Until this landed, **`git` itself was refusing** — see below |
+| Project opens in Xcode (step 4) | **done** 2026-07-28 — window `App — App.xcodeproj`, document loaded, **active scheme `App`** [self-tested]. **`cap open ios` did not achieve this on the first run** — see below |
+| Builds in Xcode | **not started.** No build has been attempted. Xcode currently reports `could not find any valid run destinations for scheme App`, which is expected before an Apple ID is added — do not read the open project as a build |
+| Signing configured | **not started.** Preconditions observed and deliberately not changed — see "Signing preconditions" below. Gated on the Developer Program decision under Open decisions |
 | Installed on device | not started |
 | Launches and renders | not started |
 
-## Blocked on Xcode
+## Xcode — installed, licensed, project open
 
-**Steps 2 and 3 of the runbook are done. Step 4 cannot run: Xcode is not
-installed on this machine.** `xcode-select -p` is
-`/Library/Developer/CommandLineTools`, `xcodebuild` errors with "requires
-Xcode", and there is no `Xcode.app` anywhere on disk (`mdfind` and
-`/Applications` both empty) [self-tested] 2026-07-28.
+**No longer blocked.** Runbook steps 2, 3 and 4 are done. Both prerequisites
+Alan owned landed 2026-07-28: Xcode 26.6 (build 17F113) installed, and the
+licence agreed.
 
-Installing it is Alan's action — it is a multi-gigabyte App Store download
-against his Apple ID. Nothing else in Phase 0 is blocked by anything else.
+**The licence is worth its own line, because it does not fail where you would
+look for it.** Before `sudo xcodebuild -license` was accepted, `git` refused
+every invocation with "You have not agreed to the Xcode license agreements" —
+macOS `git` is a Command Line Tools shim. The SessionStart hook consequently
+reported `branch: not a git repo`, which reads like a broken checkout and is
+not. `xcodebuild` failed identically. This blocked committing as well as
+building, and it was independent of the Developer Program decision. Both
+verified working after acceptance [self-tested] 2026-07-28.
 
-### `npx cap open ios` reports success with no Xcode installed
+### `npx cap open ios` exits 0 whether or not anything opened
 
-Worth knowing before someone reads a green line and believes it. Run on this
-machine, with no Xcode present, the command printed:
+Observed **twice on this machine, from two different causes**, with byte-identical
+output both times:
 
 ```
 ✔ Opening the Xcode workspace... in 3.00s
 ```
 
-and **exited 0**. Nothing opened. No Xcode process, no App Store process, no
-error. It shells out to `open` and reports on having made the call, not on
-what happened to it.
+exit 0, no error. Once with no Xcode installed. Once with Xcode 26.6 installed
+and licensed but **never launched** — Xcode came up cold on `Welcome to Xcode`
++ `What's New in Xcode` with **zero documents loaded** [self-tested] 2026-07-28.
 
-This is the same shape as the Pages `built` status that named an earlier
-commit, and the same shape as `caches.open()` creating an empty cache that
-`in caches.keys()` then reports as present. **Do not mark "Builds in Xcode"
-done on the strength of `cap open ios` exiting 0.** The artifact is an Xcode
-window with the App target selected; check for that.
+The cause is now pinned to source rather than inferred. `node_modules/@capacitor/cli/dist/ios/open.js`:
+
+```js
+await open(config.ios.nativeXcodeProjDirAbs, { wait: false });
+await wait(3000);
+```
+
+`wait: false` means it never learns the result, and the `3000` is a hardcoded
+constant. **"in 3.00s" is a fixed timer, not a measurement.** There is no
+failure this command is capable of reporting — the ✔, the exit code and the
+duration are all independent of what happened.
+
+Same shape as the Pages `built` status naming an earlier commit, and as
+`caches.open()` creating an empty cache that `in caches.keys()` then reports
+as present. **Do not mark any step done on the strength of `cap open ios`
+exiting 0.**
+
+**What actually fixed it: launch Xcode.app by hand once.** Re-issuing the open
+against an already-running Xcode loaded the project in ~2s. The first-run flow
+swallows the document silently.
+
+**The word "workspace" in that message is wrong here, and the missing
+`App.xcworkspace` is correct.** Capacitor 8 branches on package manager; the
+SPM path opens `App.xcodeproj` while printing the same "workspace" text as the
+CocoaPods path. This project has no CocoaPods, so there is no `.xcworkspace`
+and there should not be one. Do not go looking for it or try to generate one.
+
+**Artifact check, no GUI interaction required:**
+
+```
+osascript -e 'tell application "Xcode" to get name of documents'
+osascript -e 'tell application "Xcode" to get name of active scheme of workspace document 1'
+```
+
+Returned `App.xcodeproj` and `App` [self-tested] 2026-07-28. Empty output means
+nothing opened, whatever the CLI printed.
+
+## Signing preconditions — observed, NOT changed
+
+Read off the tree and the keychain while verifying step 4. **Nothing here was
+modified**; step 5 is Alan's and is gated on the Developer Program decision.
+Recorded so the state before any signing work is on paper [self-tested]
+2026-07-28.
+
+| | Observed |
+|---|---|
+| `CODE_SIGN_STYLE` | `Automatic` (both Debug and Release) |
+| `DEVELOPMENT_TEAM` | **absent — not set at all** in `project.pbxproj` |
+| Codesigning identities | **0 valid identities found** (`security find-identity -v -p codesigning`) |
+| Provisioning profiles | directory `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` **does not exist** |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `io.github.alanfuller15.fieldgold` — matches the fixed app identity |
+| `IPHONEOS_DEPLOYMENT_TARGET` | 15.0 |
+
+The zero identities and absent profiles directory are consistent with no Apple
+ID having been added under Xcode → Settings → Accounts. That is step 5's first
+action, and it is why the scheme currently resolves no run destinations.
 
 ### Untested, and flagged for the first device run
 
@@ -118,6 +177,29 @@ app code, and a difference found here belongs in this file as an open item.
   `ios/` (1.1M) landing in the tree that `test_state_claims.py` copytrees:
   `--mutate claim-none-default` completes in 3.4s and is still caught
   [self-tested] 2026-07-28
+- Xcode 26.6, build 17F113, installed at `/Applications/Xcode.app`;
+  `xcode-select -p` is `/Applications/Xcode.app/Contents/Developer`
+  [self-tested] 2026-07-28
+- Xcode licence agreed; `xcodebuild -version` and `git status` both exit 0.
+  Before acceptance **both refused**, and the `git` refusal presented as
+  `not a git repo` in the SessionStart hook [self-tested] 2026-07-28
+- `npx cap open ios` printed `✔ Opening the Xcode workspace... in 3.00s` and
+  exited 0 **while opening nothing** — Xcode cold-launched to `Welcome to
+  Xcode` with zero documents. The duration is a hardcoded `wait(3000)` after an
+  `open(..., { wait: false })` in `@capacitor/cli/dist/ios/open.js`, so the
+  string is a constant and the exit code carries no information [self-tested]
+  2026-07-28
+- Opening `ios/App/App.xcodeproj` against an already-running Xcode succeeded in
+  ~2s: window `App — App.xcodeproj`, document loaded, active scheme `App`,
+  schemes `App` + `CapApp-SPM`, target `App` → `App.app` [self-tested]
+  2026-07-28
+- Capacitor 8's SPM branch opens `App.xcodeproj`, not `App.xcworkspace`, while
+  printing "workspace" either way. **The absent `App.xcworkspace` is correct** —
+  it is a CocoaPods artifact and this project has none [self-tested] 2026-07-28
+- Signing is untouched and unconfigured: `CODE_SIGN_STYLE` `Automatic` with
+  **no `DEVELOPMENT_TEAM`**, **0 valid codesigning identities**, and **no
+  provisioning profiles directory**. Xcode resolves no valid run destinations
+  for scheme `App` [self-tested] 2026-07-28
 
 ## Decisions made
 
@@ -307,24 +389,28 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-**Install Xcode.** That is the only thing standing between here and a build.
-Runbook steps 2 and 3 are done — Capacitor 8.4.2 is installed, `ios/` is
-scaffolded, `cap sync` copies `docs/` into the bundle correctly. Step 4
-(`cap open ios`) needs an Xcode that is not on this machine, and installing it
-is Alan's action.
+**Runbook step 5 — signing. It is Alan's, and it is the only thing moving.**
 
-**Two things are waiting on Alan, and they are independent:**
+Steps 2, 3 and 4 are done: Capacitor 8.4.2 installed, `ios/` scaffolded,
+`cap sync` copying `docs/` into the bundle correctly, Xcode installed and
+licensed, and the App target open with scheme `App` selected.
 
-1. **Install Xcode** — gates step 4 (open the workspace) and everything after.
-2. **Apple Developer Program vs free 7-day provisioning** — gates step 5
-   (signing) only; see Open decisions. Not yet decided. Do not pick a tier to
-   keep moving.
+Step 5 is two actions, in order, and **both are Alan's**:
 
-Neither block reaches backwards: everything achievable without Xcode and
-without a signing tier has been done and verified. After Xcode is installed,
-the next command is `npx cap open ios`, and the thing to check is that an
-Xcode window actually appears — see the warning above about that command
-exiting 0 regardless.
+1. **Decide Apple Developer Program ($99/yr) vs free 7-day provisioning.** See
+   Open decisions — still undecided. The 7-day expiry means the app dies in the
+   field with no way to re-sign from a riverbank. **Do not pick a tier to keep
+   moving.**
+2. **Add the Apple ID** under Xcode → Settings → Accounts, then App target →
+   Signing & Capabilities → team. Nothing can be signed before this: there are
+   0 codesigning identities on this machine and no provisioning profiles
+   directory, which is also why the scheme resolves no run destinations.
+
+Everything achievable without a signing tier has been done and verified. The
+block does not reach backwards.
+
+**Do not mark "Builds in Xcode" done on the strength of the project being
+open.** No build has been attempted. That row moves when a build runs.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
