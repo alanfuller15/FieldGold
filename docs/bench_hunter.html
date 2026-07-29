@@ -8,6 +8,7 @@
      14 2026-07-28. See the same note in map.html. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Bench Hunter — Little Susitna</title>
+<link rel="stylesheet" href="fieldgold-chrome.css" />
 <style>
   /* Safe-area insets read once into variables so a test can inject them —
      env() cannot be overridden and computes to 0 in every desktop browser, so
@@ -36,7 +37,7 @@
     color:var(--ink);
     font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
     line-height:1.5;
-    padding:var(--sa-top,0px) var(--sa-right,0px) calc(4rem + var(--sa-bottom,0px)) var(--sa-left,0px);
+    padding:var(--sa-top,0px) var(--sa-right,0px) calc(4rem + var(--sa-bottom,0px) + var(--fg-chrome-h,48px)) var(--sa-left,0px);
     background-image:
       repeating-linear-gradient(0deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px),
       repeating-linear-gradient(90deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px);
@@ -407,5 +408,8 @@ document.getElementById('f').addEventListener('change',e=>{
 })();
 
 </script>
+<nav class="fg-chrome" aria-label="FieldGold navigation">
+  <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+</nav>
 </body>
 </html>

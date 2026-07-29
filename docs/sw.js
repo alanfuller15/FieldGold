@@ -12,6 +12,17 @@
 // Green on one distribution is not evidence about the other, and a bumped
 // version with no rebuild ships the fix to browsers and to nobody's phone.
 //
+// v8 (2026-07-29): the three internal links navigate in the webview, and
+// every page they reach carries a way back. A v7 phone taps the Gold map
+// card and NOTHING happens — target="_blank" routes to Capacitor's popup
+// delegate, which hands a capacitor:// URL to UIApplication.shared.open()
+// and returns nil; iOS refuses the scheme. map.html is referenced exactly
+// once in index.html, by that anchor, so the only field map screen is
+// unreachable from the app UI. Adds fieldgold-chrome.css to SHELL: without
+// it a cold-cache install has an unstyled back bar, which is the one
+// control that must not fail. The nine https:// target="_blank" links are
+// untouched and must stay that way — they work BECAUSE of the attribute.
+//
 // v7 (2026-07-29): safe-area insets. index.html, map.html, bench_hunter.html
 // and creek_manual.html gain viewport-fit=cover; the four --sa-* variables read
 // env() once so the CSS is testable; #panel, the Leaflet control containers,
@@ -118,7 +129,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v7';
+const CACHE = 'fieldgold-v8';
 
 const SHELL = [
   './',
@@ -129,6 +140,7 @@ const SHELL = [
   './load_rem_benches.html',
   './manifest.json',
   './fieldgold-data.js',
+  './fieldgold-chrome.css',
   // Vendored Leaflet — see vendor/leaflet/PROVENANCE.md. The images are not
   // optional: leaflet.css references them by relative path, and without them
   // the default marker renders as a broken image. A marker you cannot see, on

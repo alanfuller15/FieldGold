@@ -15,6 +15,7 @@
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
 <title>FieldGold — Map</title>
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="fieldgold-chrome.css" />
 <style>
   /* THE SAFE-AREA INSETS, ROUTED THROUGH CUSTOM PROPERTIES ON PURPOSE.
      env() cannot be overridden and always computes to 0 in a desktop browser,
@@ -38,7 +39,10 @@
      vendored bytes are hash-verified against an independent publisher and must
      not be edited. */
   .leaflet-top{margin-top:var(--sa-top,0px);}
-  .leaflet-bottom{margin-bottom:var(--sa-bottom,0px);}
+  /* Attribution and any bottom control clear the chrome bar as well as the
+     home indicator, or the bar covers the OpenStreetMap/Esri attribution —
+     which is a licence condition, not decoration. */
+  .leaflet-bottom{margin-bottom:calc(var(--sa-bottom,0px) + var(--fg-chrome-h,48px));}
   .leaflet-left{margin-left:var(--sa-left,0px);}
   .leaflet-right{margin-right:var(--sa-right,0px);}
   /* z-index 1200, not 1000. Leaflet's own .leaflet-top/.leaflet-bottom containers
@@ -64,7 +68,7 @@
     /* The insets come out of the available height too, or pushing the panel
        down by --sa-top just pushes its lower edge off the bottom of the screen
        and re-creates the unreachable tail at the other end. */
-    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--sa-bottom,0px));overflow-y:auto;
+    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--sa-bottom,0px) - var(--fg-chrome-h,48px));overflow-y:auto;
     overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
     /* border-box, or max-height clamps the CONTENT box and the panel still
        overruns a short window by padding + border. Measured at 1280x620: 624px
@@ -87,7 +91,10 @@
     /* Full-bleed to the screen edges, but the CONTENT is inset. Padding rather
        than a smaller box, so the sheet's background still runs under the status
        bar instead of leaving a strip of map showing through it. */
-    #panel:not(.collapsed){left:0;right:0;top:0;bottom:0;max-height:none;
+    /* bottom stops at the chrome bar rather than 0. The sheet ending ABOVE the
+       bar is what makes the bar incapable of covering warning text — the
+       failure a floating back button would have reintroduced. */
+    #panel:not(.collapsed){left:0;right:0;top:0;bottom:calc(var(--fg-chrome-h,48px) + var(--sa-bottom,0px));max-height:none;
       border:0;border-radius:0;background:#1E1A13;
       padding:11px calc(13px + var(--sa-right,0px))
               calc(30px + var(--sa-bottom,0px)) calc(13px + var(--sa-left,0px));}
@@ -872,5 +879,8 @@ window.addEventListener('load',()=>{
 
 });
 </script>
+<nav class="fg-chrome" aria-label="FieldGold navigation">
+  <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+</nav>
 </body>
 </html>

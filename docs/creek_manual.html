@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Reading Fishhook Creek — Field Manual</title>
+<link rel="stylesheet" href="fieldgold-chrome.css" />
 <style>
   /* Safe-area insets read once into variables so a test can inject them —
      env() cannot be overridden and computes to 0 in every desktop browser, so
@@ -34,7 +35,7 @@ body{
   background:var(--bg); color:var(--ink); line-height:1.6;
   -webkit-font-smoothing:antialiased;
   max-width:760px; margin:0 auto;
-  padding:var(--sa-top,0px) calc(20px + var(--sa-right,0px)) calc(80px + var(--sa-bottom,0px)) calc(20px + var(--sa-left,0px));
+  padding:var(--sa-top,0px) calc(20px + var(--sa-right,0px)) calc(80px + var(--sa-bottom,0px) + var(--fg-chrome-h,48px)) calc(20px + var(--sa-left,0px));
 }
 .mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
 
@@ -445,5 +446,8 @@ figcaption b{color:var(--gold-bright);font-weight:700;}
   Research aid only — always verify claim status with BLM before working any ground.
 </div>
 
+<nav class="fg-chrome" aria-label="FieldGold navigation">
+  <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+</nav>
 </body>
 </html>

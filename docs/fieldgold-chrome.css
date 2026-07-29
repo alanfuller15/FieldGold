@@ -1,0 +1,100 @@
+/* FieldGold shared page chrome — the bottom bar carried by every tool page.
+ *
+ * WHY THIS EXISTS AT ALL.
+ *
+ * `target="_blank"` is dead under Capacitor. The popup delegate hands the URL
+ * to `UIApplication.shared.open()` and returns nil; iOS refuses a
+ * `capacitor://` scheme (LSApplicationWorkspaceErrorDomain 115, against exit 0
+ * for an `https://` control), so the tap does nothing at all — no navigation,
+ * no error, nothing on screen to distinguish it from a missed tap. `map.html`
+ * was referenced exactly once in `index.html`, by that dead anchor, so the
+ * primary field tool was UNREACHABLE from the app's UI on a phone.
+ *
+ * The fix is a same-origin navigation inside the webview, which never enters
+ * `webView:createWebViewWithConfiguration:`. That works — demonstrated on the
+ * device before it was written. But it replaces the browser's second tab with
+ * a one-way trip: the launcher is gone and there is nothing to go back to.
+ *
+ * NOTHING PROVIDES A BACK GESTURE HERE. WKWebView's
+ * `allowsBackForwardNavigationGestures` is off by default and Capacitor never
+ * sets it — the string appears nowhere in `node_modules/`, and 8.4.2's
+ * CAPBridgeViewController configures five other webview properties and not that
+ * one. Enabling it needs native Swift or a third-party plugin, both out of
+ * scope. So the back affordance has to be in the DOM.
+ *
+ * WHY THE BOTTOM, WHICH IS NOT A PREFERENCE.
+ *
+ * The known instrument blind spot is native chrome composited above a
+ * full-bleed webview, and native chrome is at the TOP. `elementFromPoint`
+ * reported map.html's panel toggle as reachable on a control no finger could
+ * press — twice, on two installs, one virgin. A bottom control's only native
+ * neighbour is the home indicator, which is a padding problem rather than a
+ * hit-testing one. The bottom is therefore where an automated assertion can
+ * establish reachability at all; the top is where it can only appear to.
+ *
+ * WHY A FULL-WIDTH BAR AND NOT A FLOATING PILL.
+ *
+ * At <=600px map.html's expanded panel is a full-screen sheet. A floating
+ * control would sit on top of land-status warning text — reintroducing "layout
+ * is a way of deleting text" in a new place. A bar cannot overlap, because the
+ * pages end their content above it instead of scrolling under it.
+ *
+ * WHY STATIC MARKUP AND A STYLESHEET RATHER THAN A SCRIPT.
+ *
+ * A page that throws is exactly when you need to leave it, so the one control
+ * that must never fail does not depend on JS. `creek_manual.html` loads no
+ * JavaScript at all and still does.
+ *
+ * THIS IS THE ROUTER'S SEAM. When Phase 1's consolidation lands, this bar is
+ * what becomes the navigation — same position, same shape and the same
+ * safe-area handling as index.html's existing `.tabbar`, which is the app's
+ * established idiom for exactly this job. The three back links collapse into it
+ * rather than being unpicked.
+ */
+
+:root{
+  /* Duplicated from the pages on purpose: identical declarations are
+     order-independent, and this stylesheet must not depend on being linked
+     before or after a page's own <style>. */
+  --sa-top:env(safe-area-inset-top,0px);
+  --sa-right:env(safe-area-inset-right,0px);
+  --sa-bottom:env(safe-area-inset-bottom,0px);
+  --sa-left:env(safe-area-inset-left,0px);
+  /* Page content subtracts this so nothing renders under the bar. Changing it
+     here changes it everywhere, which is the point of the file. */
+  --fg-chrome-h:48px;
+}
+
+.fg-chrome{
+  position:fixed;left:0;right:0;bottom:0;
+  /* Above map.html's #panel (1200) and Leaflet's control containers (1000).
+     The way out of a page must not be something another layer can cover. */
+  z-index:1500;
+  display:flex;align-items:center;gap:10px;
+  min-height:var(--fg-chrome-h);
+  box-sizing:content-box;
+  background:#1E1A13;
+  /* The hairline is a box-shadow, not a border-top, and that is a layout
+     decision rather than a style one. Pages reserve exactly
+     --fg-chrome-h + --sa-bottom of space for this bar; a 1px border adds to the
+     box and the bar grew past its own reservation, overlapping map.html's panel
+     by exactly 1px — caught by the assertion that the panel must end above the
+     bar. A shadow paints the same line and contributes nothing to layout, so
+     the reservation stays exact. */
+  box-shadow:0 -1px 0 #4A3F2D;
+  /* The bottom inset is padding, not margin, so the bar's own background fills
+     the home-indicator strip rather than leaving the page showing through. */
+  padding:0 calc(12px + var(--sa-right,0px)) var(--sa-bottom,0px) calc(12px + var(--sa-left,0px));
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.fg-back{
+  display:inline-flex;align-items:center;gap:7px;
+  /* 44x44 is Apple's minimum tap target. This control is the whole reason the
+     bar exists; it does not get to be fiddly. */
+  min-height:44px;min-width:44px;padding:0 10px;
+  color:#E8C04A;text-decoration:none;font-size:.9rem;font-weight:600;
+  border-radius:8px;
+}
+.fg-back:active{background:#2C2619;}
+.fg-back .fg-chev{font-size:1.1rem;line-height:1;}

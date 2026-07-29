@@ -2788,7 +2788,23 @@ function openTools() {
       Your companion instruments. Each opens in its own view; your logged sites travel to the map automatically.
     </p>
 
-    <a class="card tappable" href="map.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:10px;">
+    <!-- NO target="_blank" on these three, and the omission is the fix.
+         Under Capacitor target="_blank" routes to the popup delegate, which
+         calls UIApplication.shared.open() on a capacitor:// URL and returns
+         nil. iOS refuses that scheme, so the tap did NOTHING — no navigation,
+         no error, nothing to distinguish it from a missed tap. map.html was
+         referenced exactly once in this file, by that anchor, so the primary
+         field tool was unreachable from the app UI on a phone.
+         DO NOT "fix" the other nine target="_blank" links in this file. They
+         are https:// and they WORK because of it — established on the device
+         by a control test on the same anchor pattern, same delegate, same
+         gesture. Two of the nine build their href from data at runtime, so
+         no static rule about relative hrefs is safe either: fix links here by
+         href, one at a time, and never by the attribute.
+         NOTE FOR EDITORS: this comment is inside a JS template literal. Do not
+         write a dollar-brace sequence in it — it interpolates, and it threw a
+         ReferenceError out of openTools() when this note first said so. -->
+    <a class="card tappable" href="map.html" style="display:block;text-decoration:none;margin-bottom:10px;">
       <div class="row between">
         <div class="row" style="gap:12px;">
           <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--gold-faint);color:var(--gold-bright);display:flex;align-items:center;justify-content:center;">
@@ -2803,7 +2819,23 @@ function openTools() {
       </div>
     </a>
 
-    <a class="card tappable" href="bench_hunter.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:10px;">
+    <!-- NO target="_blank" on these three, and the omission is the fix.
+         Under Capacitor target="_blank" routes to the popup delegate, which
+         calls UIApplication.shared.open() on a capacitor:// URL and returns
+         nil. iOS refuses that scheme, so the tap did NOTHING — no navigation,
+         no error, nothing to distinguish it from a missed tap. map.html was
+         referenced exactly once in this file, by that anchor, so the primary
+         field tool was unreachable from the app UI on a phone.
+         DO NOT "fix" the other nine target="_blank" links in this file. They
+         are https:// and they WORK because of it — established on the device
+         by a control test on the same anchor pattern, same delegate, same
+         gesture. Two of the nine build their href from data at runtime, so
+         no static rule about relative hrefs is safe either: fix links here by
+         href, one at a time, and never by the attribute.
+         NOTE FOR EDITORS: this comment is inside a JS template literal. Do not
+         write a dollar-brace sequence in it — it interpolates, and it threw a
+         ReferenceError out of openTools() when this note first said so. -->
+    <a class="card tappable" href="bench_hunter.html" style="display:block;text-decoration:none;margin-bottom:10px;">
       <div class="row between">
         <div class="row" style="gap:12px;">
           <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--bg-subtle);color:var(--amber);display:flex;align-items:center;justify-content:center;">
@@ -2818,7 +2850,23 @@ function openTools() {
       </div>
     </a>
 
-    <a class="card tappable" href="creek_manual.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:6px;">
+    <!-- NO target="_blank" on these three, and the omission is the fix.
+         Under Capacitor target="_blank" routes to the popup delegate, which
+         calls UIApplication.shared.open() on a capacitor:// URL and returns
+         nil. iOS refuses that scheme, so the tap did NOTHING — no navigation,
+         no error, nothing to distinguish it from a missed tap. map.html was
+         referenced exactly once in this file, by that anchor, so the primary
+         field tool was unreachable from the app UI on a phone.
+         DO NOT "fix" the other nine target="_blank" links in this file. They
+         are https:// and they WORK because of it — established on the device
+         by a control test on the same anchor pattern, same delegate, same
+         gesture. Two of the nine build their href from data at runtime, so
+         no static rule about relative hrefs is safe either: fix links here by
+         href, one at a time, and never by the attribute.
+         NOTE FOR EDITORS: this comment is inside a JS template literal. Do not
+         write a dollar-brace sequence in it — it interpolates, and it threw a
+         ReferenceError out of openTools() when this note first said so. -->
+    <a class="card tappable" href="creek_manual.html" style="display:block;text-decoration:none;margin-bottom:6px;">
       <div class="row between">
         <div class="row" style="gap:12px;">
           <div style="width:38px;height:38px;border-radius:9px;flex-shrink:0;background:var(--bg-subtle);color:var(--blue);display:flex;align-items:center;justify-content:center;">
