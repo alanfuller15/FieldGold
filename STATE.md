@@ -1318,7 +1318,38 @@ means **migrating live data**, which is the operation ground rule 3 protects mos
 heavily. It is cheap with one region and expensive with any other number — and
 Phase 2 is the last moment it is cheap, because Phase 2 is the migration.
 
-### Does FieldGold stay a dual-distribution app?
+### Does FieldGold stay a dual-distribution app? — DECIDED 2026-07-29
+
+> **DECIDED by Alan, 2026-07-29, as decision D8 of the Phase 1 rescope: it stays
+> dual, and the two are not equal partners.**
+>
+> **"Web is the primary distribution; native is the field build. A stranger
+> receives a URL. Native exists for what a browser cannot do — background GPS,
+> offline tiles at volume, storage that survives eviction."**
+>
+> Three consequences Alan stated with it, recorded because they decide work
+> rather than describe it:
+>
+> 1. **The consolidation is FIRST a fix to the web app and second a shell
+>    improvement.** Phase 1 was scoped from three shell divergences; that is no
+>    longer the ordering principle.
+> 2. **Feature divergence between the two must be visible to the user rather
+>    than silent.** This is the same standard the bundle/Pages item set for
+>    trees — enumerated and tested divergence — now extended to *features*. A
+>    capability the web build does not have is something the web build says.
+> 3. **The answer to "two storage paths or abandon the web version" is: two
+>    paths.** So Phase 2's SQLite is a native capability, not a replacement of
+>    the storage layer, and the browser path keeps working. What that costs is
+>    the standing tax recorded below, now accepted rather than open.
+>
+> **What this does NOT settle:** how the two paths are kept from diverging
+> silently in *data*, which is the Phase 2 schema question. The three sharpeners
+> below still hold and are still the sharp part; sharpener 1's question — "what
+> is the web version FOR" — is now answered, and answered in the web version's
+> favour.
+
+*Original framing retained below unedited, because it is the reasoning the
+decision was made against.*
 
 **Filed 2026-07-29. UNDECIDED — Alan's to make. No recommendation is recorded
 here on purpose.**
