@@ -27,6 +27,14 @@ sections at the end of this file.
 `e7534e4`). Goal met: FieldGold launches from a real app icon on Alan's iPhone,
 with zero changes to app code.
 
+> **PR #6 IS OPEN AND MUST NOT BE MERGED.** Phase 1 items A, B, C and D are
+> written on `phase-1-shell-divergences` and pushed —
+> https://github.com/alanfuller15/FieldGold/pull/6 — **awaiting Alan's review.
+> Do not merge it, and do not push further commits to that branch without
+> saying so.** Everything in it is `[self-tested]`; the device pass has not
+> happened. See "Phase 1 — A, B, C and D are written" below for what only the
+> phone can settle.
+
 **Next phase: Phase 1 — and its scope is not what it was filed as.** The device
 run found three silent Pages/shell divergences, two of which make the app
 unusable rather than untidy. Read "The class is now confirmed three times over"
@@ -1047,8 +1055,9 @@ does not require a cache version bump.
 
 ## Phase 1 — A, B, C and D are written. NONE is device-verified.
 
-**Branch `phase-1-shell-divergences`, 2026-07-29, five commits, all 13 suites
-green at 563 assertions and 81 mutants.** Every claim below is `[self-tested]`.
+**Branch `phase-1-shell-divergences`, 2026-07-29, seven commits, pushed, open as
+PR #6 and awaiting review — DO NOT MERGE.** All 13 suites green at 570
+assertions and 83 mutants. Every claim below is `[self-tested]`.
 **The two that decide whether this app works in terrain — can a finger open the
 map, can a finger press the controls — cannot be produced on this machine and
 are outstanding.**
