@@ -11,10 +11,16 @@ a broken button: the primary field tool cannot be opened at all)
 
 ## Active phase
 
-**Phase 0 — Capacitor shell**
+**Phase 0 — Capacitor shell — COMPLETE 2026-07-28** (PR #4, `main` at
+`e7534e4`). Goal met: FieldGold launches from a real app icon on Alan's iPhone,
+with zero changes to app code.
 
-Goal: FieldGold launches from a real app icon on Alan's iPhone, with zero
-changes to app code.
+**Next phase: Phase 1 — and its scope is not what it was filed as.** The device
+run found three silent Pages/shell divergences, two of which make the app
+unusable rather than untidy. Read "The class is now confirmed three times over"
+and the device residue at the end of this file before planning it. Do not start
+Phase 1 work without reading the two constraints on its fixes recorded there —
+both are the kind a confident fix gets wrong.
 
 ## Status
 
@@ -1252,3 +1258,199 @@ the clean build and confirm the diagnostic is absent from the installed bundle.
 `docs/` is never touched. Note also that a project hook blocks the Write tool
 outside the repo — Alan authorised the scratchpad write explicitly, which is the
 remedy the hook itself names.
+
+## Session residue — 2026-07-28, DEVICE run
+
+**Phase 0 is complete and merged (PR #4, `main` at `e7534e4`). Nothing was in
+flight when this session ended.** The tree is clean, `main` is in sync, all 12
+suites pass, and the step-5 commit that had been deferred through two PRs has
+landed. This section is the reasoning behind the device findings, which is not
+recoverable from the findings themselves. Nothing here repeats a conclusion.
+
+### The Web Inspector method — and the check that made it more than a plausible idea
+
+**Every device page measurement in this file was taken against the SHIPPING
+bundle** — Safari Web Inspector over USB, attached to the installed,
+unmodified app. No instrumented copy, no re-sign, no reinstall, nothing written
+to `docs/`. **This removes the caveat every simulator finding had to carry**
+("these numbers came from an instrumented copy, not from the shipping bundle
+reporting on itself"). Prefer this route over the instrumented-copy method
+recorded above whenever a device is attached; that method is now the fallback,
+not the default.
+
+**It was nearly not available, and the check that established it is the part
+worth keeping.** Capacitor sets `webView.isInspectable = isWebDebuggable`, and
+`isWebDebuggable` comes from `#if DEBUG` in `CAPInstanceDescriptor.swift`. The
+tempting inference — "we built Debug, so DEBUG is set" — is **wrong**.
+Capacitor ships as a **`binaryTarget` xcframework**: our build compiled **0**
+Capacitor Swift files and passed it no `-D DEBUG`, so that `#if` was resolved
+when Ionic built the framework, not by our configuration. The code has a
+fallback for exactly this case (its own comment says "this is needed for SPM
+xcframework Capacitor"): a `CAPACITOR_DEBUG` Info.plist key. The **built**
+`Info.plist` carries `CAPACITOR_DEBUG = true`, so inspection works.
+
+That check took one command and is the difference between proposing something
+grounded and proposing something plausible. **If a future Capacitor upgrade
+moves to a source-based SPM package, or a Release build is used, re-run it
+before assuming the inspector will attach.**
+
+**The route onto `map.html` matters as much as the inspector.** Once the UI
+route proved dead, the panel could only be reached by typing
+`location.href = 'map.html'` in the console. That is a **same-origin navigation
+inside the webview**, which never enters
+`webView:createWebViewWithConfiguration:` and so never hands a `capacitor://`
+URL to `UIApplication.shared.open`. It is both the measurement route and,
+incidentally, the proof of Phase 1's fix.
+
+### The measurement route and the user's route were not the same route
+
+**This is the finding that would have been missed by trusting the numbers.**
+
+Snippet C reports `FAILS 0` — every one of 291 sample points reachable. Read
+alone, that says the panel is fine. It is not. The snippet could only measure
+the panel because it does `panel.classList.remove('collapsed')`
+**programmatically** — sidestepping the exact toggle that a finger cannot reach,
+because that toggle sits under the status bar. The panel auto-collapses at phone
+width, so the user's first sight of the map is a collapsed panel with an
+unpressable control.
+
+**A green measurement obtained by a route the user does not have is not a green
+user experience.** The clean number and the broken experience are both true, and
+they are about different things: the text is reachable *given* an open panel,
+and the user cannot open the panel. Alan's report of what he could not tap is
+what caught this; no automated measurement in this session would have.
+
+This is the same family as the existing `no-overflow` mutant note — `scrollTop`
+succeeding on an `overflow-y:hidden` element proves text is *programmatically
+addressable*, not that a finger can get to it. Here the identical trap appeared
+one level up, on the control rather than the content.
+
+### Two wrong hypotheses in the same direction — the instrument lesson
+
+This file recorded **two** explanations for `security find-identity` reporting
+0 identities: first "no Apple ID has been added", then "Xcode 26 stores keys in
+the data-protection keychain, so `find-identity` is the wrong instrument". Both
+were wrong, and **wrong in the same direction — each assumed the tool was
+looking in the wrong place.**
+
+It was reporting the literal truth. The certificates had been issued to a
+**different machine** and their private keys never existed on this one. An
+identity is a certificate plus its private key; there were no identities.
+
+**The inverse of the family this project already knows.** `cap open ios` exiting
+0, a Pages `built` status naming an earlier commit, `caches.open()` creating an
+empty cache that `in caches.keys()` reports as present — all tools reporting
+**success** that meant nothing. This was a tool reporting **failure** that meant
+exactly what it said, and it was disbelieved for a whole session.
+
+The cheap check that would have settled it: `find-identity -v` **without**
+`-p codesigning` returns 0 across *all* policies, which no keychain-location
+story explains. **Check an instrument's claim against a second source before
+concluding the instrument is broken.**
+
+### An early gate hides every later one
+
+Developer Mode gates **destination resolution**, which runs *before*
+provisioning. With it disabled, `xcodebuild` exits **70** on "Timed out waiting
+for all destinations" and **no signing error is ever produced** — the device is
+listed with `error:Developer Mode disabled` and nothing about certificates or
+profiles is evaluated.
+
+That is the same shape as `GatherProvisioningInputs` running before code
+signing, which is precisely why the certificate problem stayed invisible for an
+entire session: the build kept failing on the profile, so the certificate never
+got a chance to fail. **Three stages, each masking the next.** When a pipeline
+has ordered gates, a failure at stage N tells you nothing about stages N+1
+onward — and "we fixed the thing it complained about" can be true three times
+before the real problem surfaces.
+
+### Constraints that forced the method — named so they do not read as choices
+
+- **The device delegate could not be watched from the Mac.** `log stream` in
+  this macOS build has **no `--device-udid`** option, and `idevicesyslog`,
+  `ideviceinfo` and `ios-deploy` are all absent. So the plan to observe the
+  `capacitor://` open attempt live was abandoned — not rejected on merit.
+- **`devicectl` has no `openurl` verb.** The `simctl openurl` split-the-chain
+  trick that answered this question on the simulator has **no device analogue**.
+  What replaced it was the `https://` control test through the *same* anchor
+  pattern and delegate — which is arguably better evidence, since it varies only
+  the scheme, but it was chosen under constraint.
+- **Alan's finger was the only available HID.** Accessibility for Terminal
+  remains ungranted, for the reason recorded in the simulator residue: the
+  toggle typically requires quitting Terminal, which ends the Claude Code
+  session. Unchanged, and it did not need to change.
+- **A project hook blocks the `Write` tool outside the repo.** A helper script
+  for the log capture was blocked; the work was done with inline `bash -c`
+  instead. No scratchpad authorisation was needed this session.
+- **macOS has no `timeout`**, and zsh mangled a compound backgrounded command
+  (`log ... & sleep; kill` → "too many arguments"). `bash -c '...'` gives
+  predictable parsing for that shape.
+
+### Small traps that cost time here and will cost it again
+
+- **`devicectl device info processes` lists by executable path, and this app's
+  executable is named `App`, not `FieldGold`.** Grepping the process list for
+  the app name or bundle id finds **nothing on a perfectly healthy running
+  app**, which reads exactly like a crash on launch. Grep the **bundle UUID**
+  that `install` printed instead — here `57A8A239-…`.
+- **`devicectl`'s `install` and `process launch` both print success messages
+  that are the command reporting on itself.** Confirm with
+  `device info apps --bundle-id …` and `device info processes`. Both were used
+  here and both are cheap.
+- **A `leaflet.js.map` console error appears under the inspector.** It is a
+  source map requested only by the attached debugger, not fetched by the app.
+  Not a bundle defect; ignore it.
+
+### The measurements' bounds
+
+One device, one orientation, one OS. **iPhone 14 (`iPhone14,7`), iOS 26.5.2,
+portrait, 390x844 at dpr 3, Debug build.** The 47px top inset is a notch
+figure — a Dynamic Island device reads 59px, and the simulator work was done on
+an iPhone 17 Pro, so the two sets of numbers are not directly comparable.
+**Landscape was never measured**, and landscape is where left/right insets
+appear; the panel's behaviour there is unknown.
+
+### Threads deliberately not pulled
+
+- **Offline behaviour — still the most field-relevant untested thing about this
+  app, and now untested on *three* targets.** Both the Mac and the phone had
+  network throughout, so `map.html` drew its basemap tiles and the
+  "basemap tiles unavailable — no signal" path **has never run anywhere**. With
+  `sw.js` inert in the shell, the shell's entire offline story rests on
+  bundle-local assets and **has never been observed**. This is testable without
+  any new hardware — put the phone in Airplane Mode with the inspector attached.
+  It was left purely for scope, twice now.
+- **The stage maps still have not been opened on any target.** "Present in the
+  bundle" remains the only thing verified about them under Capacitor.
+- **The nine working `https://` links were not individually exercised** — one
+  YouTube link was tapped as the control. The other eight are inferred from the
+  same mechanism.
+- **`tests/test_panel_reachability.py` was not extended to simulate Capacitor's
+  insets.** It is the obvious durable tripwire and belongs in Phase 1. Note it
+  can only ever be a simulation — it cannot produce an `[externally-verified]`
+  result, so it complements the device measurement rather than replacing it.
+
+### Two constraints on Phase 1's fixes, both established by measurement
+
+Recorded here because both are the kind of thing a confident fix gets wrong.
+
+1. **Do not blanket-strip `target="_blank"`.** Of the 12 in `index.html`, only
+   **3** are internal and dead. The other **9** are `https://` and work
+   *because* of it — stripping them would break nine working links to fix three
+   broken ones. Fix the three by href, not the attribute globally.
+2. **`viewport-fit=cover` must land before any `env()` padding.** Without it
+   `env(safe-area-inset-*)` computes to `0`, so a `padding-top:
+   env(safe-area-inset-top)` fix would ship, look correct in the diff, pass in
+   every desktop browser, and change **nothing** on the phone.
+
+### Next action
+
+**Start Phase 1, and start it with the three shell divergences rather than with
+consolidation.** In hand: `map.html` is unreachable (fix the 3 internal hrefs,
+not the attribute); the map's controls are under the status bar
+(`viewport-fit=cover` first, then insets); `sw.js` is inert in the shell so
+updates arrive only via `npx cap sync` + rebuild. Nothing is blocked — the
+device, the cable, the signing and the inspector route all work. The one thing
+worth doing *before* writing any fix is the offline test above, because it is
+cheap, it needs no new hardware, and it is the last unmeasured thing that
+decides whether this app functions where it is actually used.
