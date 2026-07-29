@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover must be present or iOS resolves every
+     env(safe-area-inset-*) to 0px while a 47px notch physically exists, and
+     any inset padding below ships as a silent no-op. Measured on the iPhone
+     14 2026-07-28. See the same note in map.html. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Bench Hunter — Little Susitna</title>
 <style>
+  /* Safe-area insets read once into variables so a test can inject them —
+     env() cannot be overridden and computes to 0 in every desktop browser, so
+     CSS written against it directly is untestable. Same block as index.html
+     and map.html; the comment there carries the measurement. */
+  :root{--sa-top:env(safe-area-inset-top,0px);--sa-right:env(safe-area-inset-right,0px);
+        --sa-bottom:env(safe-area-inset-bottom,0px);--sa-left:env(safe-area-inset-left,0px);}
+
   :root{
     --paper:#EDE8DC;
     --paper-2:#E3DCCB;
@@ -25,7 +36,7 @@
     color:var(--ink);
     font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
     line-height:1.5;
-    padding:0 0 4rem;
+    padding:var(--sa-top,0px) var(--sa-right,0px) calc(4rem + var(--sa-bottom,0px)) var(--sa-left,0px);
     background-image:
       repeating-linear-gradient(0deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px),
       repeating-linear-gradient(90deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px);

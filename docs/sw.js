@@ -12,6 +12,18 @@
 // Green on one distribution is not evidence about the other, and a bumped
 // version with no rebuild ships the fix to browsers and to nobody's phone.
 //
+// v7 (2026-07-29): safe-area insets. index.html, map.html, bench_hunter.html
+// and creek_manual.html gain viewport-fit=cover; the four --sa-* variables read
+// env() once so the CSS is testable; #panel, the Leaflet control containers,
+// the launcher header and the two document pages carry the insets. A v6 phone
+// paints the map's panel and Leaflet's zoom/layers controls UNDER the status
+// bar: the collapse toggle measured [22,24,153,19] on an iPhone 14, spanning
+// y=22..41 inside a 47px strip, and the panel auto-collapses at phone width, so
+// the first sight of the map is a collapsed panel whose only control cannot be
+// pressed. Confirmed by finger on two installs, one virgin. Note the ordering —
+// viewport-fit=cover has to land first or every env() resolves to 0 and the
+// padding is a no-op that looks correct in the diff.
+//
 // v6 (2026-07-28): map.html only — layers report from tile outcomes instead of
 // from Leaflet's `load` event. A v5 phone shows a green ✓ for every tile layer
 // that fetched NOTHING: measured on the device with the radios off as
@@ -106,7 +118,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v6';
+const CACHE = 'fieldgold-v7';
 
 const SHELL = [
   './',

@@ -2,15 +2,45 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!-- viewport-fit=cover is NOT cosmetic and NOT optional. Without it iOS resolves
+     every env(safe-area-inset-*) to 0px while a 47px notch physically exists —
+     measured on the iPhone 14 2026-07-28 against the shipping bundle. So a fix
+     that adds padding-top: env(safe-area-inset-top) WITHOUT this ships, looks
+     correct in the diff, passes in every desktop browser, and changes nothing at
+     all on the phone. This attribute has to land first or the padding below is a
+     no-op. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
 <title>FieldGold — Map</title>
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <style>
+  /* THE SAFE-AREA INSETS, ROUTED THROUGH CUSTOM PROPERTIES ON PURPOSE.
+     env() cannot be overridden and always computes to 0 in a desktop browser,
+     so CSS written against env() directly is untestable: every assertion about
+     it passes for the wrong reason. Reading env() once into a variable makes
+     the inset injectable — tests/test_panel_reachability.py sets --sa-top to a
+     real device figure and re-runs its reachability walk against it.
+     That is a SIMULATION and can never produce an [externally-verified]
+     result; it complements the device measurement rather than replacing it.
+     Fallbacks appear in both places because a browser without env() support
+     would otherwise make the whole declaration invalid at computed-value time
+     and take var() down with it. */
+  :root{--sa-top:env(safe-area-inset-top,0px);--sa-right:env(safe-area-inset-right,0px);
+        --sa-bottom:env(safe-area-inset-bottom,0px);--sa-left:env(safe-area-inset-left,0px);}
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
+  /* Leaflet's control containers anchor to the edges of #map, which is the full
+     bleed viewport, so the zoom and layers controls render UNDER the status bar
+     on a phone. Alan could not press either of them on the device 2026-07-28.
+     Shifted by the inset here rather than in vendor/leaflet/leaflet.css — the
+     vendored bytes are hash-verified against an independent publisher and must
+     not be edited. */
+  .leaflet-top{margin-top:var(--sa-top,0px);}
+  .leaflet-bottom{margin-bottom:var(--sa-bottom,0px);}
+  .leaflet-left{margin-left:var(--sa-left,0px);}
+  .leaflet-right{margin-right:var(--sa-right,0px);}
   /* z-index 1200, not 1000. Leaflet's own .leaflet-top/.leaflet-bottom containers
      are z-index:1000 (see vendor/leaflet/leaflet.css) — the 800 on .leaflet-control
      only orders controls WITHIN those containers. At 1000 the panel tied with them,
@@ -19,13 +49,22 @@
      2026-07-26 at 390x664: 21 sample points inside warning text were covered by a
      control. Rules 4 and 5 say those notices are the point; a notice you cannot
      read is a notice that was removed. */
-  #panel{position:absolute;z-index:1200;top:10px;left:10px;background:rgba(30,26,19,.95);
+  /* top/left carry the inset. The COLLAPSED panel is the case that matters: at
+     top:10px its h1 toggle measured [22,24,153,19] on the iPhone 14 — spanning
+     y=22..41, entirely inside the 47px status bar — and the panel auto-collapses
+     at phone width, so the first thing a user saw on the map was a collapsed
+     panel whose only control could not be pressed. Confirmed by finger on two
+     separate installs, including a virgin one, so it is not state-dependent. */
+  #panel{position:absolute;z-index:1200;top:calc(10px + var(--sa-top,0px));left:calc(10px + var(--sa-left,0px));background:rgba(30,26,19,.95);
     border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;
     /* The panel is taller than the viewport and #map fills the screen, so the body
        never scrolled. Everything below the fold was physically unreachable: measured
        102 of 256 warning-text sample points on a 390x664 phone, 118 of 250 on a
        375x553 one. The panel scrolls itself now. */
-    max-height:calc(100vh - 20px);overflow-y:auto;
+    /* The insets come out of the available height too, or pushing the panel
+       down by --sa-top just pushes its lower edge off the bottom of the screen
+       and re-creates the unreachable tail at the other end. */
+    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--sa-bottom,0px));overflow-y:auto;
     overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
     /* border-box, or max-height clamps the CONTENT box and the panel still
        overruns a short window by padding + border. Measured at 1280x620: 624px
@@ -45,11 +84,31 @@
        already covering most of the map, just badly, with the controls punching
        through it. Make it deliberate: a full-screen scrollable sheet. Collapsing it
        (tap the title) gives the whole map and every control back. */
+    /* Full-bleed to the screen edges, but the CONTENT is inset. Padding rather
+       than a smaller box, so the sheet's background still runs under the status
+       bar instead of leaving a strip of map showing through it. */
     #panel:not(.collapsed){left:0;right:0;top:0;bottom:0;max-height:none;
-      border:0;border-radius:0;background:#1E1A13;padding:11px 13px 30px;}
+      border:0;border-radius:0;background:#1E1A13;
+      padding:11px calc(13px + var(--sa-right,0px))
+              calc(30px + var(--sa-bottom,0px)) calc(13px + var(--sa-left,0px));}
     /* Sticky title so the collapse chevron stays reachable at any scroll depth —
-       otherwise reading to the bottom traps you away from the map. */
-    #panel:not(.collapsed) h1{position:sticky;top:0;z-index:1;margin:0 0 4px;padding:7px 0;
+       otherwise reading to the bottom traps you away from the map.
+       THE TOP INSET GOES ON THE TITLE'S OWN PADDING, NOT ON THE PANEL'S AND NOT
+       ON THE STICKY OFFSET. Measured in Chromium 2026-07-29: with the inset in
+       the panel's padding-top AND `top:var(--sa-top)` on the sticky title, the
+       two compound — 58px padding + 47px offset put the title at y=105. Worse
+       than wrong, it is engine-dependent: the sticky rectangle is anchored to
+       the scroll container's CONTENT box here and to its padding box under some
+       readings, so `top:0` parks the title at y=58 in one engine and y=0 —
+       back under the clock — in the other, and WKWebView is the one that
+       cannot be tested from this machine.
+       Putting the inset in the title's padding removes the ambiguity: the box
+       may stick at y=0 either way, its opaque background fills the strip under
+       the status bar, and the text and chevron sit below the notch because
+       their own padding puts them there. Assert on the title's SPAN, not on its
+       box — the box legitimately reaches y=0. */
+    #panel:not(.collapsed) h1{position:sticky;top:0;z-index:1;margin:0 0 4px;
+      padding:calc(7px + var(--sa-top,0px)) 0 7px;
       background:#1E1A13;}
   }
   .layer{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#D8D0BE;margin:6px 0;cursor:pointer;}

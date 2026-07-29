@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!-- viewport-fit=cover must be present or iOS resolves every
+     env(safe-area-inset-*) to 0px while a 47px notch physically exists, and
+     any inset padding below ships as a silent no-op. Measured on the iPhone
+     14 2026-07-28. See the same note in map.html. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#14110C" />
@@ -11,6 +15,16 @@
 <title>Placer — Field Brain</title>
 <style>
 :root {
+  /* Safe-area insets read once into variables so they can be injected by a
+     test. env() cannot be overridden and computes to 0 in every desktop
+     browser, which makes CSS written against it directly untestable — the
+     assertion passes for the wrong reason. See the same block in map.html.
+     A simulated inset can never be [externally-verified]; it complements the
+     device measurement rather than replacing it. */
+  --sa-top: env(safe-area-inset-top, 0px);
+  --sa-right: env(safe-area-inset-right, 0px);
+  --sa-bottom: env(safe-area-inset-bottom, 0px);
+  --sa-left: env(safe-area-inset-left, 0px);
   --bg: #14110C;
   --bg-elev: #1E1A13;
   --bg-card: #241F17;
@@ -57,7 +71,12 @@ h3 { font-size: 0.95rem; font-weight: 700; }
 
 /* Header */
 header {
-  padding: 20px 20px 12px;
+  /* headerRect.top measured 20 on the iPhone 14 against a 47px inset, so the
+     "Field Brain" title painted 27px INSIDE the status bar — the clock over the
+     title, the Dynamic Island over the subtitle. Confirmed on real hardware
+     2026-07-28, not a simulator artifact. Cosmetic on this page, unlike the
+     same absent inset on map.html, but it is the same missing declaration. */
+  padding: calc(20px + var(--sa-top, 0px)) calc(20px + var(--sa-right, 0px)) 12px calc(20px + var(--sa-left, 0px));
   position: sticky; top: 0;
   background: linear-gradient(to bottom, var(--bg) 70%, transparent);
   z-index: 10;
@@ -163,7 +182,13 @@ main { padding: 0 20px; }
   display: flex;
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  /* THIS DECLARATION HAS NEVER FIRED. It predates the native shell and was the
+     ONLY env() in the entire tree; without viewport-fit=cover iOS resolved it
+     to 0px, so the tab bar has always sat flush against the home indicator.
+     Adding the meta activates it, and the launcher gains ~34px of bottom
+     padding as a side effect of a map.html fix. That is believed correct and
+     is NOT yet confirmed on the device — flagged for the next device pass. */
+  padding-bottom: var(--sa-bottom, 0px);
   z-index: 50;
 }
 .tab {
