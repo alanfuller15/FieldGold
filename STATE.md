@@ -1943,3 +1943,171 @@ otherwise, on two installs. The iOS status bar is native chrome composited above
 a full-bleed webview and the page cannot see it. **Every hit test in this repo,
 `tests/test_panel_reachability.py` included, is blind to native chrome and will
 pass over an untappable control.**
+
+## Session residue — 2026-07-28, OFFLINE test
+
+**Nothing was in flight when this session ended.** `main` = `origin/main` =
+`f7ed23a`, tree clean, `bash .claude/verify.sh` → all 12 suites ran and passed.
+Three commits merged **fast-forward** so the order the work happened survives:
+prediction (`41c2a2c`) → Run 1 (`2283638`) → Run 2 (`f7ed23a`). This section is
+the reasoning behind those findings, which is not recoverable from the findings.
+Nothing here repeats a conclusion.
+
+### The two-run design, and why a naive Airplane Mode test reads as a PASS
+
+**This is the most transferable thing in the session.** Anyone repeating the
+offline test needs it before they start, not after.
+
+`NSURLCache` in WKWebView is disk-backed and survives app launches. The previous
+device session had loaded `map.html` over Hatcher Pass **with** network, and OSM
+tiles carry a long `max-age`. So the obvious test — put the phone in Airplane
+Mode, open the map, look — paints 12/12 basemap tiles from disk, sets `baseOk`,
+logs `basemap (Streets) ✓`, and **never fires the warning**. That reads on screen
+as "tiles work offline". It is not a wrong observation; it is an observation of a
+different thing, and it answers a question nobody asked.
+
+That is exactly what Run 1 did. It was predicted in `41c2a2c` before any device
+was touched, and it fired precisely as described. Question 3 needed a container
+that had never fetched a tile, which is why the app was **deleted** rather than
+merely restarted.
+
+**Why the control had to be structural rather than clever.** Three cheaper
+options were considered and each fails for a specific reason worth recording:
+
+- **Bust the cache from the console.** Not possible. `map` and all four tile
+  layers are `const`s inside `map.html`'s `window.addEventListener('load', …)`
+  closure and are never exposed on `window`. Nothing in the page can be driven
+  from the inspector — no `setView`, no layer reference, no URL rewrite. This
+  also rules out any future runtime probing of the map object; a diagnostic would
+  have to be injected into a copy of the bundle.
+- **Read `transferSize` to tell cache from network.** Useless here. OSM and Esri
+  send no `Timing-Allow-Origin`, so every cross-origin size reads 0 whether
+  cached or not.
+- **Trust `performance.getEntriesByType('resource')` at all.** WebKit emits **no
+  Resource Timing entries for `capacitor://` loads**. `index.html` returned
+  `resources: []` while demonstrably rendering. Half the fields in the snippets
+  are inert on a bundle-local page.
+
+So every load-bearing measurement had to be a **DOM fact** — the
+`leaflet-tile-loaded` class, `naturalWidth`, `offsetParent`, computed style.
+Those are the fields to keep if these snippets are reused; the timing fields are
+decoration.
+
+**Run 1 is a result, not a discarded attempt**, and Alan was right to insist on
+it before the numbers existed. Cached tiles carrying the map *is* the realistic
+field case — signal at home, none at the trailhead. Its bound is that nothing in
+this app controls, measures or depends on `NSURLCache`; it is evictable at the
+system's discretion. **How long it survives was not measured and is not known.**
+
+### The `test_panel_reachability.py` gap — the exclusion is correct and that is the problem
+
+Found by accident, at the end, running the verification gate after a
+**documentation-only** change. All twelve suites passed. They passed against a
+build whose no-signal warning no user can read.
+
+The suite excludes `#status` from its scope, and CLAUDE.md states the reason: it
+is the run log, it has its own 64px scroller, so scrolling the *panel* can never
+reach its lower lines. **That reasoning is still correct.** The exclusion is not
+sloppiness and removing it would make the suite assert something false.
+
+What the offline test established is that the excluded region **is the app's
+entire failure-reporting channel**. Every line `map.html` writes about what went
+wrong — the no-signal warning, its explanation, `geochem markers failed` — lands
+in the one element the reachability suite is scoped away from.
+
+**So the fix is not "delete the exclusion".** It is that `#status` needs coverage
+of its *own* shape: is the newest line visible, given the scroller's own
+geometry and the panel's collapsed state. That is a different assertion from the
+one the suite makes about warning text, and it does not exist anywhere yet.
+
+Filed here rather than acted on because Phase 0's successor deserves a fresh
+session, and because writing the assertion requires deciding what the fixed
+behaviour should be — which is Phase 1's call, not this session's.
+
+### Prediction 5 was the only miss, and the wrongness was the useful part
+
+Predicted: the log auto-scrolls to the bottom (`log()` ends
+`S.scrollTop = S.scrollHeight`), so the warning would be scrolled **above** the
+visible 64px window. Observed: `scrollTop` **0**, warning **below** the fold,
+`linesVisibleAtRest` 4 of 12.
+
+The mechanism, checked in Chromium rather than reasoned about [self-tested]:
+
+```
+COLLAPSED : display:none, scrollTop 0, scrollHeight 0, clientHeight 0
+log()'s scrollTop = scrollHeight   ->  scrollTop 0     (0 = 0, a no-op)
+EXPANDED  : scrollTop 0, scrollHeight 117, clientHeight 64
+```
+
+While `#panelbody` is `display:none`, `#status` has no layout box, `scrollHeight`
+is 0, and the auto-scroll writes 0 to 0. **The collapse that hides the log also
+disables the scroll that would reveal it.** Two defects that each make the other
+permanent — Alan's framing, and it is the right one.
+
+**Why the miss matters more than the hits.** The predicted *outcome* — "the
+warning is not visible" — was right. Had the prediction been scored on outcome
+alone it would have counted as a hit and a wrong model of the page would have
+survived intact. It was caught only because the prediction named a **mechanism**,
+and the mechanism was falsifiable. **Predict causes, not just outcomes**; a
+prediction that only names an outcome cannot be informative when it is right.
+
+### Constraints that forced the method — named so they do not read as choices
+
+- **The USB connection dropped mid-session**, between the app delete and the
+  install. Diagnosed against three instruments rather than one: `devicectl list`
+  state `unavailable`, `xctrace` listing the phone under `== Devices Offline ==`,
+  and no iPhone on the USB bus at all. **Note the contrast with earlier the same
+  evening**, when `devicectl list` reported `tunnelState: disconnected` and
+  `ddiServicesAvailable: false` on a perfectly healthy link — that was a lazy
+  tunnel that an actual operation established, and `ddiServicesAvailable: false`
+  is the *same string* that meant "Developer Mode is off" earlier in this
+  project's history. **Both directions of the instrument lesson inside one
+  session: a status field that looked broken and was not, and one that looked
+  broken and was.** The discriminator both times was running an operation and
+  reading its artifact.
+- **`playwright` lives in `.venv`, not in the Homebrew python.** `python3 -c
+  "import playwright"` fails; `.venv/bin/python` works. `.claude/verify.sh`
+  already probes both, which is where the answer was found after a wasted run.
+- **Alan's finger is still the only HID.** Accessibility for Terminal remains
+  ungranted for the reason in the simulator residue. It did not need to change:
+  the two things only a finger could settle — the toggle, and the six tabs — he
+  settled directly.
+- **The delete had to be done by hand on the phone.** It is what destroys the
+  data container, and it is the only reliable way to reach `NSURLCache`.
+
+### Threads deliberately not pulled
+
+- **`terrain` is a fifth tile layer and was never toggled on offline.** It is
+  off by default, so it did not appear in either run. Mechanically it is the
+  *worst* case of the false-✓ defect: `map.html:200` logs `terrain ✓` off
+  `load`, and `:204` installs `terrain.on('tileerror',()=>{})` — an explicitly
+  **empty** error handler, with a comment explaining that edge/no-data tiles are
+  expected. So offline it should print a green tick having swallowed every
+  error. Untested, but predicted from source; whoever fixes the ✓ defect should
+  toggle it and confirm.
+- **Whether the fetch-based paths stay honest offline was only half checked.**
+  `geochem markers failed: Load failed` proves the WFS point fetch reports
+  truthfully. The occurrence scan button and the BLM identify call were **not
+  pressed** in either run.
+- **`NSURLCache` eviction has no measured bound.** Run 1's usefulness depends
+  entirely on how long cached tiles survive, and that number does not exist.
+- **The stage maps still have not been opened on any target.** Unchanged from
+  the device run. Under Capacitor, "present in the bundle" remains all that is
+  known — and note they would now be opened *offline*, where every pixel they
+  draw comes from the network.
+- **Landscape still never measured**, on any page, on any target.
+- **`index.html` has no equivalent of `#status`.** Its offline failures have
+  nowhere to be reported at all. Not investigated; noted because the Phase 1
+  status-log work may want to cover both pages rather than one.
+
+### Next action
+
+**Start Phase 1 in a fresh session, with four items rather than three.** In
+hand and needing no new measurement: the three internal `href`s that make
+`map.html` unreachable (fix by href, never blanket-strip `target="_blank"` — 9
+of 12 are `https://` and work); `viewport-fit=cover` **before** any `env()`
+padding, or the padding computes to 0; `sw.js` inert in the shell so updates
+arrive only via `npx cap sync` + rebuild; and now the status log, which is
+unreadable on a phone in two independent ways and is the channel every other
+failure reports through. The ✓-on-zero-tiles defect rides with that last one.
+Nothing is blocked.

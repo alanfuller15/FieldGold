@@ -103,7 +103,7 @@ in the tests row did.
 | document | lines | role |
 |---|---|---|
 | `CLAUDE.md` | 653 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 1945 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `STATE.md` | 2113 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
 | `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |
 | `.claude/skills/phase-0-shell/SKILL.md` | 210 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
