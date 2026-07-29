@@ -33,6 +33,14 @@ this amendment touched app code or Phase 1.
 `e7534e4`). Goal met: FieldGold launches from a real app icon on Alan's iPhone,
 with zero changes to app code.
 
+> **PR #6 IS OPEN AND MUST NOT BE MERGED.** Phase 1 items A, B, C and D are
+> written on `phase-1-shell-divergences` and pushed —
+> https://github.com/alanfuller15/FieldGold/pull/6 — **awaiting Alan's review.
+> Do not merge it, and do not push further commits to that branch without
+> saying so.** Everything in it is `[self-tested]`; the device pass has not
+> happened. See "Phase 1 — A, B, C and D are written" below for what only the
+> phone can settle.
+
 **Next phase: Phase 1 — and its scope is not what it was filed as.** The device
 run found three silent Pages/shell divergences, two of which make the app
 unusable rather than untidy. Read "The class is now confirmed three times over"
@@ -876,6 +884,42 @@ default, so the shipping bundle cannot report on itself.
 - **The `map.html` panel toggle is untappable on a virgin install**, confirming
   it is not state-dependent. Second finger test, second container
   [externally-verified] 2026-07-28
+- **Capacitor does not enable WKWebView's back/forward swipe gesture, and this
+  is now direct source evidence rather than inference.**
+  `allowsBackForwardNavigationGestures` appears **nowhere in `node_modules/`** —
+  not in `@capacitor/ios`, not in any transitive dependency. Apple documents the
+  property as off by default. Capacitor 8.4.2's `CAPBridgeViewController.swift`
+  configures `scrollView.bounces`, `contentInsetAdjustmentBehavior`,
+  `allowsLinkPreview`, `scrollView.isScrollEnabled`, the user agent and the
+  background colour, and never touches the gesture. **This supersedes the
+  earlier argument from the existence of three community plugins**, which was
+  inference from a workaround's existence; the grep is the fact
+  [self-tested] 2026-07-29
+- **The `terrain ✓` prediction HELD, and the count was five, not four.**
+  STATE.md predicted from source that `terrain` was mechanically the worst case
+  of the false-tick defect — a ✓ logged off `load` paired with an explicitly
+  EMPTY `tileerror` handler that swallows every failure — and filed it untested
+  because terrain is off by default and neither device run toggled it. Toggled
+  on with the network cut it prints `terrain ✓` having loaded nothing. So the
+  offline log carries **five** false green ticks against **0 of 100** tiles, not
+  the four the device runs saw. Predicted from reading the shipping source
+  before it was exercised on any target [self-tested] 2026-07-29
+- **Phase 1 item D is COMPLETE and needed no device** (`33b5f5c`). Layers now
+  report from tile outcomes, not from Leaflet's `load`. `test_offline_map.py`
+  39 → 60 assertions; three new mutants (`tick-on-load`, `silent-on-fail`,
+  `base-tick-after-warn`) all caught; all 12 suites green at 510 assertions;
+  `sw.js` v5 → v6. **The suite had been running the defect's exact conditions
+  since it was written and asserting nothing about them** — sections 4-6 cut the
+  network and read the status log, and never looked at the ✓ lines. That is how
+  it reached a device through a green gate [self-tested] 2026-07-29
+- **`test_offline_map.py` pinned the cache version rather than reading it.** It
+  asserted `!= "fieldgold-v6"`, so the first legitimate sequential bump to v6
+  failed a CORRECT change — the behaviour CLAUDE.md warns pinned assertions
+  produce, found by hitting it. Generalised to `> 3` to match
+  `test_stage_maps.py` and `test_state_claims.py`, and its `sw-stale-cache`
+  mutant repointed v6 → v3 so it still violates. CLAUDE.md had claimed all three
+  suites already asserted "past v3"; that claim is now true rather than edited
+  to look true [self-tested] 2026-07-29
 
 ## Decisions made
 
@@ -1014,6 +1058,76 @@ Not affected: in-app links, `manifest.json` (`start_url` and `scope` are
 relative), the `sw.js` SHELL (all `./`-relative), and the service worker
 registration. Served URLs are identical after the move, so the move alone
 does not require a cache version bump.
+
+## Phase 1 — A, B, C and D are written. NONE is device-verified.
+
+**Branch `phase-1-shell-divergences`, 2026-07-29, seven commits, pushed, open as
+PR #6 and awaiting review — DO NOT MERGE.** All 13 suites green at 570
+assertions and 83 mutants. Every claim below is `[self-tested]`.
+**The two that decide whether this app works in terrain — can a finger open the
+map, can a finger press the controls — cannot be produced on this machine and
+are outstanding.**
+
+| item | what landed | commit |
+|---|---|---|
+| **D** false ✓ | layers report from tile outcomes, not Leaflet's `load`. Five false ticks over 0 of 100 tiles → zero | `33b5f5c` |
+| **B** safe-area | `viewport-fit=cover` on the four app pages, insets via `--sa-*`, panel/Leaflet controls/headers moved clear | `1cfa546` |
+| **A** dead links | the 3 internal hrefs navigate in-webview; a shared bottom bar carries a back control on all three tool pages | `186f4bb` |
+| **C** warn surface | warn/err surface in that bar with no user action, first line verbatim + a count, one tap for the rest | `79fcfaa` |
+
+Order was A→B originally and **B ran first**: both the back control and the
+problem row sit at the bottom edge and need `env(safe-area-inset-bottom)` to be
+real, so `viewport-fit=cover` is a prerequisite for A as well as for C.
+
+`sw.js` v5 → **v9**, one bump per item. **On the phone none of those bumps
+delivers anything** — the worker is inert in the shell and a fix arrives only
+via `npx cap sync` + rebuild + install.
+
+### What the device must settle, and nothing here can
+
+1. **Tap the Gold map card.** Does `map.html` open? Chromium has no popup
+   delegate and no `capacitor://` scheme, so the suite establishes only that the
+   markup now asks for a same-window navigation.
+2. **Tap the panel toggle, the Leaflet zoom, and the back control.** Geometry is
+   asserted against a simulated 47px/34px inset; **every hit test in this repo is
+   blind to native chrome** and will pass over an untappable control.
+3. **The `.tabbar` rider.** Its `env(safe-area-inset-bottom)` predates the shell
+   and has never fired. `viewport-fit=cover` activates it, so the launcher gains
+   ~34px of bottom padding as a side effect of a map.html fix. Believed correct,
+   asserted, **not confirmed**.
+4. **Offline, look at the screen.** The problem row should be visible with no
+   interaction. A photograph is the authority for what a person sees.
+5. **Landscape**, still never measured on any target.
+
+### The design question is CLOSED — two kinds, not one ranked list
+
+`tally()` logs `warn` whenever a bench is `avoid`, so chronological-first
+headlined "REM candidates: 20 plotted (8 clean, 0 unchecked, 12 avoid)" while
+the screen was black and unexplained. Alan's ruling 2026-07-29, and it dissolves
+the question rather than answering it: **a land-status warning and a failure
+report are different kinds and ranking them against each other was the error.**
+The first is the app working and saying something important; the second is the
+app saying what it could not do.
+
+The row headlines the first **failure**. The land-status line is not demoted —
+it keeps its `warn` class, its place in `#status`, its place in the expanded
+list with the count covering it, and it takes the headline whenever nothing has
+failed. **Classified at the call site** (`log(msg, cls, kind)`), never by
+matching message text: a line's kind is a property of what produced it, and a
+regex over wording would break silently the first time somebody rephrased a
+warning. **Failure is the default; land-status opts in**, so a warning added
+later without a kind is over-reported rather than silently dropped. Four call
+sites are `land`: `tally()`, the no-land-status-data caveat, and the two
+federal-register lines.
+
+Held in both directions by `land-as-failure` and `failure-as-land`.
+
+**One thing to check on the device:** which failure headlines is timing-
+dependent. In the Chromium harness the aborted geochem fetch resolves before the
+tile errors, so the headline is `geochem markers failed`. On the device in Run 2
+the no-signal warning was logged first, so it should headline there. Both are
+failures, so the rule holds either way — but confirm which line a person
+actually reads.
 
 ## Phase 1 — enforce the bundle/Pages divergence
 

@@ -2,15 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!-- viewport-fit=cover is NOT cosmetic and NOT optional. Without it iOS resolves
+     every env(safe-area-inset-*) to 0px while a 47px notch physically exists —
+     measured on the iPhone 14 2026-07-28 against the shipping bundle. So a fix
+     that adds padding-top: env(safe-area-inset-top) WITHOUT this ships, looks
+     correct in the diff, passes in every desktop browser, and changes nothing at
+     all on the phone. This attribute has to land first or the padding below is a
+     no-op. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
 <title>FieldGold — Map</title>
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="fieldgold-chrome.css" />
 <style>
+  /* THE SAFE-AREA INSETS, ROUTED THROUGH CUSTOM PROPERTIES ON PURPOSE.
+     env() cannot be overridden and always computes to 0 in a desktop browser,
+     so CSS written against env() directly is untestable: every assertion about
+     it passes for the wrong reason. Reading env() once into a variable makes
+     the inset injectable — tests/test_panel_reachability.py sets --sa-top to a
+     real device figure and re-runs its reachability walk against it.
+     That is a SIMULATION and can never produce an [externally-verified]
+     result; it complements the device measurement rather than replacing it.
+     Fallbacks appear in both places because a browser without env() support
+     would otherwise make the whole declaration invalid at computed-value time
+     and take var() down with it. */
+  :root{--sa-top:env(safe-area-inset-top,0px);--sa-right:env(safe-area-inset-right,0px);
+        --sa-bottom:env(safe-area-inset-bottom,0px);--sa-left:env(safe-area-inset-left,0px);}
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#14110C;color:#F2EDE0;}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#14110C;}
+  /* Leaflet's control containers anchor to the edges of #map, which is the full
+     bleed viewport, so the zoom and layers controls render UNDER the status bar
+     on a phone. Alan could not press either of them on the device 2026-07-28.
+     Shifted by the inset here rather than in vendor/leaflet/leaflet.css — the
+     vendored bytes are hash-verified against an independent publisher and must
+     not be edited. */
+  .leaflet-top{margin-top:var(--sa-top,0px);}
+  /* Attribution and any bottom control clear the chrome bar as well as the
+     home indicator, or the bar covers the OpenStreetMap/Esri attribution —
+     which is a licence condition, not decoration. */
+  .leaflet-bottom{margin-bottom:var(--fg-chrome-h,48px);}
+  .leaflet-left{margin-left:var(--sa-left,0px);}
+  .leaflet-right{margin-right:var(--sa-right,0px);}
   /* z-index 1200, not 1000. Leaflet's own .leaflet-top/.leaflet-bottom containers
      are z-index:1000 (see vendor/leaflet/leaflet.css) — the 800 on .leaflet-control
      only orders controls WITHIN those containers. At 1000 the panel tied with them,
@@ -19,13 +53,22 @@
      2026-07-26 at 390x664: 21 sample points inside warning text were covered by a
      control. Rules 4 and 5 say those notices are the point; a notice you cannot
      read is a notice that was removed. */
-  #panel{position:absolute;z-index:1200;top:10px;left:10px;background:rgba(30,26,19,.95);
+  /* top/left carry the inset. The COLLAPSED panel is the case that matters: at
+     top:10px its h1 toggle measured [22,24,153,19] on the iPhone 14 — spanning
+     y=22..41, entirely inside the 47px status bar — and the panel auto-collapses
+     at phone width, so the first thing a user saw on the map was a collapsed
+     panel whose only control could not be pressed. Confirmed by finger on two
+     separate installs, including a virgin one, so it is not state-dependent. */
+  #panel{position:absolute;z-index:1200;top:calc(10px + var(--sa-top,0px));left:calc(10px + var(--sa-left,0px));background:rgba(30,26,19,.95);
     border:1px solid #4A3F2D;border-radius:10px;padding:11px 13px;
     /* The panel is taller than the viewport and #map fills the screen, so the body
        never scrolled. Everything below the fold was physically unreachable: measured
        102 of 256 warning-text sample points on a 390x664 phone, 118 of 250 on a
        375x553 one. The panel scrolls itself now. */
-    max-height:calc(100vh - 20px);overflow-y:auto;
+    /* The insets come out of the available height too, or pushing the panel
+       down by --sa-top just pushes its lower edge off the bottom of the screen
+       and re-creates the unreachable tail at the other end. */
+    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--fg-chrome-h,48px));overflow-y:auto;
     overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
     /* border-box, or max-height clamps the CONTENT box and the panel still
        overruns a short window by padding + border. Measured at 1280x620: 624px
@@ -45,11 +88,34 @@
        already covering most of the map, just badly, with the controls punching
        through it. Make it deliberate: a full-screen scrollable sheet. Collapsing it
        (tap the title) gives the whole map and every control back. */
-    #panel:not(.collapsed){left:0;right:0;top:0;bottom:0;max-height:none;
-      border:0;border-radius:0;background:#1E1A13;padding:11px 13px 30px;}
+    /* Full-bleed to the screen edges, but the CONTENT is inset. Padding rather
+       than a smaller box, so the sheet's background still runs under the status
+       bar instead of leaving a strip of map showing through it. */
+    /* bottom stops at the chrome bar rather than 0. The sheet ending ABOVE the
+       bar is what makes the bar incapable of covering warning text — the
+       failure a floating back button would have reintroduced. */
+    #panel:not(.collapsed){left:0;right:0;top:0;bottom:var(--fg-chrome-h,48px);max-height:none;
+      border:0;border-radius:0;background:#1E1A13;
+      padding:11px calc(13px + var(--sa-right,0px))
+              calc(30px + var(--sa-bottom,0px)) calc(13px + var(--sa-left,0px));}
     /* Sticky title so the collapse chevron stays reachable at any scroll depth —
-       otherwise reading to the bottom traps you away from the map. */
-    #panel:not(.collapsed) h1{position:sticky;top:0;z-index:1;margin:0 0 4px;padding:7px 0;
+       otherwise reading to the bottom traps you away from the map.
+       THE TOP INSET GOES ON THE TITLE'S OWN PADDING, NOT ON THE PANEL'S AND NOT
+       ON THE STICKY OFFSET. Measured in Chromium 2026-07-29: with the inset in
+       the panel's padding-top AND `top:var(--sa-top)` on the sticky title, the
+       two compound — 58px padding + 47px offset put the title at y=105. Worse
+       than wrong, it is engine-dependent: the sticky rectangle is anchored to
+       the scroll container's CONTENT box here and to its padding box under some
+       readings, so `top:0` parks the title at y=58 in one engine and y=0 —
+       back under the clock — in the other, and WKWebView is the one that
+       cannot be tested from this machine.
+       Putting the inset in the title's padding removes the ambiguity: the box
+       may stick at y=0 either way, its opaque background fills the strip under
+       the status bar, and the text and chevron sit below the notch because
+       their own padding puts them there. Assert on the title's SPAN, not on its
+       box — the box legitimately reaches y=0. */
+    #panel:not(.collapsed) h1{position:sticky;top:0;z-index:1;margin:0 0 4px;
+      padding:calc(7px + var(--sa-top,0px)) 0 7px;
       background:#1E1A13;}
   }
   .layer{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#D8D0BE;margin:6px 0;cursor:pointer;}
@@ -121,7 +187,156 @@
 <script src="fieldgold-data.js"></script>
 <script>
 const S=document.getElementById('status');
-function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
+
+/* THE PROBLEM ROW. Wired into log() itself, ABOVE the load listener, and that
+   position is deliberate: the `map library missing` branch logs two err lines
+   and RETURNS before Leaflet or the map exist. That is the worst case in this
+   file — a broken install — and it is the one where the old code said nothing a
+   user could see. Anything hung off the map object would miss it.
+
+   Why this exists at all, measured on the device offline: every line map.html
+   wrote about what went wrong went into #status, inside #panelbody, which is
+   display:none while the panel is collapsed — and the panel auto-collapses at
+   phone width behind a toggle under the status bar that a finger cannot press.
+   Twelve lines logged, four visible, and the four visible ones were exactly the
+   four that report nothing wrong. Two defects each making the other permanent.
+
+   The requirement this meets: a warn or err must be visible with NO user
+   action. `ok` lines have no such requirement and stay in #status. */
+/* Items are buffered and the row is rendered when the element exists, NOT when
+   the first warning arrives. This script runs before the chrome markup at the
+   end of <body> has been parsed, so a direct getElementById here returns null
+   and every early warning would be silently dropped — which is the failure mode
+   being fixed, rebuilt. Buffering also means the window.onerror handler above
+   and the `map library missing` branch are covered even though both can fire
+   before the bar exists. */
+const P={box:null,items:[]};
+function bindProblemRow(){
+  if(P.box) return true;
+  const box=document.getElementById('fg-problem');
+  if(!box) return false;
+  P.box=box;
+  P.head=box.querySelector('.fg-problem-head');
+  P.text=box.querySelector('.fg-problem-text');
+  P.more=box.querySelector('.fg-problem-more');
+  P.list=box.querySelector('.fg-problem-list');
+  P.head.addEventListener('click',function(){
+    const open=P.list.hidden;
+    P.list.hidden=!open;
+    P.head.setAttribute('aria-expanded',open?'true':'false');
+    syncChromeHeight();
+  });
+  return true;
+}
+/* The bar's height is no longer constant, and map.html's panel is positioned
+   against it. Publishing the measured height back into --fg-chrome-h is what
+   keeps the panel ending ABOVE the bar when the problem row appears or expands
+   — otherwise the row covers the bottom of the land-status warnings, which is
+   the failure this whole change exists to end, reintroduced by the fix for it. */
+function syncChromeHeight(){
+  const bar=document.querySelector('.fg-chrome');
+  if(!bar) return;
+  document.documentElement.style.setProperty('--fg-chrome-h',bar.offsetHeight+'px');
+  // OBSERVED, NOT SNAPSHOT. Publishing the height once is not enough: the bar
+  // also changes size for reasons this code never sees — rotation, iOS Dynamic
+  // Type, or a long warning wrapping to a second line at a narrower width. A
+  // stale reservation means the bar covers the bottom of the land-status panel,
+  // which is the failure this whole row exists to end. Caught by the suite
+  // measuring a page whose insets arrived after load, which is exactly the
+  // "height changed and nothing recomputed" case.
+  if(!syncChromeHeight.ro && window.ResizeObserver){
+    syncChromeHeight.ro=new ResizeObserver(function(){
+      const b=document.querySelector('.fg-chrome');
+      if(b) document.documentElement.style.setProperty('--fg-chrome-h',b.offsetHeight+'px');
+    });
+    // BORDER box, not the default content box. The bottom safe-area inset is
+    // PADDING on this bar, and a padding change leaves the content box exactly
+    // the same size — so the default observation never fires for the one thing
+    // most likely to change the bar's height on a phone. Measured: with the
+    // default the reservation stayed at its pre-inset value and the bar
+    // overlapped the panel by the full 34px of the home indicator.
+    syncChromeHeight.ro.observe(bar,{box:'border-box'});
+  }
+}
+function showProblem(m,c,kind){
+  P.items.push({m:m,c:c,kind:kind});
+  renderProblems();
+}
+function renderProblems(){
+  if(!P.items.length||!bindProblemRow()) return;
+  /* THE HEADLINE IS THE FIRST FAILURE. A land-status line never competes for
+     the slot — it cannot displace the reason the screen is black.
+
+     It does take the slot when there is no failure at all, and that is the
+     point rather than a loophole: with nothing broken, "12 of 20 on encumbered
+     ground" is the most important thing on the bar, and it gets read with zero
+     taps instead of behind a panel. So the land-status line is never demoted by
+     this rule — it is only ever outranked by something the user needs more
+     urgently, and it stays in the list below with the count accounting for it.
+
+     Chronological within each kind: the causally upstream failure explains the
+     ones after it. */
+  const first=P.items.find(function(i){return i.kind!=='land';})||P.items[0];
+  P.text.textContent=first.m;
+  P.box.classList.toggle('err',first.c==='err');
+  P.box.classList.toggle('warn',first.c!=='err');
+  P.box.querySelector('.fg-problem-dot').textContent=first.c==='err'?'✕':'⚠';
+  const rest=P.items.length-1;
+  P.more.hidden=rest<1;
+  P.more.textContent=rest<1?'':'+'+rest;
+  P.head.setAttribute('aria-label',
+    P.items.length===1?first.m:first.m+' — and '+rest+' more');
+  // Rebuilt from the buffer rather than appended to, so a render triggered late
+  // (the element only existed after the first warnings) still lists all of them.
+  P.list.textContent='';
+  P.items.forEach(function(it){
+    const d=document.createElement('div');
+    d.className=it.c||''; if(it.kind)d.dataset.kind=it.kind;
+    d.textContent=it.m; P.list.appendChild(d);
+  });
+  P.box.hidden=false;
+  syncChromeHeight();
+}
+/* TWO KINDS OF LINE, AND THEY ARE NOT RANKED AGAINST EACH OTHER.
+   A land-status warning is the app WORKING and saying something important —
+   "12 of these 20 benches are on encumbered ground". A failure report is the
+   app saying what it COULD NOT DO — "basemap tiles unavailable, no signal".
+   Ordering one against the other was the mistake: chronological-first put the
+   REM tally in the headline while the screen was black and unexplained, and
+   severity-first would have promoted `geochem markers failed` over the
+   no-signal line that explains it. They are different channels.
+
+   CLASSIFIED AT THE CALL SITE, never by matching on the message text. A line's
+   kind is a property of what produced it, not of how it happens to be worded,
+   and a regex over message text would break silently the first time someone
+   reworded a warning — which is the exact class of failure this phase exists
+   to close.
+
+   FAILURE IS THE DEFAULT and land-status must opt in. A warn or err added later
+   without a kind therefore surfaces in the problem row. The wrong direction to
+   fail is silence: an over-reported line is noise, an under-reported one is the
+   black screen with no explanation. The kind is written to the DOM so the
+   classification is observable rather than inferred. */
+function log(m,c,kind){const d=document.createElement('div');if(c)d.className=c;
+  if(kind)d.dataset.kind=kind;d.textContent=m;S.appendChild(d);
+  // Auto-scroll only when the box has layout. While #panelbody is display:none
+  // #status has no layout box, scrollHeight is 0, and this assignment writes 0
+  // to 0 — the collapse that hides the log also silently disables the scroll
+  // that would reveal it, so the log sat pinned to the top showing its first
+  // four lines. Re-applied on expand instead (see the h1 handler below).
+  if(S.scrollHeight>0) S.scrollTop=S.scrollHeight;
+  if(c==='warn'||c==='err') showProblem(m,c,kind);}
+// #status only gets layout when the panel opens, so that is when the pending
+// auto-scroll can actually run.
+document.addEventListener('DOMContentLoaded',function(){
+  // Flush anything logged before the chrome markup was parsed — including the
+  // broken-install branch, which is the case with no map at all.
+  renderProblems();
+  const h1=document.querySelector('#panel h1');
+  if(h1) h1.addEventListener('click',function(){
+    setTimeout(function(){ if(S.scrollHeight>0) S.scrollTop=S.scrollHeight; },0);
+  });
+});
 window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
@@ -147,9 +362,69 @@ window.addEventListener('load',()=>{
   // That is a working map with no picture behind it — not a broken app — and
   // the difference matters when you are deciding whether to trust the screen.
   // Say it out loud rather than letting a grey rectangle imply a failure.
+  // A LAYER REPORTS FROM TILE OUTCOMES, NEVER FROM LEAFLET'S 'load' EVENT.
+  //
+  // Leaflet's _tileReady gates `tileload` and the leaflet-tile-loaded class on
+  // !err. It does NOT gate `load`, which fires whenever no tiles remain
+  // PENDING — including when every single one of them failed. Measured on the
+  // phone 2026-07-28 with the radios off (STATE.md, offline Run 2):
+  // `basemap (Streets) ✓`, `claims ✓`, `ardf ✓`, `ngdbsed ✓` printed with ZERO
+  // tiles loaded, and the basemap tick arrived three lines AFTER its own
+  // no-signal warning. Reproduced headlessly here 2026-07-28, which also
+  // settled the case Run 2 could not: with terrain toggled on that is FIVE
+  // false ticks against 0 of 100 tiles.
+  //
+  // Rule 4 is "never soften a land-status warning", and a ✓ over a failed
+  // fetch is a softened warning. The BLM claims layer — whose entire on-screen
+  // treatment exists to stop a blank being over-read as "no claims" — reported
+  // success having fetched nothing. So a tick is now earned by a tile that
+  // actually loaded, and by nothing else.
+  //
+  // One-shot, deliberately: the first `load` decides and nothing retracts it.
+  // A layer that fails and later succeeds stays reported as failed rather than
+  // being upgraded. That understates what the app can do, which is the safe
+  // direction; overstating it is the defect this replaces.
+  function watchTiles(lyr,name){
+    var loaded=0, errored=0, said=false;
+    lyr.on('tileload',function(){ loaded++; });
+    // Counted, not logged. Edge/no-data tiles are expected wherever a coverage
+    // footprint ends — 3DEP's IfSAR especially — and a line per failed tile
+    // would bury the log while panning. The count is what the report needs.
+    lyr.on('tileerror',function(){ errored++; });
+    lyr.on('load',function(){
+      if(said) return;
+      if(loaded>0){ said=true; log(name+' ✓','ok'); }
+      // 0 loaded AND 0 errored means nothing was ever requested. Say nothing
+      // rather than report a failure that did not happen.
+      else if(errored>0){ said=true; log(name+' unavailable — 0 tiles loaded','err'); }
+    });
+  }
+
   var baseOk=false, baseSaid=false;
   function watchBase(lyr,name){
-    lyr.on('load',function(){ if(!baseOk){ baseOk=true; log('basemap ('+name+') ✓','ok'); } });
+    var loaded=0;
+    lyr.on('tileload',function(){ loaded++; });
+    lyr.on('load',function(){
+      // Three guards, and be honest about which one does the work. `baseSaid`
+      // is the load-bearing one: without it a straggler tile arriving after the
+      // warning lets the SAME layer warn and then tick, which is what shipped
+      // and what the phone showed. `loaded===0` is belt-and-braces and has no
+      // reachable trigger while the tileerror path below exists — a failing
+      // tile always sets baseSaid before `load` fires, so no mutant can violate
+      // it in isolation and none was written pretending otherwise. It is kept
+      // so that removing the warning later cannot silently re-open the tick.
+      //
+      // Known and accepted consequence: if some tiles load and some fail, the
+      // warning fires on the first failure and the tick is then suppressed, so
+      // a partly-working basemap reads as unavailable. That understates it.
+      // Understating is the safe direction here and overstating is the bug.
+      if(baseOk||baseSaid||loaded===0) return;
+      baseOk=true; log('basemap ('+name+') ✓','ok');
+    });
+    // Kept on tileerror rather than moved to `load` on purpose: `load` only
+    // fires once every tile has settled, and with no signal a request can hang
+    // for seconds before it errors. The user is looking at a blank screen the
+    // whole time. The explanation has to arrive early, not after the timeouts.
     lyr.on('tileerror',function(){
       if(baseOk||baseSaid) return;
       baseSaid=true;
@@ -166,7 +441,7 @@ window.addEventListener('load',()=>{
 
   function wms(base,layers,attr){
     const lyr=L.tileLayer.wms(base+'?',{layers,format:'image/png',transparent:true,version:'1.3.0',attribution:attr});
-    let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' ✓','ok');}});
+    watchTiles(lyr,layers);
     return lyr;
   }
   const ardf=wms('https://mrdata.usgs.gov/services/ardf','ardf','USGS ARDF').addTo(map);
@@ -188,7 +463,7 @@ window.addEventListener('load',()=>{
     }
   });
   const claims = new ClaimTiles('', { opacity:0.6, attribution:'BLM AK Claims' });
-  let claimDone=false; claims.on('load',()=>{if(!claimDone){claimDone=true;log('claims ✓','ok');}});
+  watchTiles(claims,'claims');
   claims.addTo(map);
   log('requesting 3 layers…');
 
@@ -197,11 +472,13 @@ window.addEventListener('load',()=>{
   const terrain=L.tileLayer.wms('https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?',{
     layers:'3DEPElevation:Hillshade Multidirectional', format:'image/png', transparent:true,
     version:'1.3.0', opacity:0.55, attribution:'USGS 3DEP (IfSAR 5m, AK)'});
-  let terrDone=false; terrain.on('load',()=>{if(!terrDone){terrDone=true;log('terrain ✓','ok');}});
-  // Edge/no-data tiles are expected wherever the IfSAR footprint ends; they fail
-  // gracefully and carry no actionable info, so we don't log them (kept the map
-  // clean while scrolling). The 'load' success above still confirms coverage.
-  terrain.on('tileerror',()=>{});
+  // Edge/no-data tiles are expected wherever the IfSAR footprint ends, so
+  // individual failures are counted and not logged — watchTiles does that. This
+  // used to be an EMPTY tileerror handler paired with a ✓ logged off `load`,
+  // which made terrain the worst case of the false-tick defect: it swallowed
+  // every error and then reported success. Confirmed 2026-07-28 — with the
+  // network cut and terrain toggled on, `terrain ✓` printed against 0 tiles.
+  watchTiles(terrain,'terrain');
   document.getElementById('t-terrain').addEventListener('change',e=>{
     if(e.target.checked){ terrain.addTo(map); terrain.bringToFront(); log('terrain requested…'); }
     else map.removeLayer(terrain);
@@ -276,7 +553,7 @@ window.addEventListener('load',()=>{
     // No bench data on the device means contextForPoint has nothing to answer
     // with, and every dot would be amber for the wrong reason. Say so.
     const haveBenches = !!(window.FieldGoldData && FieldGoldData.get('bench').length);
-    if(!haveBenches) log('no land-status data on this device — site colours mean "unknown", not "unchecked"','warn');
+    if(!haveBenches) log('no land-status data on this device — site colours mean "unknown", not "unchecked"','warn','land');
 
     let avoidCount=0;
     sites.forEach(s=>{
@@ -373,9 +650,12 @@ window.addEventListener('load',()=>{
 
   const tally = (what,list,cls) => {
     const c = FieldGoldData.statusCounts(list);
+    // 'land': this line is amber because benches sit on ENCUMBERED GROUND,
+    // which is the app working correctly and reporting something important. It
+    // is not a failure and must not headline the problem row over one.
     log(what+': '+list.length+' plotted ('
         +c.clean+' clean, '+c.unchecked+' unchecked, '+c.avoid+' avoid)',
-        c.avoid ? 'warn' : (cls||'ok'));
+        c.avoid ? 'warn' : (cls||'ok'), 'land');
   };
 
   // BENCH CANDIDATES: flagged by the bench hunter, read from the shared record.
@@ -743,13 +1023,30 @@ window.addEventListener('load',()=>{
           +'<span style="color:#C25A3A;font-weight:700;display:block;margin-top:6px;">⚠ State claims and closures are in Alaska Mapper, not on this map. Check there before digging.</span></div>');
     }
     log('occurrences drawn: '+drawn+' ('+rust+' on or beside encumbered ground)','ok');
-    log('federal register only — claimed '+fedClaimed+' · none returned '+fedNone+' · no answer '+fedUnknown,'warn');
-    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn');
+    log('federal register only — claimed '+fedClaimed+' · none returned '+fedNone+' · no answer '+fedUnknown,'warn','land');
+    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn','land');
     btn.textContent=LABEL; btn.disabled=false;
     if(drawn===0) log('(zoom to a district like Hatcher Pass, then scan)','');
   });
 
 });
 </script>
+<nav class="fg-chrome" aria-label="FieldGold navigation">
+  <!-- Populated by the page when it logs a warn or an err. Hidden until then,
+       so a run with nothing wrong costs no screen. aria-live=polite because a
+       warning appearing while you are looking at the map should announce
+       itself; the panel it used to hide in never could. -->
+  <div class="fg-problem" id="fg-problem" role="status" aria-live="polite" hidden>
+    <button class="fg-problem-head" type="button" aria-expanded="false">
+      <span class="fg-problem-dot" aria-hidden="true">⚠</span>
+      <span class="fg-problem-text"></span>
+      <span class="fg-problem-more" hidden></span>
+    </button>
+    <div class="fg-problem-list" hidden></div>
+  </div>
+  <div class="fg-nav">
+    <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  </div>
+</nav>
 </body>
 </html>

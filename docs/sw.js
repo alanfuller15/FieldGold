@@ -1,5 +1,76 @@
 // BUMP THIS ON EVERY CHANGE TO A CACHED FILE.
 //
+// AND BUMPING IT ONLY DELIVERS TO ONE OF THE TWO DISTRIBUTIONS. This file is
+// the entire update path on GitHub Pages and is INERT in the iOS shell:
+// `navigator.serviceWorker` does not exist under `capacitor://localhost`, so
+// index.html's `in navigator` guard short-circuits and this worker never
+// registers — silently, with no error and nothing on screen. Measured on the
+// simulator and again on the physical iPhone 2026-07-28 (STATE.md). In the
+// shell the web assets are already bundle-local, so offline works by
+// construction and this cache is not needed; what changes is DELIVERY. A phone
+// running the app gets a fix only via `npx cap sync` + rebuild + install.
+// Green on one distribution is not evidence about the other, and a bumped
+// version with no rebuild ships the fix to browsers and to nobody's phone.
+//
+// v10 (2026-07-29): land-status warnings and failure reports are separate
+// kinds, classified at the call site. A v9 phone offline headlines the
+// problem row with "REM candidates: 20 plotted (8 clean, 0 unchecked, 12
+// avoid)" — true and important, and not the reason the screen is black,
+// which sits two lines down behind a tap. tally() logs `warn` whenever a
+// bench is on encumbered ground, so a first-line rule picks it. The two are
+// different channels and ranking them against each other was the error: the
+// row headlines the first FAILURE, and the land-status line keeps its warn
+// class, its place in the run log and its place in the expanded list. With
+// no failure at all it takes the headline, which is the point.
+//
+// v9 (2026-07-29): warnings are visible without any user action. A v8 phone
+// with no signal shows a black map with correct diamonds on it and NO word
+// of explanation: every line map.html writes about what went wrong goes into
+// #status, inside #panelbody, which is display:none while the panel is
+// collapsed — and it auto-collapses at phone width. Twelve lines logged,
+// four visible, and the four visible were exactly the four reporting nothing
+// wrong. The no-signal warning, its explanation and a real "geochem markers
+// failed" were all below the fold of a 64px scroller whose auto-scroll was
+// itself disabled by the collapse that hid it — `S.scrollTop = S.scrollHeight`
+// writes 0 to 0 with no layout box. Two defects each making the other
+// permanent. Warn and err lines now surface in the bottom chrome bar, first
+// line verbatim plus a count, one tap for the rest. `ok` lines are unchanged.
+//
+// v8 (2026-07-29): the three internal links navigate in the webview, and
+// every page they reach carries a way back. A v7 phone taps the Gold map
+// card and NOTHING happens — target="_blank" routes to Capacitor's popup
+// delegate, which hands a capacitor:// URL to UIApplication.shared.open()
+// and returns nil; iOS refuses the scheme. map.html is referenced exactly
+// once in index.html, by that anchor, so the only field map screen is
+// unreachable from the app UI. Adds fieldgold-chrome.css to SHELL: without
+// it a cold-cache install has an unstyled back bar, which is the one
+// control that must not fail. The nine https:// target="_blank" links are
+// untouched and must stay that way — they work BECAUSE of the attribute.
+//
+// v7 (2026-07-29): safe-area insets. index.html, map.html, bench_hunter.html
+// and creek_manual.html gain viewport-fit=cover; the four --sa-* variables read
+// env() once so the CSS is testable; #panel, the Leaflet control containers,
+// the launcher header and the two document pages carry the insets. A v6 phone
+// paints the map's panel and Leaflet's zoom/layers controls UNDER the status
+// bar: the collapse toggle measured [22,24,153,19] on an iPhone 14, spanning
+// y=22..41 inside a 47px strip, and the panel auto-collapses at phone width, so
+// the first sight of the map is a collapsed panel whose only control cannot be
+// pressed. Confirmed by finger on two installs, one virgin. Note the ordering —
+// viewport-fit=cover has to land first or every env() resolves to 0 and the
+// padding is a no-op that looks correct in the diff.
+//
+// v6 (2026-07-28): map.html only — layers report from tile outcomes instead of
+// from Leaflet's `load` event. A v5 phone shows a green ✓ for every tile layer
+// that fetched NOTHING: measured on the device with the radios off as
+// `basemap (Streets) ✓`, `claims ✓`, `ardf ✓`, `ngdbsed ✓` over zero loaded
+// tiles, the basemap tick arriving three lines after its own "basemap tiles
+// unavailable — no signal" warning, plus `terrain ✓` once toggled on. Leaflet's
+// _tileReady gates `tileload` on !err but fires `load` whenever no tiles remain
+// pending, including when every one failed. Rule 4 is "never soften a
+// land-status warning" and a ✓ over a failed fetch is a softened warning — on
+// the BLM claims layer, whose whole on-screen treatment exists to stop a blank
+// being over-read as "no claims".
+//
 // v5 (2026-07-26): map.html only — the panel reachability fix.
 //
 // A phone still holding v4 has the DEFECT, and holds it permanently. The fetch
@@ -82,7 +153,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v5';
+const CACHE = 'fieldgold-v10';
 
 const SHELL = [
   './',
@@ -93,6 +164,7 @@ const SHELL = [
   './load_rem_benches.html',
   './manifest.json',
   './fieldgold-data.js',
+  './fieldgold-chrome.css',
   // Vendored Leaflet — see vendor/leaflet/PROVENANCE.md. The images are not
   // optional: leaflet.css references them by relative path, and without them
   // the default marker renders as a broken image. A marker you cannot see, on

@@ -1,0 +1,173 @@
+/* FieldGold shared page chrome — the bottom bar carried by every tool page.
+ *
+ * WHY THIS EXISTS AT ALL.
+ *
+ * `target="_blank"` is dead under Capacitor. The popup delegate hands the URL
+ * to `UIApplication.shared.open()` and returns nil; iOS refuses a
+ * `capacitor://` scheme (LSApplicationWorkspaceErrorDomain 115, against exit 0
+ * for an `https://` control), so the tap does nothing at all — no navigation,
+ * no error, nothing on screen to distinguish it from a missed tap. `map.html`
+ * was referenced exactly once in `index.html`, by that dead anchor, so the
+ * primary field tool was UNREACHABLE from the app's UI on a phone.
+ *
+ * The fix is a same-origin navigation inside the webview, which never enters
+ * `webView:createWebViewWithConfiguration:`. That works — demonstrated on the
+ * device before it was written. But it replaces the browser's second tab with
+ * a one-way trip: the launcher is gone and there is nothing to go back to.
+ *
+ * NOTHING PROVIDES A BACK GESTURE HERE. WKWebView's
+ * `allowsBackForwardNavigationGestures` is off by default and Capacitor never
+ * sets it — the string appears nowhere in `node_modules/`, and 8.4.2's
+ * CAPBridgeViewController configures five other webview properties and not that
+ * one. Enabling it needs native Swift or a third-party plugin, both out of
+ * scope. So the back affordance has to be in the DOM.
+ *
+ * WHY THE BOTTOM, WHICH IS NOT A PREFERENCE.
+ *
+ * The known instrument blind spot is native chrome composited above a
+ * full-bleed webview, and native chrome is at the TOP. `elementFromPoint`
+ * reported map.html's panel toggle as reachable on a control no finger could
+ * press — twice, on two installs, one virgin. A bottom control's only native
+ * neighbour is the home indicator, which is a padding problem rather than a
+ * hit-testing one. The bottom is therefore where an automated assertion can
+ * establish reachability at all; the top is where it can only appear to.
+ *
+ * WHY A FULL-WIDTH BAR AND NOT A FLOATING PILL.
+ *
+ * At <=600px map.html's expanded panel is a full-screen sheet. A floating
+ * control would sit on top of land-status warning text — reintroducing "layout
+ * is a way of deleting text" in a new place. A bar cannot overlap, because the
+ * pages end their content above it instead of scrolling under it.
+ *
+ * WHY STATIC MARKUP AND A STYLESHEET RATHER THAN A SCRIPT.
+ *
+ * A page that throws is exactly when you need to leave it, so the one control
+ * that must never fail does not depend on JS. `creek_manual.html` loads no
+ * JavaScript at all and still does.
+ *
+ * THIS IS THE ROUTER'S SEAM. When Phase 1's consolidation lands, this bar is
+ * what becomes the navigation — same position, same shape and the same
+ * safe-area handling as index.html's existing `.tabbar`, which is the app's
+ * established idiom for exactly this job. The three back links collapse into it
+ * rather than being unpicked.
+ */
+
+:root{
+  /* Duplicated from the pages on purpose: identical declarations are
+     order-independent, and this stylesheet must not depend on being linked
+     before or after a page's own <style>. */
+  --sa-top:env(safe-area-inset-top,0px);
+  --sa-right:env(safe-area-inset-right,0px);
+  --sa-bottom:env(safe-area-inset-bottom,0px);
+  --sa-left:env(safe-area-inset-left,0px);
+  /* THE FULL HEIGHT THE BAR OCCUPIES, bottom inset included. Pages reserve
+     exactly this much and nothing renders under the bar. It includes the inset
+     rather than leaving pages to add it because the bar's height is no longer
+     constant: the problem row below makes it grow, and map.html rewrites this
+     property from the measured height when that happens, so the panel re-lays
+     itself out. A page adding --sa-bottom separately would double-count the
+     moment the value became dynamic. */
+  --fg-chrome-h:calc(48px + var(--sa-bottom,0px));
+}
+
+.fg-chrome{
+  position:fixed;left:0;right:0;bottom:0;
+  flex-direction:column;align-items:stretch;
+  /* Above map.html's #panel (1200) and Leaflet's control containers (1000).
+     The way out of a page must not be something another layer can cover. */
+  z-index:1500;
+  display:flex;gap:0;
+  background:#1E1A13;
+  /* The hairline is a box-shadow, not a border-top, and that is a layout
+     decision rather than a style one. Pages reserve exactly
+     --fg-chrome-h + --sa-bottom of space for this bar; a 1px border adds to the
+     box and the bar grew past its own reservation, overlapping map.html's panel
+     by exactly 1px — caught by the assertion that the panel must end above the
+     bar. A shadow paints the same line and contributes nothing to layout, so
+     the reservation stays exact. */
+  box-shadow:0 -1px 0 #4A3F2D;
+  /* The bottom inset is padding, not margin, so the bar's own background fills
+     the home-indicator strip rather than leaving the page showing through. */
+  padding:0 calc(12px + var(--sa-right,0px)) var(--sa-bottom,0px) calc(12px + var(--sa-left,0px));
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.fg-nav{display:flex;align-items:center;gap:10px;min-height:48px;}
+
+/* THE PROBLEM ROW.
+ *
+ * Requirement, from rules 4 and 5: a warn or err line must be visible WITHOUT
+ * ANY USER ACTION. Not one tap. A warning behind a collapsed panel is softened;
+ * behind an unpressable toggle it is deleted.
+ *
+ * What it replaced: map.html wrote every line it had about what went wrong into
+ * #status, inside #panelbody, which is display:none while the panel is
+ * collapsed — and the panel auto-collapses at phone width behind a toggle that
+ * could not be pressed. Offline on the device the log carried twelve lines and
+ * the user could see FOUR, which were exactly the four that report nothing
+ * wrong. The no-signal warning, its explanation, and a real "geochem markers
+ * failed" all sat below the fold of a 64px scroller whose auto-scroll was
+ * itself disabled by the collapse that hid it. What Alan saw was a black screen
+ * with correct diamonds on it and no word of explanation.
+ *
+ * THE HEADLINE IS THE FIRST FAILURE, and the two kinds of line are NOT ranked
+ * against each other. A land-status warning is the app WORKING and saying
+ * something important ("12 of these 20 benches are on encumbered ground"); a
+ * failure report is the app saying what it COULD NOT DO ("basemap tiles
+ * unavailable — no signal"). Ordering one against the other was the mistake:
+ * chronological-first headlined the REM tally while the screen was black and
+ * unexplained, and severity-first would have promoted `geochem markers failed`
+ * over the no-signal line that explains it. The kind is decided AT THE CALL
+ * SITE in map.html, never by matching on message text — a line's kind is a
+ * property of what produced it, and a regex over wording breaks silently.
+ *
+ * With no failure at all, the land-status line takes the slot, by design. It is
+ * never demoted by this rule, only outranked by something more urgent, and it
+ * stays in the list below with the count accounting for it.
+ *
+ * First line in full + a count is not softening. Nothing is truncated, the
+ * count makes the remainder unmissable, and the affordance that reaches them is
+ * a 44px control at the bottom of the screen — which is the whole difference
+ * from a toggle under the status bar. `ok` lines have no such requirement and
+ * stay in #status where they were.
+ */
+.fg-problem{border-bottom:1px solid #4A3F2D;}
+.fg-problem-head{
+  display:flex;align-items:center;gap:8px;width:100%;
+  min-height:44px;padding:6px 10px;
+  background:none;border:0;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:.78rem;line-height:1.35;text-align:left;
+  color:#D8D0BE;
+}
+.fg-problem-head:active{background:#2C2619;}
+.fg-problem-dot{flex:0 0 auto;font-size:.9rem;}
+/* The line itself wraps rather than ellipsing. Truncating a warning to fit is
+   the thing rules 4 and 5 forbid; the bar gets taller instead. */
+.fg-problem-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+.fg-problem-more{
+  flex:0 0 auto;font-size:.7rem;font-weight:700;color:#14110C;
+  background:#D29A3A;border-radius:999px;padding:2px 7px;
+}
+.fg-problem.err .fg-problem-dot{color:#C25A3A;}
+.fg-problem.warn .fg-problem-dot{color:#D29A3A;}
+.fg-problem.err .fg-problem-more{background:#C25A3A;color:#F2EDE0;}
+.fg-problem-list{
+  max-height:40vh;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 10px 8px;font-size:.72rem;line-height:1.45;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;
+}
+.fg-problem-list div{padding:3px 0;border-top:1px solid #332C1E;overflow-wrap:anywhere;}
+.fg-problem-list .warn{color:#D29A3A;}
+.fg-problem-list .err{color:#C25A3A;}
+
+.fg-back{
+  display:inline-flex;align-items:center;gap:7px;
+  /* 44x44 is Apple's minimum tap target. This control is the whole reason the
+     bar exists; it does not get to be fiddly. */
+  min-height:44px;min-width:44px;padding:0 10px;
+  color:#E8C04A;text-decoration:none;font-size:.9rem;font-weight:600;
+  border-radius:8px;
+}
+.fg-back:active{background:#2C2619;}
+.fg-back .fg-chev{font-size:1.1rem;line-height:1;}

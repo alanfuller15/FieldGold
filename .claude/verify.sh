@@ -6,7 +6,7 @@
 # check() harness, run directly. `pytest tests/` collects nothing useful and,
 # because these files execute at module scope (they stand up HTTP servers and
 # launch browsers), collection would run them with their exit codes swallowed.
-# Two of the twelve suites are .js and pytest would never see them at all.
+# Two of the thirteen suites are .js and pytest would never see them at all.
 #
 # On a PLAIN run every suite exits 0 on pass, 1 on failure. The split,
 # inverted convention CLAUDE.md warns about applies ONLY inside each suite's
@@ -29,6 +29,7 @@ PY_SUITES=(
   tests/test_photo_app.py
   tests/test_reactive_refresh.py
   tests/test_seed_drift.py
+  tests/test_shell_divergence.py
   tests/test_stage_maps.py
   tests/test_state_claims.py
   tests/test_sw_lifecycle.py

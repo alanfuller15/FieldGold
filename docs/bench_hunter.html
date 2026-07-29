@@ -2,9 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover must be present or iOS resolves every
+     env(safe-area-inset-*) to 0px while a 47px notch physically exists, and
+     any inset padding below ships as a silent no-op. Measured on the iPhone
+     14 2026-07-28. See the same note in map.html. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Bench Hunter — Little Susitna</title>
+<link rel="stylesheet" href="fieldgold-chrome.css" />
 <style>
+  /* Safe-area insets read once into variables so a test can inject them —
+     env() cannot be overridden and computes to 0 in every desktop browser, so
+     CSS written against it directly is untestable. Same block as index.html
+     and map.html; the comment there carries the measurement. */
+  :root{--sa-top:env(safe-area-inset-top,0px);--sa-right:env(safe-area-inset-right,0px);
+        --sa-bottom:env(safe-area-inset-bottom,0px);--sa-left:env(safe-area-inset-left,0px);}
+
   :root{
     --paper:#EDE8DC;
     --paper-2:#E3DCCB;
@@ -25,7 +37,7 @@
     color:var(--ink);
     font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
     line-height:1.5;
-    padding:0 0 4rem;
+    padding:var(--sa-top,0px) var(--sa-right,0px) calc(4rem + var(--fg-chrome-h,48px)) var(--sa-left,0px);
     background-image:
       repeating-linear-gradient(0deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px),
       repeating-linear-gradient(90deg,transparent 0 39px,rgba(138,124,85,.05) 39px 40px);
@@ -396,5 +408,22 @@ document.getElementById('f').addEventListener('change',e=>{
 })();
 
 </script>
+<nav class="fg-chrome" aria-label="FieldGold navigation">
+  <!-- Populated by the page when it logs a warn or an err. Hidden until then,
+       so a run with nothing wrong costs no screen. aria-live=polite because a
+       warning appearing while you are looking at the map should announce
+       itself; the panel it used to hide in never could. -->
+  <div class="fg-problem" id="fg-problem" role="status" aria-live="polite" hidden>
+    <button class="fg-problem-head" type="button" aria-expanded="false">
+      <span class="fg-problem-dot" aria-hidden="true">⚠</span>
+      <span class="fg-problem-text"></span>
+      <span class="fg-problem-more" hidden></span>
+    </button>
+    <div class="fg-problem-list" hidden></div>
+  </div>
+  <div class="fg-nav">
+    <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  </div>
+</nav>
 </body>
 </html>

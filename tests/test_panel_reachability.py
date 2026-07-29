@@ -288,18 +288,43 @@ def mutate(root):
         # Defect 1, exactly as it shipped: tie with .leaflet-top, lose on DOM order.
         edit("map.html", "#panel{position:absolute;z-index:1200;",
              "#panel{position:absolute;z-index:1000;")
+    # The three below were re-pointed 2026-07-29 when the safe-area work changed
+    # the strings they matched. They would otherwise have aborted exit 2 —
+    # correct behaviour, and still a gap while it lasts: an aborting mutant
+    # proves nothing about the assertion it was written for.
     elif MUTATE == "no-maxheight":
         # Defect 2a: the panel grows past the fold again.
-        edit("map.html", "max-height:calc(100vh - 20px);overflow-y:auto;",
-             "overflow-y:auto;")
+        edit("map.html", "max-height:calc(100vh - 20px - var(--sa-top,0px) - "
+                         "var(--sa-bottom,0px));overflow-y:auto;", "overflow-y:auto;")
     elif MUTATE == "no-overflow":
         # Defect 2b: bounded, but the overflow is clipped away instead of scrolled.
-        edit("map.html", "max-height:calc(100vh - 20px);overflow-y:auto;",
-             "max-height:calc(100vh - 20px);overflow-y:hidden;")
+        edit("map.html", "var(--sa-bottom,0px));overflow-y:auto;",
+             "var(--sa-bottom,0px));overflow-y:hidden;")
     elif MUTATE == "no-sticky":
         # Read to the bottom, and the way back to the map has scrolled off.
         edit("map.html", "#panel:not(.collapsed) h1{position:sticky;top:0;",
              "#panel:not(.collapsed) h1{top:0;")
+    elif MUTATE == "no-viewport-fit":
+        # The whole point of the ordering constraint: without the meta, iOS
+        # resolves every env() to 0 and all the padding below ships as a no-op
+        # that looks correct in the diff and in every desktop browser.
+        edit("map.html", ", viewport-fit=cover\" />", "\" />")
+    elif MUTATE == "no-inset-top":
+        # The panel goes back to top:10px, putting its collapse toggle at
+        # y=22..41 — inside the 47px status bar, which is where Alan could not
+        # press it on two separate installs.
+        edit("map.html", "top:calc(10px + var(--sa-top,0px));left:calc(10px + var(--sa-left,0px));",
+             "top:10px;left:10px;")
+    elif MUTATE == "sticky-no-inset":
+        # The sticky title keeps its position but loses the inset from its own
+        # padding, so scrolling to the bottom of the sheet parks the label and
+        # the chevron back under the clock. This replaced a `sticky-at-zero`
+        # mutant that SURVIVED: it moved the sticky offset from var(--sa-top)
+        # to 0, which under Chromium's content-box anchoring still left the
+        # title at y=58 — clear of the notch, violating nothing. That survival
+        # is what exposed the double-counted inset in the first place.
+        edit("map.html", "padding:calc(7px + var(--sa-top,0px)) 0 7px;",
+             "padding:7px 0;")
     elif MUTATE == "trim-warning":
         # Rule 4, tested rather than trusted: delete a notice as "clutter".
         edit("map.html",
@@ -495,6 +520,153 @@ def main():
                   d["coveredByControl"] == 0, d["coveredByControl"])
             page.close()
             ctx.close()
+
+        # ------------------------------------------------------------------
+        # 5. SAFE-AREA INSETS, SIMULATED. Read the caveat before the numbers.
+        #
+        #    This section cannot produce an [externally-verified] result and is
+        #    not trying to. Two hard limits:
+        #
+        #    a) env(safe-area-inset-*) computes to 0 in every desktop browser,
+        #       so CSS written against env() directly is untestable — the
+        #       assertion passes for the wrong reason. The pages therefore read
+        #       env() once into --sa-* custom properties, which this section
+        #       OVERRIDES with the iPhone 14's real figures. What is being
+        #       tested is that the layout responds to an inset, not that iOS
+        #       reports one.
+        #    b) EVERY HIT TEST IN THIS REPO IS BLIND TO NATIVE CHROME. The iOS
+        #       status bar is composited above a full-bleed webview and the page
+        #       cannot see it, so elementFromPoint reported map.html's panel
+        #       toggle as reachable on a control no finger could press —
+        #       demonstrated twice, on two installs, one of them virgin. So
+        #       these checks assert GEOMETRY (is the control below the inset),
+        #       never hit-testability, for anything in the top strip.
+        #
+        #    The authority for tappability is Alan's finger. This section only
+        #    catches the regression where the inset stops being applied at all.
+        # ------------------------------------------------------------------
+        print("[5] safe-area insets (SIMULATED — see the comment, not a device result)")
+
+        # The four pages carried into the field. The five stage maps are out of
+        # scope on purpose: they are archived build stages, CLAUDE.md forbids
+        # developing them further, and this change was deliberately withheld
+        # from them. Their absence is not asserted either way — a future fix to
+        # them should not have to edit this list to land.
+        APP_PAGES = ["index.html", "map.html", "bench_hunter.html", "creek_manual.html"]
+        for f in APP_PAGES:
+            head = (root / f).read_text(encoding="utf-8")[:4000]
+            m = re.search(r'<meta name="viewport"[^>]*>', head)
+            check("%s declares viewport-fit=cover (without it every env() below "
+                  "resolves to 0 and the padding is a no-op)" % f,
+                  bool(m) and "viewport-fit=cover" in m.group(0),
+                  m.group(0) if m else "no viewport meta in the first 4000 chars")
+
+        # iPhone 14 portrait, the device every measurement in STATE.md was taken
+        # on. 47px is its notch inset; 34px is the home indicator.
+        SA_TOP, SA_BOTTOM = 47, 34
+        INJECT = (":root{--sa-top:%dpx;--sa-bottom:%dpx;"
+                  "--sa-left:0px;--sa-right:0px}" % (SA_TOP, SA_BOTTOM))
+
+        ctx = browser.new_context(viewport={"width": 390, "height": 844},
+                                  device_scale_factor=3)
+        page = load(ctx, base, "map.html", 390)
+        page.add_style_tag(content=INJECT)
+        page.wait_for_timeout(300)
+
+        # The collapsed panel is the user's FIRST sight of the map — it
+        # auto-collapses at phone width — and its h1 is the only control that
+        # reveals the land-status panel. It measured [22,24,153,19] on the
+        # device: y=22..41, wholly inside the 47px strip.
+        collapsed = page.evaluate(
+            "() => document.querySelector('#panel').classList.contains('collapsed')")
+        check("map.html still auto-collapses at 390px (if this changes, the "
+              "assertion below is measuring a different thing)", collapsed, collapsed)
+        rects = page.evaluate("""() => {
+            const out = {};
+            const g = (k, sel) => { const e = document.querySelector(sel);
+                out[k] = e ? e.getBoundingClientRect().top : null; };
+            g('toggle', '#panel h1');
+            g('zoom', '.leaflet-control-zoom');
+            g('layers', '.leaflet-control-layers');
+            return out; }""")
+        for k in ("toggle", "zoom", "layers"):
+            check("map.html: %s clears the %dpx status bar with the inset "
+                  "applied (top=%s)" % (k, SA_TOP, rects[k]),
+                  rects[k] is not None and rects[k] >= SA_TOP, rects)
+
+        # Expanded, the sticky title must stick BELOW the inset, not at 0 — at
+        # top:0 the chevron scrolls up under the status bar and becomes the same
+        # untappable control this change exists to fix.
+        expand(page)
+        page.evaluate("() => { const p = document.querySelector('#panel');"
+                      " p.scrollTop = p.scrollHeight; }")
+        page.wait_for_timeout(250)
+        # Measure the title's SPAN and the chevron, not the h1 box. The box is
+        # meant to reach y=0 when stuck — its opaque background is what stops
+        # panel text showing through under the status bar. What must clear the
+        # notch is the text and the control the finger aims at.
+        sticky = page.evaluate("""() => {
+            const h = document.querySelector('#panel h1');
+            const label = h.querySelector('span:not(.chev)');
+            const chev = h.querySelector('.chev');
+            return {box: h.getBoundingClientRect().top,
+                    label: label ? label.getBoundingClientRect().top : null,
+                    chev: chev ? chev.getBoundingClientRect().top : null}; }""")
+        for k in ("label", "chev"):
+            check("map.html: the expanded panel's sticky title %s stays below "
+                  "the status bar when scrolled to the bottom (top=%s)"
+                  % (k, sticky[k]),
+                  sticky[k] is not None and sticky[k] >= SA_TOP, sticky)
+
+        # The whole point of section 4 must survive the inset: pushing the panel
+        # down must not push warning text off the bottom. max-height subtracts
+        # both insets for exactly this reason.
+        d = page.evaluate(WALK)
+        check("map.html: no warning text became unreachable once the inset was "
+              "applied (%d points)" % d["points"], d["unreachable"] == 0,
+              "%s of %s unreachable" % (d["unreachable"], d["points"]))
+        page.close()
+        ctx.close()
+
+        ctx = browser.new_context(viewport={"width": 390, "height": 844},
+                                  device_scale_factor=3)
+        page = load(ctx, base, "index.html", 390)
+        page.add_style_tag(content=INJECT)
+        page.wait_for_timeout(300)
+        hdr = page.evaluate(
+            "() => document.querySelector('header').getBoundingClientRect().top")
+        # Measure the CONTENT, not the <header> box. The box legitimately starts
+        # at y=0 — its gradient background should run under the status bar
+        # rather than leaving a bare strip — and it is the title and the Tools
+        # button inside it that must clear the inset. Measuring the ancestor
+        # reports 0 forever and the assertion can never pass, which is how this
+        # was got wrong the first time.
+        content = page.evaluate("""() => {
+            const out = {};
+            const g = (k, sel) => { const e = document.querySelector(sel);
+                out[k] = e ? e.getBoundingClientRect().top : null; };
+            g('title', 'header h1');
+            g('subtitle', '#header-sub');
+            g('toolsBtn', 'header button');
+            return out; }""")
+        for k in ("title", "subtitle", "toolsBtn"):
+            check("index.html: header %s clears the status bar (the title "
+                  "painted 27px inside it on the device; now top=%s)"
+                  % (k, content[k]),
+                  content[k] is not None and content[k] >= SA_TOP,
+                  {"headerBox": hdr, **content})
+        # The rider: .tabbar's env(safe-area-inset-bottom) predates the shell and
+        # has never fired, because nothing set viewport-fit=cover. Activating it
+        # is a side effect of a map.html fix and is NOT device-confirmed.
+        pad = page.evaluate("""() => {
+            const t = document.querySelector('.tabbar');
+            return t ? getComputedStyle(t).paddingBottom : null; }""")
+        check("index.html: the tab bar now clears the home indicator "
+              "(padding-bottom=%s — activated by viewport-fit=cover, NOT yet "
+              "confirmed on the device)" % pad,
+              pad is not None and pad.startswith(str(SA_BOTTOM)), pad)
+        page.close()
+        ctx.close()
 
         browser.close()
     httpd.shutdown()
