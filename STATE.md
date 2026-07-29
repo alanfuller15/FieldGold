@@ -1577,3 +1577,161 @@ green obtained by a route the user does not have is not a green user experience.
 
 Tiering: readings taken through Safari Web Inspector against the installed,
 unmodified app are `[externally-verified]`; Mac-side checks are `[self-tested]`.
+
+## Offline test — RUN 1 (as installed) — 2026-07-28 [externally-verified]
+
+Everything below is a device reading through Safari Web Inspector against the
+installed, unmodified app, Airplane Mode on, iPhone 14 / iOS 26.5.2 / 390x844.
+
+**The run is valid.** Preflight: all three network probes failed in 7-38 ms with
+`TypeError: Load failed` — refused immediately, not timed out, so there is no
+route out rather than a slow one. `navigator.onLine` false, `caches.keys()` `[]`,
+`serviceWorker` absent, `isSecureContext` true.
+
+### Predictions 1 and 2 hold
+
+**`index.html` works with no network.** Title `Placer — Field Brain`, launcher
+drawn (`0 / 100 UNFAVORABLE`, the score dial, "0/8 indicators assessed"), all six
+tabs present and **all six open under a finger**, `FieldGoldData` an object, no
+uncaught console errors.
+
+**The record survived and is intact offline.** 20 benches, **8 clean / 12 avoid /
+0 unchecked**, `state_claim` `none` x20, proximity `unknown` x20, seeded under v2
+(`fieldgold_rem_seeded_v2` = `1785288236415`, v1 null).
+
+**`map.html` opens and the diamonds draw.** Title `FieldGold — Map`,
+`L.version` `1.9.4` from the bundle, `window.__lf` false, `map ready ✓`. **20
+diamonds, 8 clean + 12 avoid + 0 unchecked, all ringed `#5AA9C9`**, exactly
+matching `statusCounts` on the record. The land-status colours are drawn from
+`localStorage` and do not care about the network.
+
+### RUN 1 IS A RESULT, NOT A FAILED ATTEMPT AT QUESTION 3
+
+**Cached basemap tiles carry the map after signal is lost.** `tilesPainted` 12,
+all 12 of the streets layer's viewport tiles, served from `NSURLCache` with the
+radios off. That is the realistic field case — signal at home, none at the
+trailhead — and it is genuinely useful behaviour worth knowing on its own terms.
+Recorded as a finding at Alan's instruction, and he is right to insist: it is
+*the* case the app is actually used in.
+
+Its bound: `NSURLCache` is not a durable store. It is evictable at the system's
+discretion, nothing in this app controls or measures it, and no code path
+depends on it. **Do not turn this into "the map works offline."** It means a
+recently-viewed area may still be painted, for an unspecified time, over ground
+already visited.
+
+**Question 3 is therefore UNANSWERED by this run, and correctly so.** With 12/12
+streets tiles painted, `load` fired, `baseOk` went true, `basemap (Streets) ✓`
+logged and the no-signal warning never fired. `WARN_present` false is **right
+behaviour here**, not a defect. This is precisely the confound the two-run design
+was built for — without Run 2 this reads as "tiles work offline".
+
+### Prediction 4 holds, and it holds harder than predicted
+
+It was predicted about one warning line. It is true of **the entire status log**.
+
+`panelCollapsed` true, `panelBodyDisplay` `none`, `statusVisibleToUser` **false**.
+All ten lines are written into a hidden subtree — including
+`err | geochem markers failed: Load failed`, **a real offline failure the user
+cannot see.** The map's whole self-reporting channel is invisible on a phone.
+
+**Settled by finger, not by instrument [externally-verified]:** Alan tapped the
+panel toggle. **It did not expand.** It is still drawn behind the clock.
+
+### A standing caution about `elementFromPoint`, now demonstrated
+
+`toggleHitTest` returned `SPAN.` — the page reported the toggle reachable. **That
+reading is wrong**, and it is now demonstrated rather than predicted: the iOS
+status bar is native chrome composited *above* a full-bleed webview, the page
+cannot see it, and `elementFromPoint` will report an element under it as
+hit-testable while iOS eats the touch.
+
+**This is a caution about the instrument, not a fact about this button.** Any
+hit-test in this repo — `tests/test_panel_reachability.py` included — is blind to
+native chrome and will pass over an untappable control. Same shape as the
+`FAILS 0` reading and the `no-overflow` mutant: a green obtained by a route the
+user does not have. `toggleRect` `[22,24,153,19]` — the toggle spans y=22..41,
+entirely inside the 47px strip.
+
+`env(safe-area-inset-*)` still `0px` on all four sides, `innerWH` `[390,844]`,
+`visualViewport.offsetTop` 0 — unchanged, and corroborated from the bytes by the
+bundle containing **zero** `viewport-fit` declarations.
+
+### NEW DEFECT — three layers printed ✓ while fetching nothing
+
+Not predicted, not looked for, and the sharpest thing this run found. Alan asked
+whether those ✓ lines were cache hits or something else. They are something else.
+
+**`map.html` logged `claims ✓`, `ardf ✓` and `ngdbsed ✓` with no network and
+zero tiles loaded on any of the three.**
+
+Verified in the vendored bytes rather than from memory —
+`docs/vendor/leaflet/leaflet.js`, `_tileReady`:
+
+```js
+_tileReady:function(t,e,i){ e&&this.fire("tileerror",{...});
+  ... e||(M(i.el,"leaflet-tile-loaded"),this.fire("tileload",{...})),
+  this._noTilesToLoad()&&(this._loading=!1,this.fire("load"),...) }
+```
+
+`tileload` and the `leaflet-tile-loaded` class are gated on `!err`. **`load` is
+not.** It fires when no tiles remain *pending* — including when every one of them
+failed. `map.html:169` and `:191` both log ✓ off `load`:
+
+```js
+let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' ✓','ok');}});
+```
+
+The arithmetic that pins which ✓ is which: `tilesInDom` **48** = four tile layers
+x 12 viewport tiles (streets, claims, ardf, ngdbsed; terrain is off by default),
+and `tilesLoadedClass` **12** = exactly one layer's worth succeeded — the streets
+layer, corroborated by `hosts` listing only the three OSM subdomains. So
+**claims, ardf and ngdbsed were 0/12 each, and all three printed a green tick.**
+
+**Why this is worse than the federal-register bug it sits beside.** CLAUDE.md
+already records that an empty answer from the wrong authority renders on a phone
+exactly like a clean answer from the right one. This renders a **failed** answer
+as a **✓**. The BLM claims layer — the one whose entire on-screen treatment is
+built around not over-reading a blank — reports success when it fetched nothing.
+
+**The app has two reporting styles and they disagree.** `fetch`-based calls
+report honestly: `geochem markers failed: Load failed` is a true statement of a
+real failure. Leaflet-`load`-based layers report falsely. Same page, same run,
+opposite truthfulness. Phase 1 item: `claims`/`ardf`/`ngdbsed`/`terrain` must
+report from tile outcomes, not from `load`. Note `watchBase` is **not** in this
+class — it pairs `load` with a `tileerror` handler, which is why the basemap line
+is trustworthy and the other three are not.
+
+### Instrument caveat for anyone reusing these snippets
+
+**WebKit emits no Resource Timing entries for `capacitor://` loads.**
+`index.html` returned `resources:[]` while demonstrably rendering with
+`FieldGoldData` present. So `resources`, `zeroLen` and `hosts` see `https://`
+only, and **an empty `resources` is not evidence that nothing loaded.** The
+load-bearing measurements here are DOM facts — `leaflet-tile-loaded`,
+`naturalWidth`, `offsetParent`, computed style — not timing entries.
+
+## Offline test — RUN 2 PREDICTION, WRITTEN BEFORE THE RUN
+
+Same rule as the first prediction: committed before Run 2 executes; amend below
+the line if it fails, do not edit it to match.
+
+1. **Virgin install, no signal:** the seeder takes the never-seeded path and
+   writes all 20 benches with 12 avoid / 8 clean / 0 unchecked, with no network
+   at any point. Never observed.
+2. **`tilesPainted` 0**, `tilesInDom` 48, `tilesLoadedClass` 0.
+3. **The warning fires** — both lines. `tileerror` is fired at the *top* of
+   `_tileReady`, before the `load` at the bottom, so the first failing tile
+   reaches `watchBase` while `baseOk` is still false.
+4. **And `basemap (Streets) ✓` fires too, right after it.** `watchBase`'s load
+   handler guards on `if(!baseOk)` and **never checks `baseSaid`**. So the log
+   should carry the honest warning *and* a false green tick for the same layer,
+   in that order — which is worse than either alone.
+5. **`claims ✓`, `ardf ✓`, `ngdbsed ✓` all still print**, confirming the new
+   defect in the clean case rather than only in the mixed one.
+6. **None of it is visible.** Panel auto-collapses at 390px, `#panelbody`
+   `display:none`, and the toggle is untappable.
+
+Run 2 also converts one inference into a measurement: tiles are attributed to
+layers by `src` host, so "streets got the 12" stops being arithmetic and becomes
+a per-layer count.
