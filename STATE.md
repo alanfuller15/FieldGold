@@ -9,6 +9,18 @@ nothing, and since `map.html` is referenced exactly once in `index.html` — by
 that dead anchor — **the map is UNREACHABLE from the app's UI on a phone.** Not
 a broken button: the primary field tool cannot be opened at all)
 
+**Amended 2026-07-28, later the same day — the offline test has now run**, on
+the device, in two runs, with its prediction committed before each. Headline:
+**the app's core function works with no signal** — bundle-local assets carry
+both pages, the seeder runs cold, and all 20 benches draw in correct
+land-status colours. **What fails offline is the app's ability to say what it
+could not do.** The "basemap tiles unavailable — no signal" line executed for
+the first time on any target and is correct, and no user can see it: the panel
+is collapsed behind an untappable toggle, and forced open the status box shows
+4 of 12 lines — exactly the four that report nothing wrong. A new defect also
+surfaced: four layers printed ✓ having loaded zero tiles. See the two RUN
+sections at the end of this file.
+
 ## Active phase
 
 **Phase 0 — Capacitor shell — COMPLETE 2026-07-28** (PR #4, `main` at
@@ -820,6 +832,44 @@ default, so the shipping bundle cannot report on itself.
   no instrumented copy, no re-sign, no reinstall, nothing written to `docs/`. The
   caveat the simulator findings had to carry does not apply to them
   [self-tested] 2026-07-28
+- **The offline path has now executed.** On a virgin install with Airplane Mode
+  on and nothing reaching the network (`tilesPainted` 0, `tilesLoadedClass` 0,
+  `hosts` `[]`, all four tile layers 0/12), `map.html` logged **"basemap tiles
+  unavailable — no signal"** and its follow-up line. First execution on any
+  target — not browser, not simulator, not device, until now
+  [externally-verified] 2026-07-28
+- **The app's core function works with no signal.** Both pages open from the
+  bundle, Leaflet 1.9.4 resolves locally, and all 20 benches draw at correct
+  positions in correct land-status colours (8 clean / 12 avoid, ring `#5AA9C9`)
+  matching the record — with `sw.js` inert, carried entirely by bundle-local
+  assets [externally-verified] 2026-07-28
+- **`seedREM()`'s never-seeded path runs cold and offline.** On a virgin
+  container with the radios off it wrote 20 benches, 8 clean / 12 avoid / 0
+  unchecked, `state_claim` `none` x20, proximity `unknown` x20 — matching the
+  generator payload. New flag `1785309971906`, so a fresh write, not a survivor
+  [externally-verified] 2026-07-28
+- **Cached basemap tiles carry the map after signal is lost.** Run 1, as
+  installed: 12/12 streets viewport tiles painted from `NSURLCache` with the
+  radios off, so `baseOk` went true and the warning correctly did not fire. The
+  realistic field case. Bound: `NSURLCache` is evictable, unmeasured, and
+  depended on by nothing [externally-verified] 2026-07-28
+- **`map.html` prints ✓ for layers that fetched nothing.** With zero tiles
+  loaded on any layer it logged `basemap (Streets) ✓`, `claims ✓`, `ardf ✓` and
+  `ngdbsed ✓` — the basemap tick arriving three lines *after* its own no-signal
+  warning. Cause verified in the vendored bytes: Leaflet's `_tileReady` gates
+  `tileload` and `leaflet-tile-loaded` on `!err` but fires `load` whenever no
+  tiles remain pending [externally-verified] 2026-07-28
+- **The whole status log is unreachable on a phone.** Collapsed:
+  `statusVisibleToUser` false. Forced open: `linesVisibleAtRest` **4 of 12**,
+  `statusScroll` `[0, 64, 182]` — the four visible lines are the four that
+  report nothing wrong. `log()`'s `scrollTop = scrollHeight` is a no-op while
+  `#panelbody` is `display:none` (`scrollHeight` 0), so the auto-scroll is
+  disabled by the collapse that hides the log. Reproduces in Chromium at 390px,
+  so it is a phone-width defect on **both** distributions, not a shell
+  divergence [externally-verified] + [self-tested] 2026-07-28
+- **The `map.html` panel toggle is untappable on a virgin install**, confirming
+  it is not state-dependent. Second finger test, second container
+  [externally-verified] 2026-07-28
 
 ## Decisions made
 
@@ -1735,3 +1785,161 @@ the line if it fails, do not edit it to match.
 Run 2 also converts one inference into a measurement: tiles are attributed to
 layers by `src` host, so "streets got the 12" stops being arithmetic and becomes
 a per-layer count.
+
+## Offline test — RUN 2 (virgin install, cold, no signal) — 2026-07-28
+
+**[externally-verified]** unless marked otherwise. Virgin container: the app was
+deleted from the phone (confirmed by a pre-install query that ran and returned
+zero rows), reinstalled over USB into a new container
+`E8CDFFE7-EA41-4847-9BC0-362B736FE81E`, and **never launched** until Airplane
+Mode was on. Preflight: probes refused in 6-44 ms, `onLine` false, `caches.keys()`
+`[]`.
+
+### QUESTION 3 IS ANSWERED — the message runs, and it is good
+
+```
+warn | basemap tiles unavailable — no signal
+warn | your points and their land-status colours are still correct;
+       the background is blank, not wrong
+```
+
+**First execution on any target — not browser, not simulator, not device, until
+now.** `tilesPainted` 0, `tilesLoadedClass` 0, `hosts` `[]`, and per-layer
+`streets`/`ardf`/`ngdbsed`/`claims` all `n:12 painted:0 loadedClass:0`. Nothing
+reached the network, so this is the real path and not a partial one.
+
+The second line is the one that earns its place. A blank background with no
+explanation reads as a broken app, and a person who thinks the app is broken
+stops trusting the colours too. That sentence is the control against it, it is
+correct, and it now demonstrably runs.
+
+### The seeder ran cold, offline, on a virgin container — never observed before
+
+`fieldgold_rem_seeded_v2` = `1785309971906`, a **new** timestamp ~21,700 s after
+Run 1's `1785288236415`, so this is a fresh write and not a surviving record. It
+produced 20 benches, **8 clean / 12 avoid / 0 unchecked**, `state_claim` `none`
+x20, proximity `unknown` x20 — identical to the generator payload, with the
+radios off. The never-seeded path of `seedREM()` works with no network.
+
+### Every Run 2 prediction held, including the sharp one
+
+Predicted in `2283638` before the run; observed order in `#status`:
+
+```
+5  warn | REM candidates: 20 plotted (8 clean, 0 unchecked, 12 avoid)
+6  warn | basemap tiles unavailable — no signal
+7  warn | your points and their land-status colours are still correct…
+8  err  | geochem markers failed: Load failed
+9  ok   | basemap (Streets) ✓        <-- FALSE, and it follows the warning
+10 ok   | claims ✓                   <-- FALSE
+11 ok   | ardf ✓                     <-- FALSE
+12 ok   | ngdbsed ✓                  <-- FALSE
+```
+
+**`map.html` tells you the basemap is unavailable and then, three lines later,
+ticks it as loaded.** `watchBase`'s `load` handler guards on `if(!baseOk)` and
+never checks `baseSaid`, so both fire; `tileerror` is raised at the top of
+Leaflet's `_tileReady` and `load` at the bottom, which fixes the order. The
+new-defect finding from Run 1 is confirmed in the clean case: **four** ✓ lines,
+**zero** tiles loaded, on a run where nothing reached the network at all.
+
+`STREETS_TICK` true, `falseTicks` `["claims","ardf","ngdbsed"]`. 20 diamonds,
+8 clean + 12 avoid, ring `#5AA9C9`, matching `recordCounts`.
+
+### Prediction 5 was WRONG about the mechanism and right about the outcome
+
+Recorded as a miss, per the rule set before the run.
+
+Predicted: the log auto-scrolls to the bottom, so the warning would sit **above**
+the visible 64px window. Observed: `statusScroll` `[0, 64, 182]` — `scrollTop`
+is **0**. The scroller sits at the **top** and the warning is **below** the fold.
+`linesVisibleAtRest` **4 of 12**.
+
+The mechanism, checked in Chromium at 390x844 against `docs/map.html` rather
+than asserted [self-tested] 2026-07-28:
+
+```
+COLLAPSED : display:none, scrollTop 0, scrollHeight 0, clientHeight 0
+log()'s scrollTop = scrollHeight   ->  scrollTop 0     (0 = 0, a no-op)
+EXPANDED  : scrollTop 0, scrollHeight 117, clientHeight 64
+```
+
+`log()` (`map.html:124`) ends `S.scrollTop = S.scrollHeight`. While the panel is
+collapsed `#status` has no layout box, so `scrollHeight` is 0 and the assignment
+writes 0 to 0. **The auto-scroll is silently disabled by the very collapse that
+hides the log**, and when the box finally gets layout it is pinned to the top.
+
+**Scope note: this one is not a Capacitor divergence.** It reproduces in desktop
+Chromium at 390px, so it is a **phone-width** defect present on GitHub Pages
+too — unlike the service worker, `target="_blank"` and safe-area findings, which
+are shell-only.
+
+### The failure is two-layered, and either layer alone would suffice
+
+Alan's framing, and it is the right one:
+
+1. **The panel is collapsed and the toggle cannot be pressed.** `panelCollapsed`
+   true, `panelBodyDisplay` `none`, `statusVisibleToUser` **false**,
+   `toggleRect` `[22,24,153,19]` — inside the 47px strip. He tapped it: **it did
+   not expand.** Second confirmation, now on a virgin install, so it is **not
+   state-dependent**.
+2. **Even forced open, the status box shows only the four lines that report
+   nothing wrong** — indices 0-3: `map ready ✓`, `requesting 3 layers…`,
+   `no logged sites yet`, `no bench-hunter candidates yet`. Every line reporting
+   a problem is below the fold: the warning at 5, its explanation at 6, the real
+   `geochem markers failed` at 7.
+
+**What Alan saw: the map renders BLACK, with the diamonds in their correct
+positions.** This is precisely the outcome CLAUDE.md's rule was written to
+prevent — "do not delete that message to tidy the log", except the message was
+not deleted, it was rendered unreachable by layout. **Layout is a way of
+deleting text, and it deleted the whole run log.**
+
+### What this settles about offline, stated plainly
+
+**The app's core function works with no signal.** Both pages open from the
+bundle, Leaflet 1.9.4 resolves locally, the data layer loads, the seeder runs
+cold, and all 20 benches draw at their correct positions in their correct
+land-status colours — 8 clean, 12 avoid, matching the record exactly. With
+`sw.js` inert under Capacitor, the shell's offline story rests entirely on
+bundle-local assets, and **those assets carry it.** That question is now closed
+in the affirmative.
+
+**What fails offline is the app's ability to tell you what it could not do.**
+The data is correct; the self-reporting is invisible. A user at a trailhead sees
+a black screen with correct diamonds on it and no word of explanation, while
+twelve lines of accurate diagnosis sit in a subtree they cannot open.
+
+### Phase 1 consequences from this test
+
+Recorded as requirements, not as designs.
+
+1. **The status log must be reachable on a phone.** Both layers need fixing;
+   fixing only the toggle leaves four visible lines out of twelve, and fixing
+   only the scroller leaves a panel that cannot be opened. This is now the
+   fourth item on Phase 1 and it is not cosmetic — it is the channel through
+   which every other failure gets reported.
+
+   **`tests/test_panel_reachability.py` cannot catch this, by design.** It
+   excludes `#status` from its scope for a stated and correct reason — it is the
+   run log and has its own 64px scroller, so scrolling the panel can never reach
+   its lower lines. That exclusion is now known to cover **the app's entire
+   failure-reporting channel**. All twelve suites pass green against a build
+   whose no-signal warning no user can read. The exclusion should not simply be
+   removed — the reason for it still holds — but the gap it leaves is no longer
+   theoretical and needs its own coverage.
+2. **`claims`, `ardf`, `ngdbsed` and `terrain` must report from tile outcomes,
+   not from Leaflet's `load` event.** `load` fires when no tiles remain pending,
+   including when every one failed. `watchBase` is the pattern that works — it
+   pairs `load` with `tileerror` — and even it needs `baseSaid` added to its
+   `load` guard so a layer cannot warn and then tick.
+3. **The safe-area work is confirmed twice over** and `viewport-fit=cover` must
+   still land before any `env()` padding, or the fix computes to zero.
+
+### The instrument caution, now demonstrated twice
+
+`elementFromPoint` reported the toggle reachable in Run 1; the finger says
+otherwise, on two installs. The iOS status bar is native chrome composited above
+a full-bleed webview and the page cannot see it. **Every hit test in this repo,
+`tests/test_panel_reachability.py` included, is blind to native chrome and will
+pass over an untappable control.**
