@@ -132,12 +132,41 @@ def mutate(root):
         if not _cur:
             print("mutant %s: no readable cache version in sw.js" % MUTATE)
             sys.exit(2)
+        # Now v3 — the version actually on a device that never got land status,
+        # which is both what "stale cache" means here and the one value that
+        # violates the check below. It was 'fieldgold-v6' until 2026-07-28, when
+        # the real sequential bump to v6 made the pinned check fail on a
+        # CORRECT change. Same trap as test_stage_maps.py's stale-cache mutant:
+        # a mutant must violate the assertion it targets, not merely differ from
+        # the current value.
         edit("sw.js", "const CACHE = 'fieldgold-v%s';" % _cur.group(1),
-             "const CACHE = 'fieldgold-v6';")
+             "const CACHE = 'fieldgold-v3';")
     elif MUTATE == "swap-leaflet":
         # A silently-swapped library. One appended byte is enough; it has to be.
         p = root / "vendor/leaflet/leaflet.js"
         p.write_bytes(p.read_bytes() + b"\n//x\n")
+    elif MUTATE == "tick-on-load":
+        # Put the shipped defect back: tick off Leaflet's `load` whatever the
+        # tiles actually did. This is the exact code that printed five green
+        # ticks over 0 of 100 tiles.
+        edit("map.html",
+             "      if(loaded>0){ said=true; log(name+' ✓','ok'); }",
+             "      if(true){ said=true; log(name+' ✓','ok'); }")
+    elif MUTATE == "silent-on-fail":
+        # The false-RED direction. Stop ticking falsely AND stop reporting the
+        # failure, so offline the layers simply say nothing. 7a's "reports the
+        # failure instead" half is what catches this; 7a alone without it would
+        # be satisfied by silence.
+        edit("map.html",
+             "      else if(errored>0){ said=true; log(name+' unavailable — 0 tiles loaded','err'); }\n",
+             "")
+    elif MUTATE == "base-tick-after-warn":
+        # Drop `baseSaid` from watchBase's load guard, leaving the tile-count
+        # guard in place. Invisible in the all-fail case — which is why 7c
+        # exists. In the MIXED case the basemap warns and then ticks itself
+        # green, the sequence the phone showed.
+        edit("map.html", "if(baseOk||baseSaid||loaded===0) return;",
+             "if(baseOk||loaded===0) return;")
     elif MUTATE == "no-tile-honesty":
         # Keep the map, drop the sentence that tells you the blank background
         # is a missing basemap and not a broken app.
@@ -202,10 +231,22 @@ def main():
            ["./vendor/leaflet/images/" + i for i in VENDOR_IMAGES]
     for n in need:
         check("SHELL caches " + n, n in shell_entries, shell_entries)
-    ver = re.search(r"const CACHE = '([^']+)'", sw)
-    check("the cache version was bumped past v6 (a v6 phone still has the "
-          "cdnjs shell and looks fine until it evicts)",
-          bool(ver) and ver.group(1) != "fieldgold-v6", ver and ver.group(1))
+    # PUBLISHED is the last version that reached a device without land status.
+    # Read, not pinned — and it took a real bump to find that out. This check
+    # used to read `!= "fieldgold-v6"`, which is a pinned literal wearing a
+    # comparison's clothes: it passed for as long as nobody bumped to v6 and
+    # then failed on a CORRECT change, which is precisely how a suite teaches
+    # the next person to edit the assertion instead of thinking. The other two
+    # suites that read this value (test_stage_maps.py, test_state_claims.py)
+    # were already `> 3`; CLAUDE.md said all three were, and was wrong about
+    # this one.
+    PUBLISHED = 3
+    ver = re.search(r"const CACHE = 'fieldgold-v(\d+)'", sw)
+    check("  the cache version is readable at all", bool(ver), sw[:80])
+    check("cache version is past the v%d already on the device (a v%d phone "
+          "has no land status at all and looks fine until it evicts)"
+          % (PUBLISHED, PUBLISHED),
+          bool(ver) and int(ver.group(1)) > PUBLISHED, ver and ver.group(0))
 
     # ------------------------------------------------------------------
     # 4. The real thing: load the map with every off-origin request blocked.
@@ -322,6 +363,120 @@ def main():
                   for u in blocked), blocked[:3])
 
         check("no uncaught page errors with the network cut", not errors, errors[:2])
+
+        # ------------------------------------------------------------------
+        # 7. A ✓ is earned by a tile that LOADED. Nothing else earns it.
+        #
+        #    Leaflet's _tileReady gates `tileload` and the leaflet-tile-loaded
+        #    class on !err. It does NOT gate `load`, which fires whenever no
+        #    tiles remain PENDING — including when every one of them failed. On
+        #    the phone with the radios off (STATE.md, offline Run 2) map.html
+        #    logged `basemap (Streets) ✓`, `claims ✓`, `ardf ✓` and `ngdbsed ✓`
+        #    over ZERO loaded tiles, the basemap tick arriving three lines after
+        #    its own no-signal warning.
+        #
+        #    Sections 4-6 above have been running these exact conditions since
+        #    this suite was written and asserted nothing about them. That is why
+        #    the defect reached a device through a green gate.
+        #
+        #    Two-sided on purpose. "No ✓ offline" is also satisfied by a page
+        #    that never reports success at all — a false RED, the same defect
+        #    pointing the other way. 7b is the control that forbids it.
+        # ------------------------------------------------------------------
+        print("[7] a tick is earned by a loaded tile, in both directions")
+
+        # 7a. terrain is OFF by default, so neither device run exercised it, and
+        #     it was mechanically the worst case: a ✓ logged off `load` paired
+        #     with an EMPTY tileerror handler that swallowed every failure.
+        page.check("#t-terrain")
+        page.wait_for_timeout(1500)
+        status = page.evaluate("() => document.getElementById('status').innerText")
+        loaded_cls = page.evaluate(
+            "() => document.querySelectorAll('img.leaflet-tile-loaded').length")
+        in_dom = page.evaluate(
+            "() => document.querySelectorAll('img.leaflet-tile').length")
+        check("tiles were requested and NONE loaded — otherwise everything "
+              "below this line proves nothing", in_dom > 0 and loaded_cls == 0,
+              {"inDom": in_dom, "loadedClass": loaded_cls})
+        for name in ["ardf", "ngdbsed", "claims", "terrain"]:
+            check("no false ✓ for " + name + " over zero loaded tiles",
+                  (name + " ✓") not in status, status)
+            check("  ...and " + name + " reports the failure instead",
+                  (name + " unavailable") in status, status)
+        check("the basemap does not tick at all with nothing loaded",
+              "basemap (" not in status, status)
+        # The ordering half. The phone showed the warning and the tick in the
+        # same log, three lines apart, which is worse than either alone.
+        after_warn = status.split("basemap tiles unavailable", 1)
+        check("no layer ticks green ANYWHERE after the no-signal warning",
+              len(after_warn) == 2 and "✓" not in after_warn[1],
+              after_warn[-1][:200])
+
+        # 7b. The control. Every tile request fulfilled with a real PNG, so
+        #     every layer must tick. Without this, deleting all ✓ logging would
+        #     pass 7a.
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+            "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+
+        def fulfil(route, request):
+            if request.url.startswith(base):
+                route.continue_()
+            else:
+                route.fulfill(status=200, content_type="image/png", body=png)
+
+        ok_ctx = browser.new_context()
+        ok_ctx.route("**/*", fulfil)
+        ok_page = ok_ctx.new_page()
+        ok_page.goto(base + "/map.html", wait_until="load")
+        ok_page.wait_for_timeout(1500)
+        ok_page.check("#t-terrain")
+        ok_page.wait_for_timeout(1500)
+        ok_status = ok_page.evaluate(
+            "() => document.getElementById('status').innerText")
+        for name in ["basemap (Streets)", "ardf", "ngdbsed", "claims", "terrain"]:
+            check("a layer whose tiles DO load still ticks: " + name,
+                  (name + " ✓") in ok_status, ok_status)
+        check("nothing reports unavailable when every tile loaded",
+              "unavailable" not in ok_status, ok_status)
+        ok_ctx.close()
+
+        # 7c. The mixed case — the ONLY scenario in which watchBase's `baseSaid`
+        #     guard is load-bearing. The first two basemap tiles fail, the rest
+        #     succeed, so the warning fires on the first failure and `load` then
+        #     arrives with loaded > 0. Without the guard the same layer warns and
+        #     then ticks itself green, which is what the phone showed.
+        seen = {"n": 0}
+
+        def partial(route, request):
+            if request.url.startswith(base):
+                route.continue_()
+            elif "openstreetmap" in request.url:
+                seen["n"] += 1
+                if seen["n"] <= 2:
+                    route.abort()
+                else:
+                    route.fulfill(status=200, content_type="image/png", body=png)
+            else:
+                route.abort()
+
+        part_ctx = browser.new_context()
+        part_ctx.route("**/*", partial)
+        part_page = part_ctx.new_page()
+        part_page.goto(base + "/map.html", wait_until="load")
+        part_page.wait_for_timeout(2000)
+        part_status = part_page.evaluate(
+            "() => document.getElementById('status').innerText")
+        part_loaded = part_page.evaluate(
+            "() => document.querySelectorAll('img.leaflet-tile-loaded').length")
+        check("the mixed case really is mixed — some basemap tiles loaded and "
+              "at least one failed", part_loaded > 0 and seen["n"] > 2,
+              {"loadedClass": part_loaded, "streetsRequests": seen["n"]})
+        check("a partly-failing basemap still warns",
+              "basemap tiles unavailable" in part_status, part_status)
+        check("  ...and does NOT then tick the same layer green",
+              "basemap (Streets) ✓" not in part_status, part_status)
+        part_ctx.close()
 
         browser.close()
     httpd.shutdown()

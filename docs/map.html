@@ -147,9 +147,69 @@ window.addEventListener('load',()=>{
   // That is a working map with no picture behind it — not a broken app — and
   // the difference matters when you are deciding whether to trust the screen.
   // Say it out loud rather than letting a grey rectangle imply a failure.
+  // A LAYER REPORTS FROM TILE OUTCOMES, NEVER FROM LEAFLET'S 'load' EVENT.
+  //
+  // Leaflet's _tileReady gates `tileload` and the leaflet-tile-loaded class on
+  // !err. It does NOT gate `load`, which fires whenever no tiles remain
+  // PENDING — including when every single one of them failed. Measured on the
+  // phone 2026-07-28 with the radios off (STATE.md, offline Run 2):
+  // `basemap (Streets) ✓`, `claims ✓`, `ardf ✓`, `ngdbsed ✓` printed with ZERO
+  // tiles loaded, and the basemap tick arrived three lines AFTER its own
+  // no-signal warning. Reproduced headlessly here 2026-07-28, which also
+  // settled the case Run 2 could not: with terrain toggled on that is FIVE
+  // false ticks against 0 of 100 tiles.
+  //
+  // Rule 4 is "never soften a land-status warning", and a ✓ over a failed
+  // fetch is a softened warning. The BLM claims layer — whose entire on-screen
+  // treatment exists to stop a blank being over-read as "no claims" — reported
+  // success having fetched nothing. So a tick is now earned by a tile that
+  // actually loaded, and by nothing else.
+  //
+  // One-shot, deliberately: the first `load` decides and nothing retracts it.
+  // A layer that fails and later succeeds stays reported as failed rather than
+  // being upgraded. That understates what the app can do, which is the safe
+  // direction; overstating it is the defect this replaces.
+  function watchTiles(lyr,name){
+    var loaded=0, errored=0, said=false;
+    lyr.on('tileload',function(){ loaded++; });
+    // Counted, not logged. Edge/no-data tiles are expected wherever a coverage
+    // footprint ends — 3DEP's IfSAR especially — and a line per failed tile
+    // would bury the log while panning. The count is what the report needs.
+    lyr.on('tileerror',function(){ errored++; });
+    lyr.on('load',function(){
+      if(said) return;
+      if(loaded>0){ said=true; log(name+' ✓','ok'); }
+      // 0 loaded AND 0 errored means nothing was ever requested. Say nothing
+      // rather than report a failure that did not happen.
+      else if(errored>0){ said=true; log(name+' unavailable — 0 tiles loaded','err'); }
+    });
+  }
+
   var baseOk=false, baseSaid=false;
   function watchBase(lyr,name){
-    lyr.on('load',function(){ if(!baseOk){ baseOk=true; log('basemap ('+name+') ✓','ok'); } });
+    var loaded=0;
+    lyr.on('tileload',function(){ loaded++; });
+    lyr.on('load',function(){
+      // Three guards, and be honest about which one does the work. `baseSaid`
+      // is the load-bearing one: without it a straggler tile arriving after the
+      // warning lets the SAME layer warn and then tick, which is what shipped
+      // and what the phone showed. `loaded===0` is belt-and-braces and has no
+      // reachable trigger while the tileerror path below exists — a failing
+      // tile always sets baseSaid before `load` fires, so no mutant can violate
+      // it in isolation and none was written pretending otherwise. It is kept
+      // so that removing the warning later cannot silently re-open the tick.
+      //
+      // Known and accepted consequence: if some tiles load and some fail, the
+      // warning fires on the first failure and the tick is then suppressed, so
+      // a partly-working basemap reads as unavailable. That understates it.
+      // Understating is the safe direction here and overstating is the bug.
+      if(baseOk||baseSaid||loaded===0) return;
+      baseOk=true; log('basemap ('+name+') ✓','ok');
+    });
+    // Kept on tileerror rather than moved to `load` on purpose: `load` only
+    // fires once every tile has settled, and with no signal a request can hang
+    // for seconds before it errors. The user is looking at a blank screen the
+    // whole time. The explanation has to arrive early, not after the timeouts.
     lyr.on('tileerror',function(){
       if(baseOk||baseSaid) return;
       baseSaid=true;
@@ -166,7 +226,7 @@ window.addEventListener('load',()=>{
 
   function wms(base,layers,attr){
     const lyr=L.tileLayer.wms(base+'?',{layers,format:'image/png',transparent:true,version:'1.3.0',attribution:attr});
-    let done=false; lyr.on('load',()=>{if(!done){done=true;log(layers+' ✓','ok');}});
+    watchTiles(lyr,layers);
     return lyr;
   }
   const ardf=wms('https://mrdata.usgs.gov/services/ardf','ardf','USGS ARDF').addTo(map);
@@ -188,7 +248,7 @@ window.addEventListener('load',()=>{
     }
   });
   const claims = new ClaimTiles('', { opacity:0.6, attribution:'BLM AK Claims' });
-  let claimDone=false; claims.on('load',()=>{if(!claimDone){claimDone=true;log('claims ✓','ok');}});
+  watchTiles(claims,'claims');
   claims.addTo(map);
   log('requesting 3 layers…');
 
@@ -197,11 +257,13 @@ window.addEventListener('load',()=>{
   const terrain=L.tileLayer.wms('https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?',{
     layers:'3DEPElevation:Hillshade Multidirectional', format:'image/png', transparent:true,
     version:'1.3.0', opacity:0.55, attribution:'USGS 3DEP (IfSAR 5m, AK)'});
-  let terrDone=false; terrain.on('load',()=>{if(!terrDone){terrDone=true;log('terrain ✓','ok');}});
-  // Edge/no-data tiles are expected wherever the IfSAR footprint ends; they fail
-  // gracefully and carry no actionable info, so we don't log them (kept the map
-  // clean while scrolling). The 'load' success above still confirms coverage.
-  terrain.on('tileerror',()=>{});
+  // Edge/no-data tiles are expected wherever the IfSAR footprint ends, so
+  // individual failures are counted and not logged — watchTiles does that. This
+  // used to be an EMPTY tileerror handler paired with a ✓ logged off `load`,
+  // which made terrain the worst case of the false-tick defect: it swallowed
+  // every error and then reported success. Confirmed 2026-07-28 — with the
+  // network cut and terrain toggled on, `terrain ✓` printed against 0 tiles.
+  watchTiles(terrain,'terrain');
   document.getElementById('t-terrain').addEventListener('change',e=>{
     if(e.target.checked){ terrain.addTo(map); terrain.bringToFront(); log('terrain requested…'); }
     else map.removeLayer(terrain);

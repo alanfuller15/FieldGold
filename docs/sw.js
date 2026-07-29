@@ -1,5 +1,29 @@
 // BUMP THIS ON EVERY CHANGE TO A CACHED FILE.
 //
+// AND BUMPING IT ONLY DELIVERS TO ONE OF THE TWO DISTRIBUTIONS. This file is
+// the entire update path on GitHub Pages and is INERT in the iOS shell:
+// `navigator.serviceWorker` does not exist under `capacitor://localhost`, so
+// index.html's `in navigator` guard short-circuits and this worker never
+// registers — silently, with no error and nothing on screen. Measured on the
+// simulator and again on the physical iPhone 2026-07-28 (STATE.md). In the
+// shell the web assets are already bundle-local, so offline works by
+// construction and this cache is not needed; what changes is DELIVERY. A phone
+// running the app gets a fix only via `npx cap sync` + rebuild + install.
+// Green on one distribution is not evidence about the other, and a bumped
+// version with no rebuild ships the fix to browsers and to nobody's phone.
+//
+// v6 (2026-07-28): map.html only — layers report from tile outcomes instead of
+// from Leaflet's `load` event. A v5 phone shows a green ✓ for every tile layer
+// that fetched NOTHING: measured on the device with the radios off as
+// `basemap (Streets) ✓`, `claims ✓`, `ardf ✓`, `ngdbsed ✓` over zero loaded
+// tiles, the basemap tick arriving three lines after its own "basemap tiles
+// unavailable — no signal" warning, plus `terrain ✓` once toggled on. Leaflet's
+// _tileReady gates `tileload` on !err but fires `load` whenever no tiles remain
+// pending, including when every one failed. Rule 4 is "never soften a
+// land-status warning" and a ✓ over a failed fetch is a softened warning — on
+// the BLM claims layer, whose whole on-screen treatment exists to stop a blank
+// being over-read as "no claims".
+//
 // v5 (2026-07-26): map.html only — the panel reachability fix.
 //
 // A phone still holding v4 has the DEFECT, and holds it permanently. The fetch
@@ -82,7 +106,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v5';
+const CACHE = 'fieldgold-v6';
 
 const SHELL = [
   './',
