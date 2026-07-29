@@ -1454,3 +1454,126 @@ device, the cable, the signing and the inspector route all work. The one thing
 worth doing *before* writing any fix is the offline test above, because it is
 cheap, it needs no new hardware, and it is the last unmeasured thing that
 decides whether this app functions where it is actually used.
+
+**That test is now in progress.** Its prediction is recorded below, before the
+run. Read that section before reading any result of it.
+
+## Offline test — 2026-07-28 — PREDICTION, WRITTEN BEFORE THE RUN
+
+**Nothing in this section is a result.** It was committed before a single
+snippet executed on the phone, so that when the numbers arrive it is checkable
+whether they were predicted or explained afterwards. If the prediction holds, it
+holds having been stated in advance. **If it does not hold, that is the more
+interesting outcome and it must not be quietly rewritten to match** — amend
+below the line, do not edit above it.
+
+### Mac-side preconditions, checked first [self-tested] 2026-07-28
+
+| check | observed |
+|---|---|
+| worktree | clean, `main` = `origin/main` = `bcd5d9d` — so the installed app is the shipping bundle and nothing local diverges |
+| device | `Alans IPhone`, UDID `00008110-0006398C0ABA401E`, iPhone 14 (`iPhone14,7`), iOS **26.5.2**, `pairingState paired`, `transportType wired`, `bootState booted`, `developerModeStatus enabled` |
+| app installed | `FieldGold  io.github.alanfuller15.fieldgold  1.0  1`, by independent lookup rather than by an install command's own message |
+| inspector will attach | built `Info.plist` carries `CAPACITOR_DEBUG = true` — the SPM-xcframework fallback the residue says to re-check. Re-checked, still true |
+| bundle == `docs/` | `diff -rq docs <App.app>/public` → only `cordova.js` and `cordova_plugins.js` extra. No drift |
+| `CFBundleURLTypes` | **absent** — the `capacitor://` refusal behind the dead internal links is unchanged |
+| `viewport-fit` in bundle | **0 files** — corroborates, from the bytes rather than from the device, why `env(safe-area-inset-*)` reads 0 |
+
+**One trap found doing this, worth keeping.** `devicectl list devices` reported
+`tunnelState: disconnected`, `ddiServicesAvailable: false`, `tunnelIPAddress:
+nil` on a perfectly healthy wired connection — `ddiServicesAvailable: false` is
+the *same* string that meant "Developer Mode is off" earlier in this file. It
+did not mean that here. The tunnel is established lazily: running an actual
+operation printed `Acquired tunnel connection to device` / `Enabling developer
+disk image services` and then answered. **Do not read `tunnelState` from the
+listing as a blocker — run an operation and read its artifact.** Same family as
+everything else in this file: the status field is not the thing.
+
+**Not established:** that the *on-device* bundle is byte-identical to the built
+one. Identity and version match (`1.0`/`1`) and the tree has not changed since
+the install, but the installed bundle cannot be read back without an app
+container route. Treated as sound, not proven.
+
+### The prediction, from reading the shipping source
+
+1. **Both pages open with no network.** Everything either page loads at parse
+   time is bundle-local: `index.html` → `manifest.json`, `icon-192.png`,
+   `fieldgold-data.js`, and **nothing else**; `map.html` → `vendor/leaflet/`
+   (css + js) and `fieldgold-data.js`. Every remote call in `index.html` is
+   user-triggered (Research tab, photo analysis, Apple Maps) and none run on
+   load.
+2. **The 20 bench diamonds draw with correct land-status colours**, because
+   `loadREM` reads `localStorage` and the colour is inlined into the `divIcon`
+   from `STATUS_META` — `#4E9A5F` clean, `#D29A3A` unchecked, `#B2402F` avoid,
+   REM ring `#5AA9C9`. Expect **12 avoid / 8 clean / 0 unchecked**, matching the
+   record.
+3. **The "basemap tiles unavailable — no signal" line runs** — `map.html:150-161`,
+   on the first `tileerror` while `baseOk` is false.
+4. **And it will not be readable on the phone.** `#status` is inside
+   `#panelbody`; `map.html:39` is `#panel.collapsed #panelbody{display:none}`;
+   `map.html:128` auto-collapses the panel at `innerWidth <= 600` and the phone
+   is 390. So the message is written into a `display:none` subtree, and the one
+   control that reveals it is the `#panel h1` toggle already established as
+   untappable under the 47px status bar. **Predicted answer to "does the message
+   appear, or is there just a blank background with no explanation": both.** The
+   code runs and the user cannot see it — CLAUDE.md's "layout is a way of
+   deleting text" firing at the exact moment it matters.
+5. **Secondary, weaker:** `#status` is `max-height:64px;overflow:auto` and
+   auto-scrolls to the bottom, so even with the panel forced open the warning may
+   sit above the visible 64px window, depending on whether `tileerror` beats the
+   REM tally into the log.
+
+### The confound this design exists to control
+
+`NSURLCache` in WKWebView is disk-backed and survives launches. The previous
+device session loaded `map.html` over Hatcher Pass **with** network, and OSM
+tiles carry a long `max-age`. A naive Airplane-Mode run can therefore paint from
+cache, set `baseOk`, and leave the message correctly silent — reading as "tiles
+work offline" when nothing was tested. It cannot be busted from the console:
+`map` and the tile layers are closure-scoped inside the `load` listener and
+never reach `window`.
+
+So there are two runs, and **Run 1 is a result in its own right, not merely a
+gate on Run 2** (Alan's instruction, 2026-07-28, and he is right):
+
+- **Run 1 — as installed.** The realistic field case: signal at home, none at
+  the trailhead. If cached tiles carry the map for a while that is genuinely
+  useful behaviour and worth knowing on its own terms. What it cannot do is
+  answer question 3.
+- **Run 2 — virgin data store**, only if Run 1 paints tiles. Delete the app
+  (destroys the container and its `NSURLCache`), reinstall over USB, **do not
+  launch**, then go offline and launch. Tiles have never been fetched, so
+  `tileerror` is forced. Also measures the v2 seed running on a virgin install
+  with no signal, which has never been observed.
+
+Discriminator: `img.leaflet-tile` elements with `naturalWidth > 0` — a painted
+pixel. Resource Timing is useless here; OSM and Esri send no
+`Timing-Allow-Origin`, so `transferSize` reads 0 cross-origin whether cached or
+not.
+
+### Decision rule, fixed before the numbers exist
+
+| # | question | PASS | FAIL |
+|---|---|---|---|
+| 1 | `map.html` opens offline | title `FieldGold — Map`, `L.version` `1.9.4`, `window.__lf` false, `map ready ✓` in the log | any absent, or the `map library missing` branch fired |
+| 2 | markers + colours draw | 20 `.bench-div` diamonds, 12 avoid + 8 clean + 0 unchecked, ring `#5AA9C9`, matching `statusCounts` on the record | any count differs, or the drawn histogram disagrees with the record |
+| 3 | the message runs | **given 0 tiles painted**: both warn lines present in `#status` | 0 tiles painted and either line absent → **defect** |
+| 3b | inconclusive branch | tiles painted > 0 → cached; message correctly silent; **question 3 unanswered** → Run 2 | — |
+| 4 | the message is **legible** | `#status` has an `offsetParent`, the warn line is inside the scroller's visible box, and the toggle can be tapped | anything else → the app explains itself to a DOM inspector and not to a person. **Separate finding; must not be merged into 3** |
+| 5 | `index.html` works offline | renders, `FieldGoldData` present, `fieldgold_rem_seeded_v2` set, 20 benches at 12/8/0, all six tabs switch under a finger, no uncaught console errors | otherwise |
+
+Void-run guards: if the preflight probe reaches the network, the run is void; if
+0 tiles are ever requested or `#map` has zero size, no `tileerror` could fire and
+question 3 is void regardless of what the log says.
+
+### One thing the instruments cannot answer
+
+`elementFromPoint` will report the panel toggle as reachable even though iOS eats
+the touch, because the status bar is native chrome above a full-bleed webview and
+the page cannot see it. **The authority for tappability is Alan's finger**, and
+the authority for "what does a person actually see" is a photograph of the
+screen. Same lesson as the `FAILS 0` reading that was true and misleading: a
+green obtained by a route the user does not have is not a green user experience.
+
+Tiering: readings taken through Safari Web Inspector against the installed,
+unmodified app are `[externally-verified]`; Mac-side checks are `[self-tested]`.
