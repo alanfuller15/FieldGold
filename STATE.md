@@ -21,6 +21,12 @@ is collapsed behind an untappable toggle, and forced open the status box shows
 surfaced: four layers printed ✓ having loaded zero tiles. See the two RUN
 sections at the end of this file.
 
+**Amended 2026-07-29 — one open decision is now filed, and it gates Phase 2's
+schema:** whether FieldGold stays a dual-distribution app once `localStorage`
+becomes SQLite. See "Does FieldGold stay a dual-distribution app?" under Open
+decisions. It is undecided and no answer is recommended there. Nothing else in
+this amendment touched app code or Phase 1.
+
 ## Active phase
 
 **Phase 0 — Capacitor shell — COMPLETE 2026-07-28** (PR #4, `main` at
@@ -1065,8 +1071,73 @@ Until this lands, the accepted cost recorded under the Phase 0 decision stands.
   `teamName = "Alan Fuller"` [self-tested]. A free Personal Team would read
   `isFreeProvisioningTeam = 1`; this is the paid membership.
 
-**No open decisions remain in Phase 0.** What blocks it now is hardware — see
-Next action.
+**Phase 0 has no open decisions left.** One is now filed against **Phase 2** —
+see immediately below. It does not block Phase 0 and does not gate Phase 1; it
+gates the Phase 2 schema, so it has to be answered before that schema is
+designed rather than discovered while writing it.
+
+### Does FieldGold stay a dual-distribution app?
+
+**Filed 2026-07-29. UNDECIDED — Alan's to make. No recommendation is recorded
+here on purpose.**
+
+Today both distributions work: GitHub Pages serves `docs/` at
+`alanfuller15.github.io/FieldGold/`, and the Capacitor shell ships the same
+tree inside an app icon. **Phase 2 breaks that.** SQLite does not exist in a
+browser, so either two storage paths get maintained or the web version is
+abandoned. Nothing in CLAUDE.md or in this file decides it.
+
+**Divergence between the two is already accepted in principle.** Phase 1's own
+bundle/Pages item plans it in as many words — "Excluding the stage maps from the
+iOS bundle means **`webDir` stops being 'the directory Pages serves'**". So the
+question is not whether the trees may differ. They may.
+
+**What is not accepted is SILENT divergence, and that principle is already in
+the record.** Phase 1's item states the requirement it imposes on itself: "A
+test asserting the bundle and the Pages tree diverge exactly as intended and no
+further […] Without this, the mechanism is unguarded and the first silent drop
+ships." **Enumerated and tested divergence is required.** Whichever way the
+storage question goes, that is the standard it inherits — and note what a
+storage divergence is compared with the three already confirmed: service
+worker, `target="_blank"` and safe-area insets diverge in *behaviour and
+layout*. A second storage path diverges in **data**, which is the subject of
+ground rule 4.
+
+Three things that sharpen the decision and are not obvious from the framing:
+
+1. **Phase 4 settles part of it regardless.** A browser tab cannot do
+   background GPS. By Phase 4 the two distributions are not the same app
+   whatever is decided about storage. So the durable question is not "does the
+   web version survive Phase 2" — it is **"what is the web version FOR once
+   the app can do things it cannot."** That question outlives the storage
+   decision and is not answered by it.
+2. **It is a standing tax on phases 2, 3 and 4, not a one-time cost in 2.** The
+   ordering constraint recorded in CLAUDE.md is Phase 2 before Phase 3 because
+   "the tile index needs real tables." **The tile index needs tables too**, so
+   if a web storage path is maintained, Phase 3 owes it a second index or the
+   web version loses offline tiles as well. Phase 4 then owes it whatever a
+   browser can be given in place of a background fix. The cost recurs per
+   phase.
+3. **There is a precedent for a shipped-and-wrong distribution, and it is
+   upgrade-in-place, not abandonment.** Seed v1 shipped the twenty coordinates
+   with no land status at all, leaving devices holding twelve encumbered
+   benches drawn as if nothing were known against them. The response was
+   neither "seeded already, skip" nor a re-seed: the seeder distinguishes three
+   states and **upgrades a v1 device in place**, adding nothing that is not
+   there and never resurrecting a deleted bench. That is how this project has
+   already handled a distribution that was in the field and wrong.
+
+Two facts that bear on the cost of either answer, recorded so neither has to be
+re-established:
+
+- The two installs **already hold separate records**. `README.md` says so —
+  "this only works within one browser on one phone — your data doesn't sync"
+  and "export often — it's your only backup." Whatever is decided, it is not
+  deciding the fate of shared state; there is none.
+- `README.md` documents the Pages URL as *the* way to use the app. If the web
+  version is abandoned, that is a documentation change too, subject to
+  CLAUDE.md's index control — the row and the prose both move in the same
+  change.
 
 ## Deliberately not built yet
 

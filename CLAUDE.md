@@ -17,6 +17,40 @@ physically walks.** That constrains everything below.
    produce the iOS wrapper. It does not transform app source — `webDir`
    points at the same files GitHub Pages serves today. This exception covers
    the shell only. It does not license a bundler or framework for app code.
+
+   **What that exception does not answer: how app code reaches a plugin.**
+   Phases 2, 3 and 4 all need one — SQLite, filesystem, background location.
+   The shell exception covers *installing* those packages. It says nothing
+   about app code *importing* from `node_modules`, and a bare module specifier
+   normally needs a bundler, which is the thing this rule forbids. Two routes
+   avoid one. **Neither is ratified; this is the state of the question, not a
+   decision.**
+
+   - **The Capacitor bridge global** — `window.Capacitor.Plugins.*` at runtime.
+     No specifier is resolved and nothing is transformed, so it needs no new
+     exception at all. Untested here for the specific plugins.
+   - **An import map** — `<script type="importmap">`, plain markup, no build.
+     Grounded rather than assumed: Safari shipped import maps in **16.4**
+     (Apple's Safari release notes; the Can I Use and MDN entries for
+     `script type=importmap` agree), and the device runs **26.5.2**, so the
+     platform supports them. Three properties are load-bearing before anyone
+     designs around it. The tag **rejects `src`, `async`, `defer`, `integrity`
+     and `crossorigin`** — the JSON must be inline, so it is one copy per page,
+     four pages, and four copies of anything drift apart. The same duplication
+     already has to be managed for the per-page chrome markup that carries the
+     back control. The map must be declared **before** any module that imports
+     through it. And see the cross-reference under rule 6: **changing an import
+     map changes what the browser loads with no diff in the importing module**,
+     which is rule 6's signature failure arriving through a new mechanism.
+
+   **Genuinely untested, and it must stay marked so: whether import maps
+   resolve under `capacitor://localhost` in WKWebView.** Three web platform
+   features have already behaved differently there — Service Worker absent
+   entirely, `target="_blank"` handed to iOS and refused, `env(safe-area-inset-*)`
+   reading 0 — so "Safari 16.4 supports it" is not the same claim as "it works
+   in the shell." One command establishes it: load a page in the shell that
+   declares a map and imports through it, and read whether the specifier
+   resolved. **Establish that before Phase 2 designs around it.**
 2. **No new runtime dependencies from a CDN.** The app must work with no signal.
    Anything fetched at page load is a failure mode at the trailhead.
 3. **Never invent coordinates.** Latitude and longitude values in this repo trace
@@ -26,6 +60,28 @@ physically walks.** That constrains everything below.
 4. **Never soften a land-status warning.** Candidates are tiered clean /
    not-checked / avoid. "Not checked" must never be presented as safe, and
    "avoid" must never be quietly dropped from a list to make the UI tidier.
+
+   **Routing is a way of deleting a page, the same way layout is a way of
+   deleting text.** That is not a prediction; it is the next level of a class
+   this repo has now hit three times, each at a different level, each shipping
+   green through the suites of its day:
+
+   | level | instance | how the warning was deleted |
+   |---|---|---|
+   | content | the **z-index tie** — `#panel` at 1000 against Leaflet's containers at 1000, broken by DOM order | 21 sample points inside warning text painted over on a 390x664 phone |
+   | layout | the **unreachable tail** — no `max-height`, no scroller, body cannot scroll | 102 of 256 warning sample points physically unreachable |
+   | control | the **untappable toggle** — auto-collapse at phone width, the reopen control at y=22..41 inside a 47px status bar | every warning in the panel unreadable, while the suite reported 291 of 291 reachable |
+
+   Nothing was edited out in any of the three. The text was correct in the diff
+   in all of them. **Phase 1 adds a fourth level — the page itself.** A router
+   decides what is reachable, so a route that renders a bench list before its
+   tier is resolved, a route that reaches the photo screen without its banner,
+   or a screen that exists only on a route nothing links to, deletes a warning
+   by the same mechanism one level up. The measurement trap comes with it:
+   **a green obtained by a route the user does not have is not a green** — the
+   reachability suite got that green by calling `classList.remove('collapsed')`,
+   and a router offers an even easier way to make the same mistake, because a
+   test can navigate to a route no control on screen reaches.
 5. **State uncertainty in the UI.** Where the data is unverified, the page says
    so. Do not remove those notices as "clutter"; they are the point.
 6. **Never hand-edit a generated file.** `load_rem_benches.html` is written by
@@ -47,6 +103,49 @@ physically walks.** That constrains everything below.
    `geo_rank` are the deliberate exception — they must be inherited; the reason
    is recorded at their assignment. **If you add a derived field, add it to
    `DERIVED`.**
+
+   **KNOWN GAP — Phase 4 cannot comply with this rule as written.** Filed
+   2026-07-29, unresolved. Background location cannot be configured without
+   **hand-maintained keys in Capacitor-generated iOS files**: the
+   `UIBackgroundModes` entry and its usage-description string in
+   `ios/App/App/Info.plist`, and the corresponding capability in
+   `App.xcodeproj/project.pbxproj`. Both files are written by
+   `npx cap add ios`. There is no config-as-code route recorded here that
+   expresses them.
+
+   **The `Package.resolved` carve-out does not cover this.** That one says
+   ground rule 6 "is about hand-*editing* generated files, not about refusing
+   to track a lock" — it licensed **tracking** a generated file. This is
+   **editing** one. The distinction is the whole content of that carve-out and
+   it does not stretch.
+
+   The failure mode is this rule's own signature: **a regenerated project loses
+   the key, background location silently stops, and there is no diff to read.**
+   Same shape as a hand edit vanishing on the next generator run, and same
+   shape as the 0007 inheritance bug — assertions green, nothing to see.
+
+   **DRAFT wording, NOT RATIFIED — Alan has not approved this and drafting is
+   not ratifying:**
+
+   > *Exception, scoped: the background-mode entries in `ios/App/App/Info.plist`
+   > and the corresponding capability in `project.pbxproj` are hand-maintained,
+   > because Capacitor's config cannot express them. Each hand-maintained key is
+   > listed in this file with its reason, and a test asserts its presence, so a
+   > regenerated project that loses it fails rather than silently disabling
+   > background location.*
+
+   **The tripwire is the part that would make it an exception rather than a
+   hole.** Without the presence assertion, the wording licenses exactly the
+   silent loss this rule exists to catch. Do not adopt the first sentence
+   without the last one.
+
+   **Cross-reference — a second mechanism with this rule's failure signature.**
+   An import map (see rule 1's exception) changes what the browser loads **with
+   no diff in the importing module**. The `import` line is byte-identical, the
+   bytes executed are different, and nothing in the changed file records it.
+   That is this rule's failure arriving through a route rule 6 was not written
+   about. If an import map ships, it is a file whose edits must be read as
+   carefully as a generator's STATUS table.
 7. **The model-facing prompt is not a safety control.** `VISION_PROMPT` in
    `index.html` is sent to a vision model along with a land-status block built
    by `FieldGoldData.landBriefForPrompt`. Instructing a model to withhold pan
@@ -55,6 +154,19 @@ physically walks.** That constrains everything below.
    `contextForPoint()` before the request is even sent. If you change this
    screen, the banner renders on every path — success, HTTP error, network
    failure, and re-opening an old photo — or the change is wrong.
+
+   **"Before the request is even sent" is free today only because
+   `contextForPoint()` is synchronous.** It reads `localStorage` and returns.
+   Phase 2 removes that: plugin storage APIs are promise-based, so the read
+   becomes a `Promise` and **there is a window in which the screen exists and
+   the banner does not.** The required order is: **await context, draw banner,
+   send.** The tempting inversion — fire the request, draw the banner when the
+   read resolves — defeats the rule while looking like a performance
+   improvement, because it puts a request for pan advice in flight over ground
+   whose status the screen has not yet stated. It will also test green on a warm
+   store, where the promise resolves before the response does. The consequence
+   for design: the photo screen either awaits its context before it can send, or
+   is handed an already-resolved context and never reads storage itself.
 
 ## Layout
 
@@ -102,8 +214,8 @@ in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 653 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 2113 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `CLAUDE.md` | 765 | this file — the whole brief for anyone changing the repo |
+| `STATE.md` | 2184 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
 | `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |
 | `.claude/skills/phase-0-shell/SKILL.md` | 210 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
