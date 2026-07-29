@@ -1045,6 +1045,56 @@ relative), the `sw.js` SHELL (all `./`-relative), and the service worker
 registration. Served URLs are identical after the move, so the move alone
 does not require a cache version bump.
 
+## Phase 1 — A, B, C and D are written. NONE is device-verified.
+
+**Branch `phase-1-shell-divergences`, 2026-07-29, five commits, all 13 suites
+green at 563 assertions and 81 mutants.** Every claim below is `[self-tested]`.
+**The two that decide whether this app works in terrain — can a finger open the
+map, can a finger press the controls — cannot be produced on this machine and
+are outstanding.**
+
+| item | what landed | commit |
+|---|---|---|
+| **D** false ✓ | layers report from tile outcomes, not Leaflet's `load`. Five false ticks over 0 of 100 tiles → zero | `33b5f5c` |
+| **B** safe-area | `viewport-fit=cover` on the four app pages, insets via `--sa-*`, panel/Leaflet controls/headers moved clear | `1cfa546` |
+| **A** dead links | the 3 internal hrefs navigate in-webview; a shared bottom bar carries a back control on all three tool pages | `186f4bb` |
+| **C** warn surface | warn/err surface in that bar with no user action, first line verbatim + a count, one tap for the rest | `79fcfaa` |
+
+Order was A→B originally and **B ran first**: both the back control and the
+problem row sit at the bottom edge and need `env(safe-area-inset-bottom)` to be
+real, so `viewport-fit=cover` is a prerequisite for A as well as for C.
+
+`sw.js` v5 → **v9**, one bump per item. **On the phone none of those bumps
+delivers anything** — the worker is inert in the shell and a fix arrives only
+via `npx cap sync` + rebuild + install.
+
+### What the device must settle, and nothing here can
+
+1. **Tap the Gold map card.** Does `map.html` open? Chromium has no popup
+   delegate and no `capacitor://` scheme, so the suite establishes only that the
+   markup now asks for a same-window navigation.
+2. **Tap the panel toggle, the Leaflet zoom, and the back control.** Geometry is
+   asserted against a simulated 47px/34px inset; **every hit test in this repo is
+   blind to native chrome** and will pass over an untappable control.
+3. **The `.tabbar` rider.** Its `env(safe-area-inset-bottom)` predates the shell
+   and has never fired. `viewport-fit=cover` activates it, so the launcher gains
+   ~34px of bottom padding as a side effect of a map.html fix. Believed correct,
+   asserted, **not confirmed**.
+4. **Offline, look at the screen.** The problem row should be visible with no
+   interaction. A photograph is the authority for what a person sees.
+5. **Landscape**, still never measured on any target.
+
+### One design question left open, deliberately
+
+`map.html:600`'s `tally()` logs `warn` whenever any bench is `avoid`, so the
+first warn offline is "REM candidates: 20 plotted (8 clean, 0 unchecked, 12
+avoid)" — a true land-status signal, not a failure. Chronological-first
+therefore headlines it and puts "basemap tiles unavailable — no signal" at +2
+behind the tap, which falsifies the premise chronological-first was chosen on.
+Not reclassified, because softening a land-status line breaks rule 4.
+Severity-first is not the fix either — it promotes `geochem markers failed` over
+the no-signal line. **Alan's call.**
+
 ## Phase 1 — enforce the bundle/Pages divergence
 
 > **Phase 1's scope grew on 2026-07-28 and its priority changed.** The device
