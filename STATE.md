@@ -40,6 +40,18 @@ ground rule 4, and one subagent was established at
 `.claude/agents/failure-classes.md`. **No application code was touched, and
 PR #6 was not touched.**
 
+**Amended 2026-07-29, third time — PHASE 1 IS RESCOPED and its design is
+approved.** The three shell divergences PR #6 fixes are real and are not why the
+app is hard to use; **the design lives in `PHASE1-DESIGN.md` and nothing in it is
+built.** D8 settles the dual-distribution decision — web primary, native the
+field build — and reorders the phase accordingly. D7 is scoped by ruling (query
+layers off, record layers on) because a literal reading would have hidden the
+twelve encumbered benches behind an opt-in. Three items are filed and not acted
+on: the OSM policy prohibits offline use of `tile.openstreetmap.org` by name,
+which **changes what Phase 3 is**; two OSM compliance flags on the app as it
+stands; and one un-subscribed consumer that is a ten-line fix available today.
+**Still no application code, still no PR #6.**
+
 ## Active phase
 
 **Phase 0 — Capacitor shell — COMPLETE 2026-07-28** (PR #4, `main` at
@@ -1197,6 +1209,158 @@ visual redesign.** Three notes that cost nothing to know first:
   the shell. The two delivery paths are independent.
 - The legend at `docs/map.html:93` will need the new channel added to it, or the
   key stops matching what is drawn.
+
+## Phase 1 — RESCOPED 2026-07-29. The design lives in `PHASE1-DESIGN.md`
+
+**Read `PHASE1-DESIGN.md` before planning any Phase 1 work.** This file is *how
+far*; that file is *what the work is*. It is approved as designed and **nothing
+in it is built.**
+
+**Why the rescope.** Phase 1 was scoped from three shell divergences found on a
+device, and PR #6 fixes those. They are real and they are **not why the app is
+hard to use.** Using it with a second person surfaced what is: the app plots
+exactly the things worth going to, and those are the only things you cannot
+select — tapping blank map yields coordinates, tapping a bench diamond yields a
+popup with no way to carry it anywhere, so the habit that developed is tapping
+*next to* the feature you want. There are only two states a location can be in,
+"nothing" and "a saved Site", so committing to the permanent record is the price
+of merely considering a place. And demonstrating the app to another person
+required teaching it.
+
+**Under D8 this reorders the phase: the consolidation is FIRST a fix to the web
+app and second a shell improvement.**
+
+The design covers four things — consolidating the five documents into one with
+the existing tab bar as navigation and the map as a view; a **working set**, the
+missing noun for multi-point selection distinct from saved Sites; layer defaults
+and what the app says when tiles fail; and the feature popup. It also states what
+survives from PR #6 (B and D intact, C improved by consolidation, A partly
+redundant but **not to be un-picked** — its bottom bar is the seam the navigation
+grows into).
+
+### Rulings recorded here because they are decisions, not design
+
+- **D7 is scoped, 2026-07-29.** Query layers (`ardf`, `geo`, `claim`, `terrain`)
+  default **OFF**; record layers (`sites`, `bench`, `rem`) stay **ON**; the
+  basemap is not a toggle. **The reasoning is the part worth keeping: a
+  zero-network layer gets no politeness argument** — the three record layers read
+  `localStorage` and issue nothing, so the burst argument does not reach them —
+  **and the land-status layers are the ones rule 4 exists for.** Defaulting
+  `t-bench` and `t-rem` off would open the map with the twelve encumbered benches
+  not drawn, behind an opt-in, which is rule 4's "`avoid` must never be quietly
+  dropped from a list" arriving through a default rather than an edit. A literal
+  reading of D7 would have shipped that.
+- **N1 — the pending-occurrence compat obligation takes option (a):** convert
+  once and remove, with the seed v1→v2 care — convert in place, add nothing that
+  is not there, never resurrect a deleted one. It is a data migration, so ground
+  rule 3 applies at full weight.
+- **N2 — `creek_manual.html` and `load_rem_benches.html` stay standalone.** The
+  no-JS property is real and rule 6's blast radius staying at zero is worth more
+  than uniformity.
+- **N3 — the iframe fallback stays on the table.** If opening `map.html`'s
+  closure proves worse than expected, **say so and stop rather than pushing
+  through** — that file carries the land-status colours and the federal-register
+  caveat.
+
+### Five premises the design had to correct against the tree
+
+Recorded here because a session planning this work will otherwise inherit the
+conversational version. All [self-tested] 2026-07-29; the detail is in the design.
+
+1. **There already is a single-slot working set**, and it is a *persisted record*:
+   `map.html:526`/`:538` write `kind:'occurrence', pending:true`, and
+   `index.html:2849` reads `pending[0]` silently with no picker. Tapping ＋ today
+   **writes to the permanent record**, so the working set is a net reduction in
+   accidental permanent writes.
+2. **Marker popups can never reach the carry affordance.** `saveOccurrence` and
+   `setSpot` are called from exactly two places, both inside the
+   `map.on('click')` identify popup, and a Leaflet marker click does not
+   propagate to `map.on('click')`. The tap-beside-it habit is the only path that
+   exists.
+3. **"The pages do not share live state" is narrower than it reads** — see
+   "Filed, not acted on" below.
+4. **Six of seven layers are on by default**, not all seven; `t-terrain` is
+   already off. The measured burst is **48 tile requests per pan**.
+5. **The blank-tile threshold is recorded nowhere.** Confirmed by search, so the
+   design cannot reference it and must not guess a cause.
+
+## Phase 3 — filed before the phase starts: OSM tiles cannot be used offline
+
+**Filed 2026-07-29. Not acted on. This changes what Phase 3 is.**
+
+Phase 3 is "offline map tiles on the filesystem". The OSM Foundation tile usage
+policy prohibits exactly that, by name, for `tile.openstreetmap.org` — which is
+the basemap `map.html` uses today (`docs/map.html:140`,
+`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`).
+
+Quoted verbatim [fetched] **2026-07-29** from
+`https://operations.osmfoundation.org/policies/tiles/`:
+
+> *"Offline use is not permitted on tile.openstreetmap.org. Features such as
+> 'Download city/country for offline use' or 'Save area for later' rely on
+> prefetch/bulk downloading and are therefore prohibited."*
+
+> *"Bulk downloading is any pre-emptive fetching of tiles other than those a user
+> is actively viewing."* — which the policy expands to include *"Pre-seeding
+> large areas or multiple zoom levels in advance"* and *"Building tile archives
+> for later distribution."*
+
+> *"Access may be blocked without prior notice."*
+
+**So Phase 3 as scoped needs a different or self-hosted source.** Do not design a
+tile pack against this provider. The same policy is the recorded reason for D7's
+default: a burst of concurrent requests is the shape that gets blocked, and the
+symptom is reports of blank maps — which the app cannot correctly diagnose (see
+the design's Design 3).
+
+Not established here: which providers permit it, on what terms, or what
+self-hosting would cost. That is Phase 3's first question rather than an
+assumption to inherit.
+
+## Filed, not acted on
+
+Found while designing the Phase 1 rescope, 2026-07-29. **Each is filed
+deliberately rather than fixed, so none of them rides along inside unrelated
+work.** All [self-tested] 2026-07-29 unless marked.
+
+### OSM policy compliance — two flags on the app as it stands
+
+Same policy and fetch date as the Phase 3 filing above.
+
+1. **The attribution string is short.** `docs/map.html:140` sends
+   `attribution:'© OpenStreetMap'`. The policy asks for *"Show OpenStreetMap
+   licence attribution clearly on the map (typically bottom-right). Typically:
+   © OpenStreetMap contributors"*. A one-word change to a non-land-status string;
+   deliberately not made in a design pass.
+2. **The User-Agent requirement is unmeetable in a browser and questionable in
+   the shell.** The policy requires *"a clear, unique User-Agent string that
+   names your app"* and says apps must not *"use a library default User-Agent"*
+   or *"impersonate another app or a browser."* A page cannot set its own
+   User-Agent, so the web distribution cannot comply by construction. **In the
+   iOS shell WKWebView sends a browser-default UA, which is the thing the policy
+   names** — and Capacitor exposes an override, so this one is at least
+   addressable. Untested: whether setting it is possible without native Swift.
+
+### The un-subscribed consumer — a ten-line fix, available today
+
+**Independent of consolidation. It does not need the Phase 1 design and should
+not wait for it.**
+
+`FieldGoldData.onChange` already fires on same-tab writes, cross-tab `storage`
+events and `pageshow`, and both pages subscribe — so the machinery for live
+cross-page state exists and works. What is missing is one consumer:
+
+- `index.html:2907`'s subscriber re-renders **only** Sites and Research, and
+  **only if that view is already active** (`:2908-2913`).
+- `checkPendingOccurrence()` (`:2849`) runs **once at boot**, at `:2893`, and is
+  never re-invoked.
+
+So a point sent from the map is offered only on the next full load of
+`index.html`. **That is the whole cause of the tab-switch-and-reload habit** —
+not absent machinery, one un-subscribed function. Note it interacts with N1: if
+the pending mechanism is converted away by the consolidation, this fix becomes
+moot, so it is worth doing only if consolidation is not imminent. Recorded
+either way, because the diagnosis is the part that took the work.
 
 ## Open decisions
 
