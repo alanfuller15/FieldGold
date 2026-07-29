@@ -63,17 +63,18 @@ physically walks.** That constrains everything below.
 
    **Routing is a way of deleting a page, the same way layout is a way of
    deleting text.** That is not a prediction; it is the next level of a class
-   this repo has now hit three times, each at a different level, each shipping
+   this repo has now hit four times, each at a different level, each shipping
    green through the suites of its day:
 
    | level | instance | how the warning was deleted |
    |---|---|---|
    | content | the **z-index tie** — `#panel` at 1000 against Leaflet's containers at 1000, broken by DOM order | 21 sample points inside warning text painted over on a 390x664 phone |
-   | layout | the **unreachable tail** — no `max-height`, no scroller, body cannot scroll | 102 of 256 warning sample points physically unreachable |
+   | layout | the **unreachable tail** — no `max-height`, no scroller, body cannot scroll | 102 of 256 warning sample points physically unreachable. And the run log: `linesVisibleAtRest` **4 of 12**, the four that report nothing wrong |
    | control | the **untappable toggle** — auto-collapse at phone width, the reopen control at y=22..41 inside a 47px status bar | every warning in the panel unreadable, while the suite reported 291 of 291 reachable |
+   | **perception** | **colour as the only channel** — a bench diamond's tier is its fill: `#4E9A5F` clean, `#D29A3A` unchecked, `#B2402F` avoid, with no glyph, no tooltip and no `title`. The tier is in words only inside the popup, behind a tap | under red-green colour vision deficiency clean and avoid converge, so the map shows encumbered ground as cleared. Filed as **Phase 1 item E** in `STATE.md`; verified there against the marker code, not assumed |
 
-   Nothing was edited out in any of the three. The text was correct in the diff
-   in all of them. **Phase 1 adds a fourth level — the page itself.** A router
+   Nothing was edited out in any of the four. The text was correct in the diff
+   in all of them. **Phase 1 adds a fifth level — the page itself.** A router
    decides what is reachable, so a route that renders a bench list before its
    tier is resolved, a route that reaches the photo screen without its banner,
    or a screen that exists only on a route nothing links to, deletes a warning
@@ -82,6 +83,51 @@ physically walks.** That constrains everything below.
    reachability suite got that green by calling `classList.remove('collapsed')`,
    and a router offers an even easier way to make the same mistake, because a
    test can navigate to a route no control on screen reaches.
+
+   **This app makes claims about LAND STATUS. It makes no claim about PHYSICAL
+   SAFETY, and it must not be readable as making one.** Approved by Alan
+   2026-07-29 as an addition to this rule.
+
+   The gap it closes: everything above governs **legal encumbrance** — clean,
+   not checked, avoid. None of it governs terrain. Meanwhile the app already
+   plots physical hazards without naming them as such. **ARDF occurrences are
+   documented mine workings**, which means shafts and adits, and the scan button
+   draws them wherever the map is panned. The working reach is avalanche terrain
+   with cold water, no cell coverage, and bears.
+
+   **The asymmetry is what makes this a rule 4 matter and not a disclaimer.** An
+   app that says ground is clean has implicitly said it is walkable. Being wrong
+   about an encumbrance is a legal problem for the user; being wrong about
+   terrain is a physical one. A `clean` tier that reads as "go here" is a
+   softened warning by the same logic this rule already applies to "not checked"
+   reading as safe.
+
+   What the rule requires:
+
+   - **A tier is visibly a statement about encumbrance and nothing else.**
+     `clean` means "no claim found in the registers checked" — never "safe".
+     `STATUS_META.clean.long` is already worded that way ("Land status checked —
+     no closing order, lease or park boundary found"); the requirement is that
+     nothing added later shortens it into a verdict on the ground.
+   - **The app does not present physical hazard information it has not
+     assessed, and does not imply it has assessed any.**
+   - **ARDF occurrences are plotted as documented mine workings**, and whatever
+     the app says about them must not read as a recommendation to visit. Same
+     shape as the existing treatment of the terrain score and the federal claims
+     layer: the information stays, it stops being the thing you read at a
+     glance.
+
+   **What this does NOT do, stated so a later session does not over-read it: it
+   does not make FieldGold a safety system.** That is a different application
+   requiring data this project does not have. This rule constrains what the app
+   **claims**, not what it must provide. Do not read it as licence to add
+   avalanche, weather or route-safety features, and do not read it as requiring
+   them.
+
+   A ship-gate rides with this and is recorded in `STATE.md` under "Ship gates":
+   before this app is used by anyone other than Alan, the disclaimers need review
+   by a lawyer familiar with recreational-use liability in Alaska. That is a
+   gate, not a task, and nothing in this repo can discharge it.
 5. **State uncertainty in the UI.** Where the data is unverified, the page says
    so. Do not remove those notices as "clutter"; they are the point.
 6. **Never hand-edit a generated file.** `load_rem_benches.html` is written by
@@ -214,11 +260,12 @@ in the tests row did.
 
 | document | lines | role |
 |---|---|---|
-| `CLAUDE.md` | 765 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 2184 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `CLAUDE.md` | 812 | this file — the whole brief for anyone changing the repo |
+| `STATE.md` | 2499 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
 | `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |
 | `.claude/skills/phase-0-shell/SKILL.md` | 210 | Phase 0 runbook — Capacitor init, `cap add ios`, signing, first device install. Defers to `STATE.md` for status |
+| `.claude/agents/failure-classes.md` | 342 | **the one subagent.** Read-only; checks a change against this project's recorded failure classes and reports which one it may reintroduce, citing the instance. Added 2026-07-29. It has no expertise the base model lacks — its value is generator–evaluator separation, reliable recall of a fixed catalogue, and absorbing the reading. Entries cite `CLAUDE.md`/`STATE.md`; two sections are marked **added** because they are recorded but were not in the brief that established it. **A second agent is justified by an instance this one missed, not by a category** |
 | `ios/App/CapApp-SPM/README.md` | 5 | **generated by `cap add ios`, not written here.** Five lines saying the SPM package hosts Capacitor's Swift dependencies and not to edit it. Indexed because the control above says every tracked `.md` gets a row, and a generated file is exactly the kind that otherwise accumulates unlisted. Regenerated by Capacitor — do not hand-edit (ground rule 6 applies) |
 
 What this index found when it was first built, both now fixed:

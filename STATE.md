@@ -27,6 +27,19 @@ becomes SQLite. See "Does FieldGold stay a dual-distribution app?" under Open
 decisions. It is undecided and no answer is recommended there. Nothing else in
 this amendment touched app code or Phase 1.
 
+**Amended again 2026-07-29 — two decisions filed as DECIDED, one Phase 1 item
+filed, one ship gate recorded.** Alan decided that **land status has one
+curator** and that **regions are first-class with coverage stated**, both under
+Open decisions, both gating the Phase 2 schema; what they constrain is gathered
+under "Phase 2 — constraints fixed before the schema is designed". **Phase 1 item
+E** is filed — land status is conveyed on the map by colour alone, verified
+against the marker code, a rule 4 failure at the level of perception. A **ship
+gate** now exists: legal review of the disclaimers before anyone but Alan uses
+this app. `CLAUDE.md` gained the physical-hazard boundary as an addition to
+ground rule 4, and one subagent was established at
+`.claude/agents/failure-classes.md`. **No application code was touched, and
+PR #6 was not touched.**
+
 ## Active phase
 
 **Phase 0 — Capacitor shell — COMPLETE 2026-07-28** (PR #4, `main` at
@@ -1059,6 +1072,132 @@ answers the same question in a weaker place.
 
 Until this lands, the accepted cost recorded under the Phase 0 decision stands.
 
+## Phase 1 item E — land status is conveyed on the map by colour alone
+
+**Filed 2026-07-29. Not implemented — this is an item.** Sequenced into Phase 1
+at Alan's instruction.
+
+> **Where items A–D are.** They are written on `phase-1-shell-divergences` and
+> pushed as **PR #6, which is open and must not be merged**; the table naming
+> them is on that branch, not here on `main`. Item E is filed here because
+> `main` is where documentation lands. **When PR #6 merges, this section belongs
+> beside that table** — until then the two halves of Phase 1's item list are on
+> two branches, which is itself worth knowing before planning the work.
+
+### The finding — verified against the code, not assumed
+
+The suspicion was filed as suspected. It is **confirmed for the map's marker
+layer**, with two corrections to how it was first stated. All of this is
+[self-tested] 2026-07-29, read out of the tree:
+
+- **The tier is the fill colour and nothing else.** `docs/map.html:367` —
+  `diamond()` builds a 12x12 rotated square with `background:` the tier colour
+  and a 2px border. Tier colours from `STATUS_META` in
+  `docs/fieldgold-data.js:57` — `#4E9A5F` clean, `#D29A3A` unchecked,
+  `#B2402F` avoid.
+- **No text and no text alternative on the marker.** `docs/map.html` contains
+  **zero** `bindTooltip`, **zero** `title=`, and **zero** `aria-` attributes.
+  The diamond carries no glyph, no letter, no label.
+- **The tier IS stated in words — behind a tap.** `statusBadge`
+  (`docs/map.html:351`) prints `st.label`: `CLEAN`, `NOT CHECKED`, `AVOID`.
+  The popup also carries `st.long` and, for the two non-clean tiers,
+  `statusWarn`'s sentences. Every one of those is inside `bindPopup`, so
+  reaching it requires an action, on one marker at a time.
+- **Without any action, the only tier text is an aggregate.** `tally()`
+  (`docs/map.html:374`) logs "REM candidates: 20 plotted (8 clean, 0 unchecked,
+  12 avoid)", classed `warn` whenever any avoid exists. It says **how many** are
+  encumbered, never **which**. And on `main` that line lands in the status log
+  that Run 2 showed is unreachable on a phone — 4 of 12 lines visible, panel
+  collapsed, toggle untappable — so today it is not reachable either. PR #6's
+  item C is what surfaces a warning with no interaction.
+- **The panel legend does not help.** `docs/map.html:93` states the mapping in
+  words — "green = DNR-checked, nothing found · amber = never checked · red =
+  encumbered, avoid" — but a colour→meaning key requires perceiving the colour.
+  It is a translation table, not a second channel.
+
+**Correction 1 to the framing: the cyan ring is not on all three tiers of both
+layers.** `#5AA9C9` is passed only by the REM layer (`docs/map.html:441`); the
+bench-hunter diamonds pass no ring and default to `#14110C`
+(`docs/map.html:403`). So the ring distinguishes **which layer**, exactly as
+suspected, and the code says so in a comment at `docs/map.html:365` — "so you can
+still tell the two layers apart at a glance without the colour having to carry
+two meanings at once." It is constant across tiers within a layer, which is the
+part that matters.
+
+**Correction 2: `avoid` does carry one faint non-colour channel.** `diamond()`
+adds `opacity:.95` and `box-shadow:0 0 0 2px rgba(178,64,47,.35)` when
+`isAvoid`. That is a 2px halo at 35% alpha in rust, plus a 5% opacity change. So
+the strict statement is:
+
+- **clean vs unchecked: colour only.** Identical geometry, hue is the entire
+  difference. This is the distinction between "checked and cleared" and "nobody
+  has looked", which is the one this project has gone furthest out of its way to
+  keep separate.
+- **avoid vs the other two: colour plus a faint halo.** Whether a 35%-alpha 2px
+  halo is perceptible on a phone in daylight is a question for an eye, not for
+  the code. **It is not an automated assertion and must not be written as one.**
+- Site dots have the same shape of problem: `docs/map.html:288` varies stroke
+  `weight: isAvoid?3:2` — one pixel — and the occurrence dots at `:734` are
+  colour-only.
+
+**`index.html` is NOT affected and the item should not be scoped to it.** Its
+`statusBadge` (`docs/index.html:1015`) renders the words `CLEAN` / `AVOID` /
+`NOT CHECKED` with a tone class, and `landBanner` (`:2093`) renders a headline
+and detail as text. The launcher, the trip planner and the photo banner all carry
+the tier in words. **The defect is the map's marker layer.**
+
+### The grounding, checked rather than taken on report
+
+**WCAG 2.2 Success Criterion 1.4.1 "Use of Color", Level A** [fetched]
+2026-07-29 from `w3.org/WAI/WCAG22/Understanding/use-of-color.html`, quoted
+exactly: *"Color is not used as the only visual means of conveying information,
+indicating an action, prompting a response, or distinguishing a visual
+element."* Level A confirmed. That is the lowest conformance level, and the
+marker layer does not meet it.
+
+**One citation in the brief does not hold, recorded because this repo does not
+let a number pass unsourced.** The "roughly 8% of men" prevalence figure is
+**not** in W3C's Understanding document for 1.4.1 — that page states no
+prevalence statistic at all. The figure is widely cited elsewhere (usually as
+~8% of men of Northern European descent, red-green deficiency), and **it is not
+sourced here.** The SC text and its level are what the argument needs; the
+percentage is not load-bearing and should not be quoted from this file as though
+W3C stated it.
+
+### Why this is a rule 4 item and not a compliance item
+
+If tier is colour-only, the app tells a colourblind prospector that encumbered
+ground is clear. That is the failure ground rule 4 exists to prevent, arriving
+through **perception** rather than through layout or control. `CLAUDE.md` now
+carries it as the fourth row of rule 4's table — content, layout, control,
+perception — with routing as the fifth level Phase 1 adds. Note the shape it
+shares with the other three: **the text is correct in the diff**, the data is
+correct in the record, the colours are correct by the app's own standard, and a
+person still reads the wrong answer.
+
+### Why Phase 1 and not later
+
+Phase 1 already restructures how status reaches the screen, so the fix lands in
+code being touched anyway. Every later phase makes it more expensive: Phase 3
+changes what is drawn *beneath* the markers, and Phase 4 adds a position marker
+that would inherit the same colour vocabulary. Rule 4 items in this project have
+been fixed on discovery rather than queued.
+
+### Scope it small when it is implemented
+
+Add a **non-colour channel** — shape, fill pattern, or a glyph inside the
+`divIcon` — sufficient to distinguish the three tiers without colour. **Not a
+visual redesign.** Three notes that cost nothing to know first:
+
+- The diamonds are `L.divIcon`s, so a glyph is an HTML character inside the div.
+  This does not touch `circleMarker`, and `tests/test_stage_maps.py`'s assertion
+  that no map page contains a green `circleMarker` is unaffected.
+- `map.html` is in the `sw.js` SHELL, so changing its contents requires a cache
+  version bump for the Pages distribution, and `npx cap sync` plus a rebuild for
+  the shell. The two delivery paths are independent.
+- The legend at `docs/map.html:93` will need the new channel added to it, or the
+  key stops matching what is drawn.
+
 ## Open decisions
 
 - ~~Apple Developer Program ($99/yr) vs free 7-day provisioning.~~
@@ -1071,10 +1210,113 @@ Until this lands, the accepted cost recorded under the Phase 0 decision stands.
   `teamName = "Alan Fuller"` [self-tested]. A free Personal Team would read
   `isFreeProvisioningTeam = 1`; this is the paid membership.
 
-**Phase 0 has no open decisions left.** One is now filed against **Phase 2** —
-see immediately below. It does not block Phase 0 and does not gate Phase 1; it
-gates the Phase 2 schema, so it has to be answered before that schema is
-designed rather than discovered while writing it.
+**Phase 0 has no open decisions left.** Three entries below concern **Phase 2**:
+two **DECIDED** by Alan 2026-07-29 (sole curator; regions are first-class), and
+one still **UNDECIDED** (dual distribution). None of them blocks Phase 0 or gates
+Phase 1. All three gate the Phase 2 **schema**, so they belong answered before
+that schema is designed rather than discovered while writing it — what each one
+constrains is gathered under "Phase 2 — constraints fixed before the schema is
+designed", below.
+
+### Land status has one curator — DECIDED 2026-07-29
+
+**Alan's decision: land status is determined by one curator — Alan — and by
+nobody else. Not by live query. Not by user contribution.** Recorded with the
+reasoning, because a later session will be tempted to reopen it.
+
+**Live query was rejected on evidence this project already owns.** The
+federal-register bug established that **an empty answer from the wrong authority
+renders on a phone exactly like a clean answer from the right one** — measured,
+1 polygon across the reach envelope against 143 in a same-size envelope near
+Fairbanks. Ground rule 2 forbids load-time network dependencies for the same
+class of reason. A live DNR query fails precisely where it is needed — at a
+trailhead with no signal — **and it fails by drawing nothing**, which is the
+blank screen that caused the federal-register bug in the first place. `CLAUDE.md`
+already states the shape of the alternative: query server-side, ship the answer
+dated, and say on screen how old it is.
+
+**User contribution was rejected because it inverts ground rule 4.** An
+unverified claim from a stranger does not read as "not checked"; it reads as
+"checked by someone", which is **more dangerous than a blank**. The whole point
+of the `unchecked` tier is that "we did not ask" and "we asked and the answer was
+no" must not render the same way — a contributed claim creates a third thing that
+looks like the second and is neither. Reviewing contributions is a team function
+and **there is no team**.
+
+**The condition this decision depends on, recorded so it is revisited rather
+than quietly strained: there is no deadline pressure.** Sole curation is viable
+here *because* nobody is waiting. If that ever stops being true — a release date,
+an obligation to a user, an expansion someone else is counting on — this decision
+is to be **revisited**, not stretched. A curator under time pressure is how an
+unchecked bench gets stamped clean.
+
+**The consequence, which is a property of the decision and not a defect in it:**
+expansion scales in **users** freely and in **geography** only at the rate one
+person can adjudicate. Ten thousand users of the Hatcher Pass data cost nothing.
+One new drainage costs a DNR encumbrance battery and a claims query per
+candidate.
+
+**Residue, and it is a constraint on Phase 2 even though contribution is
+rejected today.** If contributed land status is ever introduced, it must have
+**its own tier — never `clean`** — something along the lines of
+`reported, unverified`. **That tier has to exist in the schema from the start
+rather than be retrofitted into live user data.** Retrofitting means migrating
+records a user already holds, which is the operation ground rule 3 protects most
+heavily, and the seed v1→v2 history is what it would look like: a tier added
+later has to be back-stamped onto every record already in the field, and
+"unknown" must not inherit the benefit of the doubt on the way. Designing the
+tier column so a fourth value is additive is cheap now and expensive later. This
+is **not** authorisation to build contribution.
+
+### Regions are first-class, and coverage is stated — DECIDED 2026-07-29
+
+**Alan's decision: the data model treats a curated region as a first-class
+entity, and the application states its own coverage boundaries rather than
+implying them.**
+
+**The failure this prevents, verified in the tree rather than asserted**
+[self-tested] 2026-07-29: the app today **has no concept of a coverage
+boundary**. `docs/fieldgold-data.js` contains no `region` and no `bounds` of any
+kind; `docs/map.html` sets no `maxBounds`, and every scan — ARDF, geochem, the
+BLM identify — takes its envelope from `map.getBounds()`, i.e. **wherever the map
+happens to be panned**. So panning to an uncurated drainage draws a basemap, ARDF
+occurrences and the claims layer, with no bench data and **nothing on screen
+saying the app knows nothing about that ground**.
+
+That is **absence rendering as presence** — the same pattern as the federal
+register, the four ✓ ticks over zero tiles, and the invisible status log. An
+empty bench layer over uncurated ground looks exactly like an empty bench layer
+over ground where nothing was found.
+
+**What must be true of the model. These are requirements on the Phase 2 schema,
+not a design:**
+
+- **A region has explicit bounds, a survey date, and a provenance record naming
+  what analysis produced it.** The existing region's provenance is a
+  lidar-derived REM analysis plus DNR land-status queries; that sentence has to
+  become a stored field rather than a paragraph in a repository guide.
+- **Every land-status record belongs to exactly one region.** Land status is a
+  property of a record **within** a region, never a property of an arbitrary
+  point on the map. Note this is already the shape of `contextForPoint()`, which
+  answers from nearby *records* and **never reports a position as clean**.
+- **Seed state is per-region.** `fieldgold_rem_seeded_v2` is one global boolean
+  for one dataset. With N regions that becomes N states, and the v1→v2 upgrade
+  path establishes how carefully it must be handled: **upgrade in place, add
+  nothing that is not there, never resurrect a deleted record.** A global flag
+  with two regions either re-seeds one or skips both.
+- **Records carry enough provenance to invalidate one region without touching
+  another.** A re-survey of one drainage must not force a re-seed of the others,
+  and must not silently leave stale records that look current.
+
+**What the app must say.** Outside a curated region, the app states that it has
+no coverage there, **and it states it before drawing anything a person could
+mistake for analysis.** Ground rule 5 governs the wording; rule 4 governs the
+fact that "no data here" must never render as "nothing found here."
+
+**Why now rather than later.** Adding a region column after users hold records
+means **migrating live data**, which is the operation ground rule 3 protects most
+heavily. It is cheap with one region and expensive with any other number — and
+Phase 2 is the last moment it is cheap, because Phase 2 is the migration.
 
 ### Does FieldGold stay a dual-distribution app?
 
@@ -1138,6 +1380,79 @@ re-established:
   version is abandoned, that is a documentation change too, subject to
   CLAUDE.md's index control — the row and the prose both move in the same
   change.
+
+## Phase 2 — constraints fixed before the schema is designed
+
+**This section is not a schema and must not become one.** It is the list of
+things already decided, so the session that designs the schema inherits them
+instead of rediscovering them or silently defaulting them. Every line points at
+where the reasoning lives; none of it is restated here.
+
+**Decided, and they shape the tables:**
+
+1. **One curator.** No live query, no user contribution. → "Land status has one
+   curator", above. The schema consequence is the residue: **if a contributed
+   tier is ever added it is never `clean`**, and the tier column has to be
+   designed so a fourth value is additive rather than a migration of live data.
+2. **Regions are first-class.** Explicit bounds, survey date, provenance;
+   every land-status record in exactly one region; **seed state per region**, not
+   one global boolean; provenance sufficient to invalidate one region alone. →
+   "Regions are first-class", above.
+3. **Land status is not a safety claim.** → `CLAUDE.md` ground rule 4. Not a
+   schema constraint so much as a constraint on every label the schema feeds:
+   a tier is a statement about encumbrance, never about walkable ground.
+
+**Open, and it changes the answer:**
+
+4. **Dual distribution.** → "Does FieldGold stay a dual-distribution app?",
+   above. A shared-subset schema the browser can also satisfy is a different
+   design from a native-only one. **Undecided; Alan's.**
+
+**Already in `CLAUDE.md`, and easy to lose in a storage migration:**
+
+5. **Unknown normalises to `unchecked`, never `clean` — on read as well as on
+   write.** A SQL `NULL`, or a column added later with `DEFAULT NULL`, re-creates
+   the data-gap-as-green-light failure in a new medium. `stampStatus` currently
+   runs in `put()`, `replaceKind()` and the seeder; it moves with the storage, it
+   does not get delegated to a constraint that only fires on write.
+6. **The banner order becomes load-bearing.** `contextForPoint()` is synchronous
+   today, which is what makes "before the request is even sent" free. With
+   promise-based storage the order is **await context, draw banner, send** — the
+   inversion tests green on a warm store. → rule 7.
+7. **The seed is a generated artifact.** `tools/build_loader.py` writes the
+   payload into two files today; if the seed moves into a schema or a `.sql`
+   artifact, the generator writes that too, from the same STATUS table, and both
+   its read-back assertion and `tests/test_seed_drift.py` extend to the new
+   target. A prebuilt binary `.db` is a generated file **with no diff to read at
+   all**. Any new derived field goes in `DERIVED`. → rule 6.
+8. **The migration is the operation rule 3 protects most heavily.** Lossless,
+   verified value-by-value against the generator payload — the device read is
+   the reference: 12 `avoid` / 8 `clean` / 0 `unchecked`, `state_claim` `none`
+   x20, proximity `unknown` x20. Carry the seed flags across, or a virgin-looking
+   store re-seeds records the user deleted.
+9. **A partial migration says so on screen.** Dropped records are counted and
+   reported, never silently skipped — the legacy `fieldgold_sites` precedent. →
+   rule 5.
+
+**Not yet established, and it is a prerequisite rather than a constraint:**
+whether app code can reach a Capacitor plugin without a bundler — the bridge
+global, or an import map under `capacitor://localhost` in WKWebView, which is
+**untested**. → `CLAUDE.md` rule 1. Establish it before designing around it.
+
+## Ship gates — conditions on distribution beyond Alan
+
+**A gate is not a task.** Nothing in this repo can discharge these, and no
+session should record one as done.
+
+- **Legal review of the disclaimers, before this app is used by anyone other
+  than Alan.** Filed 2026-07-29 with the physical-hazard boundary
+  (`CLAUDE.md` ground rule 4). It needs a lawyer familiar with
+  **recreational-use liability in Alaska** — the app plots documented mine
+  workings, i.e. shafts and adits, in avalanche terrain with cold water and no
+  cell coverage, and it makes tiered claims about legal encumbrance that a
+  reader could take as claims about safety. A model cannot perform this review
+  and must not approximate it. **Do not act on this; it is recorded so that
+  "who else can use this" has a gate attached rather than an assumption.**
 
 ## Deliberately not built yet
 
