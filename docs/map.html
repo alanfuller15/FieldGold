@@ -42,7 +42,7 @@
   /* Attribution and any bottom control clear the chrome bar as well as the
      home indicator, or the bar covers the OpenStreetMap/Esri attribution —
      which is a licence condition, not decoration. */
-  .leaflet-bottom{margin-bottom:calc(var(--sa-bottom,0px) + var(--fg-chrome-h,48px));}
+  .leaflet-bottom{margin-bottom:var(--fg-chrome-h,48px);}
   .leaflet-left{margin-left:var(--sa-left,0px);}
   .leaflet-right{margin-right:var(--sa-right,0px);}
   /* z-index 1200, not 1000. Leaflet's own .leaflet-top/.leaflet-bottom containers
@@ -68,7 +68,7 @@
     /* The insets come out of the available height too, or pushing the panel
        down by --sa-top just pushes its lower edge off the bottom of the screen
        and re-creates the unreachable tail at the other end. */
-    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--sa-bottom,0px) - var(--fg-chrome-h,48px));overflow-y:auto;
+    max-height:calc(100vh - 20px - var(--sa-top,0px) - var(--fg-chrome-h,48px));overflow-y:auto;
     overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
     /* border-box, or max-height clamps the CONTENT box and the panel still
        overruns a short window by padding + border. Measured at 1280x620: 624px
@@ -94,7 +94,7 @@
     /* bottom stops at the chrome bar rather than 0. The sheet ending ABOVE the
        bar is what makes the bar incapable of covering warning text — the
        failure a floating back button would have reintroduced. */
-    #panel:not(.collapsed){left:0;right:0;top:0;bottom:calc(var(--fg-chrome-h,48px) + var(--sa-bottom,0px));max-height:none;
+    #panel:not(.collapsed){left:0;right:0;top:0;bottom:var(--fg-chrome-h,48px);max-height:none;
       border:0;border-radius:0;background:#1E1A13;
       padding:11px calc(13px + var(--sa-right,0px))
               calc(30px + var(--sa-bottom,0px)) calc(13px + var(--sa-left,0px));}
@@ -187,7 +187,125 @@
 <script src="fieldgold-data.js"></script>
 <script>
 const S=document.getElementById('status');
-function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);S.scrollTop=S.scrollHeight;}
+
+/* THE PROBLEM ROW. Wired into log() itself, ABOVE the load listener, and that
+   position is deliberate: the `map library missing` branch logs two err lines
+   and RETURNS before Leaflet or the map exist. That is the worst case in this
+   file — a broken install — and it is the one where the old code said nothing a
+   user could see. Anything hung off the map object would miss it.
+
+   Why this exists at all, measured on the device offline: every line map.html
+   wrote about what went wrong went into #status, inside #panelbody, which is
+   display:none while the panel is collapsed — and the panel auto-collapses at
+   phone width behind a toggle under the status bar that a finger cannot press.
+   Twelve lines logged, four visible, and the four visible ones were exactly the
+   four that report nothing wrong. Two defects each making the other permanent.
+
+   The requirement this meets: a warn or err must be visible with NO user
+   action. `ok` lines have no such requirement and stay in #status. */
+/* Items are buffered and the row is rendered when the element exists, NOT when
+   the first warning arrives. This script runs before the chrome markup at the
+   end of <body> has been parsed, so a direct getElementById here returns null
+   and every early warning would be silently dropped — which is the failure mode
+   being fixed, rebuilt. Buffering also means the window.onerror handler above
+   and the `map library missing` branch are covered even though both can fire
+   before the bar exists. */
+const P={box:null,items:[]};
+function bindProblemRow(){
+  if(P.box) return true;
+  const box=document.getElementById('fg-problem');
+  if(!box) return false;
+  P.box=box;
+  P.head=box.querySelector('.fg-problem-head');
+  P.text=box.querySelector('.fg-problem-text');
+  P.more=box.querySelector('.fg-problem-more');
+  P.list=box.querySelector('.fg-problem-list');
+  P.head.addEventListener('click',function(){
+    const open=P.list.hidden;
+    P.list.hidden=!open;
+    P.head.setAttribute('aria-expanded',open?'true':'false');
+    syncChromeHeight();
+  });
+  return true;
+}
+/* The bar's height is no longer constant, and map.html's panel is positioned
+   against it. Publishing the measured height back into --fg-chrome-h is what
+   keeps the panel ending ABOVE the bar when the problem row appears or expands
+   — otherwise the row covers the bottom of the land-status warnings, which is
+   the failure this whole change exists to end, reintroduced by the fix for it. */
+function syncChromeHeight(){
+  const bar=document.querySelector('.fg-chrome');
+  if(!bar) return;
+  document.documentElement.style.setProperty('--fg-chrome-h',bar.offsetHeight+'px');
+  // OBSERVED, NOT SNAPSHOT. Publishing the height once is not enough: the bar
+  // also changes size for reasons this code never sees — rotation, iOS Dynamic
+  // Type, or a long warning wrapping to a second line at a narrower width. A
+  // stale reservation means the bar covers the bottom of the land-status panel,
+  // which is the failure this whole row exists to end. Caught by the suite
+  // measuring a page whose insets arrived after load, which is exactly the
+  // "height changed and nothing recomputed" case.
+  if(!syncChromeHeight.ro && window.ResizeObserver){
+    syncChromeHeight.ro=new ResizeObserver(function(){
+      const b=document.querySelector('.fg-chrome');
+      if(b) document.documentElement.style.setProperty('--fg-chrome-h',b.offsetHeight+'px');
+    });
+    // BORDER box, not the default content box. The bottom safe-area inset is
+    // PADDING on this bar, and a padding change leaves the content box exactly
+    // the same size — so the default observation never fires for the one thing
+    // most likely to change the bar's height on a phone. Measured: with the
+    // default the reservation stayed at its pre-inset value and the bar
+    // overlapped the panel by the full 34px of the home indicator.
+    syncChromeHeight.ro.observe(bar,{box:'border-box'});
+  }
+}
+function showProblem(m,c){
+  P.items.push({m:m,c:c});
+  renderProblems();
+}
+function renderProblems(){
+  if(!P.items.length||!bindProblemRow()) return;
+  const first=P.items[0];
+  // FIRST, not most severe: the causally upstream line explains the ones below
+  // it. Offline that is the no-signal warning, which accounts for every failure
+  // after it.
+  P.text.textContent=first.m;
+  P.box.classList.toggle('err',first.c==='err');
+  P.box.classList.toggle('warn',first.c!=='err');
+  P.box.querySelector('.fg-problem-dot').textContent=first.c==='err'?'✕':'⚠';
+  const rest=P.items.length-1;
+  P.more.hidden=rest<1;
+  P.more.textContent=rest<1?'':'+'+rest;
+  P.head.setAttribute('aria-label',
+    P.items.length===1?first.m:first.m+' — and '+rest+' more');
+  // Rebuilt from the buffer rather than appended to, so a render triggered late
+  // (the element only existed after the first warnings) still lists all of them.
+  P.list.textContent='';
+  P.items.forEach(function(it){
+    const d=document.createElement('div');
+    d.className=it.c||''; d.textContent=it.m; P.list.appendChild(d);
+  });
+  P.box.hidden=false;
+  syncChromeHeight();
+}
+function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);
+  // Auto-scroll only when the box has layout. While #panelbody is display:none
+  // #status has no layout box, scrollHeight is 0, and this assignment writes 0
+  // to 0 — the collapse that hides the log also silently disables the scroll
+  // that would reveal it, so the log sat pinned to the top showing its first
+  // four lines. Re-applied on expand instead (see the h1 handler below).
+  if(S.scrollHeight>0) S.scrollTop=S.scrollHeight;
+  if(c==='warn'||c==='err') showProblem(m,c);}
+// #status only gets layout when the panel opens, so that is when the pending
+// auto-scroll can actually run.
+document.addEventListener('DOMContentLoaded',function(){
+  // Flush anything logged before the chrome markup was parsed — including the
+  // broken-install branch, which is the case with no map at all.
+  renderProblems();
+  const h1=document.querySelector('#panel h1');
+  if(h1) h1.addEventListener('click',function(){
+    setTimeout(function(){ if(S.scrollHeight>0) S.scrollTop=S.scrollHeight; },0);
+  });
+});
 window.onerror=(m)=>{log('ERR: '+m,'err');return false;};
 
 window.addEventListener('load',()=>{
@@ -880,7 +998,21 @@ window.addEventListener('load',()=>{
 });
 </script>
 <nav class="fg-chrome" aria-label="FieldGold navigation">
-  <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  <!-- Populated by the page when it logs a warn or an err. Hidden until then,
+       so a run with nothing wrong costs no screen. aria-live=polite because a
+       warning appearing while you are looking at the map should announce
+       itself; the panel it used to hide in never could. -->
+  <div class="fg-problem" id="fg-problem" role="status" aria-live="polite" hidden>
+    <button class="fg-problem-head" type="button" aria-expanded="false">
+      <span class="fg-problem-dot" aria-hidden="true">⚠</span>
+      <span class="fg-problem-text"></span>
+      <span class="fg-problem-more" hidden></span>
+    </button>
+    <div class="fg-problem-list" hidden></div>
+  </div>
+  <div class="fg-nav">
+    <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  </div>
 </nav>
 </body>
 </html>

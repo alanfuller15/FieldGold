@@ -35,7 +35,7 @@ body{
   background:var(--bg); color:var(--ink); line-height:1.6;
   -webkit-font-smoothing:antialiased;
   max-width:760px; margin:0 auto;
-  padding:var(--sa-top,0px) calc(20px + var(--sa-right,0px)) calc(80px + var(--sa-bottom,0px) + var(--fg-chrome-h,48px)) calc(20px + var(--sa-left,0px));
+  padding:var(--sa-top,0px) calc(20px + var(--sa-right,0px)) calc(80px + var(--fg-chrome-h,48px)) calc(20px + var(--sa-left,0px));
 }
 .mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
 
@@ -447,7 +447,21 @@ figcaption b{color:var(--gold-bright);font-weight:700;}
 </div>
 
 <nav class="fg-chrome" aria-label="FieldGold navigation">
-  <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  <!-- Populated by the page when it logs a warn or an err. Hidden until then,
+       so a run with nothing wrong costs no screen. aria-live=polite because a
+       warning appearing while you are looking at the map should announce
+       itself; the panel it used to hide in never could. -->
+  <div class="fg-problem" id="fg-problem" role="status" aria-live="polite" hidden>
+    <button class="fg-problem-head" type="button" aria-expanded="false">
+      <span class="fg-problem-dot" aria-hidden="true">⚠</span>
+      <span class="fg-problem-text"></span>
+      <span class="fg-problem-more" hidden></span>
+    </button>
+    <div class="fg-problem-list" hidden></div>
+  </div>
+  <div class="fg-nav">
+    <a class="fg-back" href="index.html"><span class="fg-chev">‹</span>Field Brain</a>
+  </div>
 </nav>
 </body>
 </html>

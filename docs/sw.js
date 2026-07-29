@@ -12,6 +12,19 @@
 // Green on one distribution is not evidence about the other, and a bumped
 // version with no rebuild ships the fix to browsers and to nobody's phone.
 //
+// v9 (2026-07-29): warnings are visible without any user action. A v8 phone
+// with no signal shows a black map with correct diamonds on it and NO word
+// of explanation: every line map.html writes about what went wrong goes into
+// #status, inside #panelbody, which is display:none while the panel is
+// collapsed — and it auto-collapses at phone width. Twelve lines logged,
+// four visible, and the four visible were exactly the four reporting nothing
+// wrong. The no-signal warning, its explanation and a real "geochem markers
+// failed" were all below the fold of a 64px scroller whose auto-scroll was
+// itself disabled by the collapse that hid it — `S.scrollTop = S.scrollHeight`
+// writes 0 to 0 with no layout box. Two defects each making the other
+// permanent. Warn and err lines now surface in the bottom chrome bar, first
+// line verbatim plus a count, one tap for the rest. `ok` lines are unchanged.
+//
 // v8 (2026-07-29): the three internal links navigate in the webview, and
 // every page they reach carries a way back. A v7 phone taps the Gold map
 // card and NOTHING happens — target="_blank" routes to Capacitor's popup
@@ -129,7 +142,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v8';
+const CACHE = 'fieldgold-v9';
 
 const SHELL = [
   './',

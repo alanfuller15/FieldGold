@@ -167,6 +167,21 @@ def mutate(root):
         # green, the sequence the phone showed.
         edit("map.html", "if(baseOk||baseSaid||loaded===0) return;",
              "if(baseOk||loaded===0) return;")
+    elif MUTATE == "problem-silent":
+        # Back to the shipped behaviour: every warning goes only into #status,
+        # inside a collapsed panel, behind an untappable toggle.
+        edit("map.html", "  if(c==='warn'||c==='err') showProblem(m,c);}", "}")
+    elif MUTATE == "problem-no-count":
+        # Headline only. The other problems still exist and nothing on screen
+        # says so — deferred becomes hidden, which IS softening.
+        edit("map.html", "  P.more.hidden=rest<1;\n"
+                         "  P.more.textContent=rest<1?'':'+'+rest;\n", "")
+    elif MUTATE == "problem-covers-panel":
+        # The bar grows and the pages' reservation does not, so the problem row
+        # covers the bottom of the land-status panel — the failure being fixed,
+        # rebuilt by its own fix.
+        edit("map.html", "  P.box.hidden=false;\n  syncChromeHeight();",
+             "  P.box.hidden=false;")
     elif MUTATE == "no-tile-honesty":
         # Keep the map, drop the sentence that tells you the blank background
         # is a missing basemap and not a broken app.
@@ -477,6 +492,135 @@ def main():
         check("  ...and does NOT then tick the same layer green",
               "basemap (Streets) ✓" not in part_status, part_status)
         part_ctx.close()
+
+        # ------------------------------------------------------------------
+        # 8. THE WARNING IS VISIBLE WITHOUT ANY USER ACTION.
+        #
+        #    Sections 6 and 7 assert the page SAYS the right things. This one
+        #    asserts a person can READ them, which is a different claim and the
+        #    one that was false on the device: offline, map.html logged twelve
+        #    lines and the user could see FOUR — exactly the four that report
+        #    nothing wrong. The no-signal warning, its explanation and a real
+        #    "geochem markers failed" were all inside #panelbody, which is
+        #    display:none while the panel is collapsed, behind a toggle under
+        #    the status bar that a finger could not press. What Alan saw was a
+        #    black screen with correct diamonds on it and no explanation.
+        #
+        #    tests/test_panel_reachability.py CANNOT cover this: it excludes
+        #    #status from its scope for a stated and still-correct reason, and
+        #    that exclusion covers the app's entire failure-reporting channel.
+        #    All twelve suites passed green against that build.
+        #
+        #    NO INTERACTION HAPPENS BEFORE THE ASSERTION. No expand, no click,
+        #    no programmatic class removal. A green obtained by a route the user
+        #    does not have is not a green.
+        # ------------------------------------------------------------------
+        print("[8] the warning is visible with no user action, at phone size")
+        ph = browser.new_context(viewport={"width": 390, "height": 844},
+                                 device_scale_factor=3)
+        ph.route("**/*", gate)
+        pp = ph.new_page()
+        pp.goto(base + "/map.html", wait_until="load")
+        pp.wait_for_timeout(2500)
+        pp.add_style_tag(content=":root{--sa-top:47px;--sa-bottom:34px;"
+                                 "--sa-left:0px;--sa-right:0px}")
+        pp.wait_for_timeout(300)
+
+        st = pp.evaluate("""() => {
+            const b = document.getElementById('fg-problem');
+            if (!b || b.hidden || !b.offsetParent) return {visible: false};
+            const r = b.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
+            const more = b.querySelector('.fg-problem-more');
+            return {visible: true,
+                    text: b.querySelector('.fg-problem-text').textContent,
+                    more: more.hidden ? null : more.textContent,
+                    top: r.top, bottom: r.bottom, vh: window.innerHeight,
+                    hit: !!(hit && hit.closest('#fg-problem')),
+                    panelCollapsed: document.querySelector('#panel')
+                                      .classList.contains('collapsed')}; }""")
+        check("the panel is still collapsed — this is the state the user is "
+              "actually in, and nothing below opened it", st.get("panelCollapsed"), st)
+        check("a problem is on screen with NO interaction at all", st["visible"], st)
+        check("  ...it is at the bottom, clear of the status bar's blind spot "
+              "(top=%s of %s)" % (st.get("top"), st.get("vh")),
+              st["visible"] and st["top"] > st["vh"] / 2, st)
+        check("  ...it wins its own hit test", st.get("hit"), st)
+        check("  ...and its text is a line the page actually logged, verbatim "
+              "and untruncated", st["visible"] and st["text"]
+              and st["text"] in status and "…" not in st["text"], st.get("text"))
+
+        # Every remaining problem is accounted for by the count. Nothing is
+        # dropped and nothing is shortened — the count is what makes the
+        # remainder unmissable rather than merely deferred.
+        logged = [l for l in pp.evaluate(
+            "() => Array.from(document.querySelectorAll('#status div'))"
+            ".map(d => ({c: d.className, t: d.textContent}))")
+            if l["c"] in ("warn", "err")]
+        check("more than one problem was logged (otherwise the count below is "
+              "vacuous)", len(logged) > 1, len(logged))
+        check("the count accounts for every problem not in the headline "
+              "(%s logged, badge %s)" % (len(logged), st.get("more")),
+              st.get("more") == "+%d" % (len(logged) - 1), {"logged": len(logged), **st})
+
+        # Geometry with the row SHOWN but not expanded. This is what
+        # showProblem's own syncChromeHeight call covers, and it has to be
+        # asserted separately from the expanded case: the click handler syncs
+        # too, so a check made only after tapping passes even when appearing
+        # never resized anything. A mutant removing the sync from showProblem
+        # survived on exactly that.
+        pp.evaluate("() => document.querySelector('#panel')"
+                    ".classList.remove('collapsed')")
+        pp.wait_for_timeout(300)
+        g1 = pp.evaluate("""() => {
+            const p = document.querySelector('#panel');
+            const c = document.querySelector('.fg-chrome');
+            if (!p || !c) return null;
+            return {panelBottom: p.getBoundingClientRect().bottom,
+                    barTop: c.getBoundingClientRect().top}; }""")
+        check("the problem row APPEARING does not cover the land-status panel "
+              "(%s)" % g1,
+              bool(g1) and g1["panelBottom"] <= g1["barTop"] + 0.5, g1)
+
+        # One tap reaches all of them, in full.
+        if pp.query_selector(".fg-problem-head") and st["visible"]:
+            pp.click(".fg-problem-head")
+            pp.wait_for_timeout(400)
+        listed = pp.evaluate(
+            "() => Array.from(document.querySelectorAll('.fg-problem-list div'))"
+            ".map(d => d.textContent)")
+        check("one tap lists every problem, in full", listed == [l["t"] for l in logged],
+              {"listed": listed, "logged": [l["t"] for l in logged]})
+        for needle in ["basemap tiles unavailable — no signal",
+                       "land-status colours are still correct"]:
+            check("  ...including %r" % needle[:44],
+                  any(needle in l for l in listed), listed)
+
+        # And again once expanded, where the bar is at its tallest.
+        geo = pp.evaluate("""() => {
+            const p = document.querySelector('#panel');
+            const c = document.querySelector('.fg-chrome');
+            if (!p || !c) return null;
+            return {panelBottom: p.getBoundingClientRect().bottom,
+                    barTop: c.getBoundingClientRect().top}; }""") or {"panelBottom": 1, "barTop": 0}
+        check("the expanded problem row still does not cover the land-status "
+              "panel (panel %s, bar %s)" % (geo["panelBottom"], geo["barTop"]),
+              geo["panelBottom"] <= geo["barTop"] + 0.5, geo)
+
+        # The #status auto-scroll was a no-op: `S.scrollTop = S.scrollHeight`
+        # while #panelbody is display:none writes 0 to 0, so the log sat pinned
+        # to the top showing its first four lines. It runs when the box gets
+        # layout now.
+        pp.evaluate("() => document.querySelector('#panel h1').click()")
+        pp.wait_for_timeout(200)
+        pp.evaluate("() => document.querySelector('#panel h1').click()")
+        pp.wait_for_timeout(400)
+        sc = pp.evaluate("""() => { const s = document.getElementById('status');
+            return {top: s.scrollTop, h: s.scrollHeight, c: s.clientHeight}; }""")
+        check("the run log auto-scrolls to its newest line once it has layout "
+              "(scrollTop %s of %s)" % (sc["top"], sc["h"] - sc["c"]),
+              sc["h"] <= sc["c"] or sc["top"] > 0, sc)
+        ph.close()
 
         browser.close()
     httpd.shutdown()

@@ -60,19 +60,23 @@
   --sa-right:env(safe-area-inset-right,0px);
   --sa-bottom:env(safe-area-inset-bottom,0px);
   --sa-left:env(safe-area-inset-left,0px);
-  /* Page content subtracts this so nothing renders under the bar. Changing it
-     here changes it everywhere, which is the point of the file. */
-  --fg-chrome-h:48px;
+  /* THE FULL HEIGHT THE BAR OCCUPIES, bottom inset included. Pages reserve
+     exactly this much and nothing renders under the bar. It includes the inset
+     rather than leaving pages to add it because the bar's height is no longer
+     constant: the problem row below makes it grow, and map.html rewrites this
+     property from the measured height when that happens, so the panel re-lays
+     itself out. A page adding --sa-bottom separately would double-count the
+     moment the value became dynamic. */
+  --fg-chrome-h:calc(48px + var(--sa-bottom,0px));
 }
 
 .fg-chrome{
   position:fixed;left:0;right:0;bottom:0;
+  flex-direction:column;align-items:stretch;
   /* Above map.html's #panel (1200) and Leaflet's control containers (1000).
      The way out of a page must not be something another layer can cover. */
   z-index:1500;
-  display:flex;align-items:center;gap:10px;
-  min-height:var(--fg-chrome-h);
-  box-sizing:content-box;
+  display:flex;gap:0;
   background:#1E1A13;
   /* The hairline is a box-shadow, not a border-top, and that is a layout
      decision rather than a style one. Pages reserve exactly
@@ -87,6 +91,65 @@
   padding:0 calc(12px + var(--sa-right,0px)) var(--sa-bottom,0px) calc(12px + var(--sa-left,0px));
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
+
+.fg-nav{display:flex;align-items:center;gap:10px;min-height:48px;}
+
+/* THE PROBLEM ROW.
+ *
+ * Requirement, from rules 4 and 5: a warn or err line must be visible WITHOUT
+ * ANY USER ACTION. Not one tap. A warning behind a collapsed panel is softened;
+ * behind an unpressable toggle it is deleted.
+ *
+ * What it replaced: map.html wrote every line it had about what went wrong into
+ * #status, inside #panelbody, which is display:none while the panel is
+ * collapsed — and the panel auto-collapses at phone width behind a toggle that
+ * could not be pressed. Offline on the device the log carried twelve lines and
+ * the user could see FOUR, which were exactly the four that report nothing
+ * wrong. The no-signal warning, its explanation, and a real "geochem markers
+ * failed" all sat below the fold of a 64px scroller whose auto-scroll was
+ * itself disabled by the collapse that hid it. What Alan saw was a black screen
+ * with correct diamonds on it and no word of explanation.
+ *
+ * FIRST line, not most severe: the causally upstream one explains the ones
+ * below it. Offline that is "basemap tiles unavailable — no signal", which
+ * accounts for the six that follow; severity ordering would promote a
+ * downstream err and bury the cause.
+ *
+ * First line in full + a count is not softening. Nothing is truncated, the
+ * count makes the remainder unmissable, and the affordance that reaches them is
+ * a 44px control at the bottom of the screen — which is the whole difference
+ * from a toggle under the status bar. `ok` lines have no such requirement and
+ * stay in #status where they were.
+ */
+.fg-problem{border-bottom:1px solid #4A3F2D;}
+.fg-problem-head{
+  display:flex;align-items:center;gap:8px;width:100%;
+  min-height:44px;padding:6px 10px;
+  background:none;border:0;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:.78rem;line-height:1.35;text-align:left;
+  color:#D8D0BE;
+}
+.fg-problem-head:active{background:#2C2619;}
+.fg-problem-dot{flex:0 0 auto;font-size:.9rem;}
+/* The line itself wraps rather than ellipsing. Truncating a warning to fit is
+   the thing rules 4 and 5 forbid; the bar gets taller instead. */
+.fg-problem-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+.fg-problem-more{
+  flex:0 0 auto;font-size:.7rem;font-weight:700;color:#14110C;
+  background:#D29A3A;border-radius:999px;padding:2px 7px;
+}
+.fg-problem.err .fg-problem-dot{color:#C25A3A;}
+.fg-problem.warn .fg-problem-dot{color:#D29A3A;}
+.fg-problem.err .fg-problem-more{background:#C25A3A;color:#F2EDE0;}
+.fg-problem-list{
+  max-height:40vh;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 10px 8px;font-size:.72rem;line-height:1.45;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;
+}
+.fg-problem-list div{padding:3px 0;border-top:1px solid #332C1E;overflow-wrap:anywhere;}
+.fg-problem-list .warn{color:#D29A3A;}
+.fg-problem-list .err{color:#C25A3A;}
 
 .fg-back{
   display:inline-flex;align-items:center;gap:7px;
