@@ -170,12 +170,30 @@ def mutate(root):
     elif MUTATE == "problem-silent":
         # Back to the shipped behaviour: every warning goes only into #status,
         # inside a collapsed panel, behind an untappable toggle.
-        edit("map.html", "  if(c==='warn'||c==='err') showProblem(m,c);}", "}")
+        # Re-pointed 2026-07-29 when log() gained the kind argument; it aborted
+        # exit 2 until then, which is the intended behaviour and still a gap
+        # while it lasts.
+        edit("map.html", "  if(c==='warn'||c==='err') showProblem(m,c,kind);}", "}")
     elif MUTATE == "problem-no-count":
         # Headline only. The other problems still exist and nothing on screen
         # says so — deferred becomes hidden, which IS softening.
         edit("map.html", "  P.more.hidden=rest<1;\n"
                          "  P.more.textContent=rest<1?'':'+'+rest;\n", "")
+    elif MUTATE == "land-as-failure":
+        # The boundary, pushed from one side: the REM tally stops opting into
+        # 'land' and competes for the headline. This is the state the branch
+        # shipped in before the split — chronological-first, with "20 plotted
+        # (8 clean, 0 unchecked, 12 avoid)" in the slot while the screen was
+        # black and nothing on the bar said why.
+        edit("map.html", "c.avoid ? 'warn' : (cls||'ok'), 'land');",
+             "c.avoid ? 'warn' : (cls||'ok'));")
+    elif MUTATE == "failure-as-land":
+        # And from the other side: a real failure reclassified as land-status,
+        # so it stops competing and the headline falls back to the tally. This
+        # is the direction that HIDES a failure, and it is the one a careless
+        # "this mentions land status, so tag it land" edit would produce.
+        edit("map.html", "log('basemap tiles unavailable — no signal','warn');",
+             "log('basemap tiles unavailable — no signal','warn','land');")
     elif MUTATE == "problem-covers-panel":
         # The bar grows and the pages' reservation does not, so the problem row
         # covers the bottom of the land-status panel — the failure being fixed,
@@ -555,8 +573,49 @@ def main():
         # remainder unmissable rather than merely deferred.
         logged = [l for l in pp.evaluate(
             "() => Array.from(document.querySelectorAll('#status div'))"
-            ".map(d => ({c: d.className, t: d.textContent}))")
+            ".map(d => ({c: d.className, t: d.textContent, k: d.dataset.kind || null}))")
             if l["c"] in ("warn", "err")]
+
+        # ---- the two kinds, and the boundary between them ----
+        #
+        # A land-status warning is the app WORKING and saying something
+        # important; a failure report is the app saying what it could not do.
+        # They are not ranked against each other. Chronological-first was tried
+        # and falsified by measurement: map.html's tally() logs `warn` whenever
+        # any bench is `avoid`, so the first warn offline is "20 plotted (8
+        # clean, 0 unchecked, 12 avoid)" — true, important, and not the reason
+        # the screen is black. Severity-first is not the answer either; it
+        # promotes `geochem markers failed` over the no-signal line explaining it.
+        #
+        # The kind is read from data-kind, which the CALL SITE sets. This suite
+        # must not infer it from message text for the same reason the app must
+        # not: a reworded warning would silently change its own classification.
+        land = [l for l in logged if l["k"] == "land"]
+        fails = [l for l in logged if l["k"] != "land"]
+        check("both kinds are present offline (otherwise the boundary below is "
+              "vacuous): %d land-status, %d failure" % (len(land), len(fails)),
+              len(land) >= 1 and len(fails) >= 1,
+              {"land": [l["t"][:40] for l in land], "fail": [l["t"][:40] for l in fails]})
+        check("the REM tally is classified land-status, not failure — it is "
+              "amber because benches are on encumbered ground, which is the app "
+              "working",
+              any("plotted" in l["t"] and "avoid" in l["t"] for l in land),
+              [l["t"] for l in logged if "plotted" in l["t"]])
+        check("the no-signal line is classified as a failure",
+              any("basemap tiles unavailable" in l["t"] for l in fails),
+              [l["t"] for l in logged if "basemap tiles" in l["t"]])
+        check("the headline is the FIRST FAILURE, not merely the first warning "
+              "(%r)" % (st.get("text") or "")[:52],
+              st["visible"] and fails and st["text"] == fails[0]["t"],
+              {"headline": st.get("text"), "firstFailure": fails[0]["t"] if fails else None})
+        check("  ...and a land-status line did not take the slot from it",
+              st["visible"] and st["text"] not in [l["t"] for l in land],
+              st.get("text"))
+        # The constraint that makes the split safe: separating the kinds must
+        # not demote the land-status line. It keeps its warn class, stays in
+        # #status, and stays in the expanded list with the count covering it.
+        check("the land-status line is NOT hidden by the split — still warn, "
+              "still in the run log", all(l["c"] == "warn" for l in land), land)
         check("more than one problem was logged (otherwise the count below is "
               "vacuous)", len(logged) > 1, len(logged))
         check("the count accounts for every problem not in the headline "
@@ -591,6 +650,9 @@ def main():
             ".map(d => d.textContent)")
         check("one tap lists every problem, in full", listed == [l["t"] for l in logged],
               {"listed": listed, "logged": [l["t"] for l in logged]})
+        check("  ...INCLUDING the land-status line, which the split must not "
+              "drop from the list", all(l["t"] in listed for l in land),
+              {"land": [l["t"] for l in land], "listed": listed})
         for needle in ["basemap tiles unavailable — no signal",
                        "land-status colours are still correct"]:
             check("  ...including %r" % needle[:44],

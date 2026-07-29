@@ -1084,16 +1084,35 @@ via `npx cap sync` + rebuild + install.
    interaction. A photograph is the authority for what a person sees.
 5. **Landscape**, still never measured on any target.
 
-### One design question left open, deliberately
+### The design question is CLOSED — two kinds, not one ranked list
 
-`map.html:600`'s `tally()` logs `warn` whenever any bench is `avoid`, so the
-first warn offline is "REM candidates: 20 plotted (8 clean, 0 unchecked, 12
-avoid)" — a true land-status signal, not a failure. Chronological-first
-therefore headlines it and puts "basemap tiles unavailable — no signal" at +2
-behind the tap, which falsifies the premise chronological-first was chosen on.
-Not reclassified, because softening a land-status line breaks rule 4.
-Severity-first is not the fix either — it promotes `geochem markers failed` over
-the no-signal line. **Alan's call.**
+`tally()` logs `warn` whenever a bench is `avoid`, so chronological-first
+headlined "REM candidates: 20 plotted (8 clean, 0 unchecked, 12 avoid)" while
+the screen was black and unexplained. Alan's ruling 2026-07-29, and it dissolves
+the question rather than answering it: **a land-status warning and a failure
+report are different kinds and ranking them against each other was the error.**
+The first is the app working and saying something important; the second is the
+app saying what it could not do.
+
+The row headlines the first **failure**. The land-status line is not demoted —
+it keeps its `warn` class, its place in `#status`, its place in the expanded
+list with the count covering it, and it takes the headline whenever nothing has
+failed. **Classified at the call site** (`log(msg, cls, kind)`), never by
+matching message text: a line's kind is a property of what produced it, and a
+regex over wording would break silently the first time somebody rephrased a
+warning. **Failure is the default; land-status opts in**, so a warning added
+later without a kind is over-reported rather than silently dropped. Four call
+sites are `land`: `tally()`, the no-land-status-data caveat, and the two
+federal-register lines.
+
+Held in both directions by `land-as-failure` and `failure-as-land`.
+
+**One thing to check on the device:** which failure headlines is timing-
+dependent. In the Chromium harness the aborted geochem fetch resolves before the
+tile errors, so the headline is `geochem markers failed`. On the device in Run 2
+the no-signal warning was logged first, so it should headline there. Both are
+failures, so the rule holds either way — but confirm which line a person
+actually reads.
 
 ## Phase 1 — enforce the bundle/Pages divergence
 

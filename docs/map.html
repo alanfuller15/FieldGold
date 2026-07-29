@@ -258,16 +258,25 @@ function syncChromeHeight(){
     syncChromeHeight.ro.observe(bar,{box:'border-box'});
   }
 }
-function showProblem(m,c){
-  P.items.push({m:m,c:c});
+function showProblem(m,c,kind){
+  P.items.push({m:m,c:c,kind:kind});
   renderProblems();
 }
 function renderProblems(){
   if(!P.items.length||!bindProblemRow()) return;
-  const first=P.items[0];
-  // FIRST, not most severe: the causally upstream line explains the ones below
-  // it. Offline that is the no-signal warning, which accounts for every failure
-  // after it.
+  /* THE HEADLINE IS THE FIRST FAILURE. A land-status line never competes for
+     the slot — it cannot displace the reason the screen is black.
+
+     It does take the slot when there is no failure at all, and that is the
+     point rather than a loophole: with nothing broken, "12 of 20 on encumbered
+     ground" is the most important thing on the bar, and it gets read with zero
+     taps instead of behind a panel. So the land-status line is never demoted by
+     this rule — it is only ever outranked by something the user needs more
+     urgently, and it stays in the list below with the count accounting for it.
+
+     Chronological within each kind: the causally upstream failure explains the
+     ones after it. */
+  const first=P.items.find(function(i){return i.kind!=='land';})||P.items[0];
   P.text.textContent=first.m;
   P.box.classList.toggle('err',first.c==='err');
   P.box.classList.toggle('warn',first.c!=='err');
@@ -282,19 +291,41 @@ function renderProblems(){
   P.list.textContent='';
   P.items.forEach(function(it){
     const d=document.createElement('div');
-    d.className=it.c||''; d.textContent=it.m; P.list.appendChild(d);
+    d.className=it.c||''; if(it.kind)d.dataset.kind=it.kind;
+    d.textContent=it.m; P.list.appendChild(d);
   });
   P.box.hidden=false;
   syncChromeHeight();
 }
-function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;S.appendChild(d);
+/* TWO KINDS OF LINE, AND THEY ARE NOT RANKED AGAINST EACH OTHER.
+   A land-status warning is the app WORKING and saying something important —
+   "12 of these 20 benches are on encumbered ground". A failure report is the
+   app saying what it COULD NOT DO — "basemap tiles unavailable, no signal".
+   Ordering one against the other was the mistake: chronological-first put the
+   REM tally in the headline while the screen was black and unexplained, and
+   severity-first would have promoted `geochem markers failed` over the
+   no-signal line that explains it. They are different channels.
+
+   CLASSIFIED AT THE CALL SITE, never by matching on the message text. A line's
+   kind is a property of what produced it, not of how it happens to be worded,
+   and a regex over message text would break silently the first time someone
+   reworded a warning — which is the exact class of failure this phase exists
+   to close.
+
+   FAILURE IS THE DEFAULT and land-status must opt in. A warn or err added later
+   without a kind therefore surfaces in the problem row. The wrong direction to
+   fail is silence: an over-reported line is noise, an under-reported one is the
+   black screen with no explanation. The kind is written to the DOM so the
+   classification is observable rather than inferred. */
+function log(m,c,kind){const d=document.createElement('div');if(c)d.className=c;
+  if(kind)d.dataset.kind=kind;d.textContent=m;S.appendChild(d);
   // Auto-scroll only when the box has layout. While #panelbody is display:none
   // #status has no layout box, scrollHeight is 0, and this assignment writes 0
   // to 0 — the collapse that hides the log also silently disables the scroll
   // that would reveal it, so the log sat pinned to the top showing its first
   // four lines. Re-applied on expand instead (see the h1 handler below).
   if(S.scrollHeight>0) S.scrollTop=S.scrollHeight;
-  if(c==='warn'||c==='err') showProblem(m,c);}
+  if(c==='warn'||c==='err') showProblem(m,c,kind);}
 // #status only gets layout when the panel opens, so that is when the pending
 // auto-scroll can actually run.
 document.addEventListener('DOMContentLoaded',function(){
@@ -522,7 +553,7 @@ window.addEventListener('load',()=>{
     // No bench data on the device means contextForPoint has nothing to answer
     // with, and every dot would be amber for the wrong reason. Say so.
     const haveBenches = !!(window.FieldGoldData && FieldGoldData.get('bench').length);
-    if(!haveBenches) log('no land-status data on this device — site colours mean "unknown", not "unchecked"','warn');
+    if(!haveBenches) log('no land-status data on this device — site colours mean "unknown", not "unchecked"','warn','land');
 
     let avoidCount=0;
     sites.forEach(s=>{
@@ -619,9 +650,12 @@ window.addEventListener('load',()=>{
 
   const tally = (what,list,cls) => {
     const c = FieldGoldData.statusCounts(list);
+    // 'land': this line is amber because benches sit on ENCUMBERED GROUND,
+    // which is the app working correctly and reporting something important. It
+    // is not a failure and must not headline the problem row over one.
     log(what+': '+list.length+' plotted ('
         +c.clean+' clean, '+c.unchecked+' unchecked, '+c.avoid+' avoid)',
-        c.avoid ? 'warn' : (cls||'ok'));
+        c.avoid ? 'warn' : (cls||'ok'), 'land');
   };
 
   // BENCH CANDIDATES: flagged by the bench hunter, read from the shared record.
@@ -989,8 +1023,8 @@ window.addEventListener('load',()=>{
           +'<span style="color:#C25A3A;font-weight:700;display:block;margin-top:6px;">⚠ State claims and closures are in Alaska Mapper, not on this map. Check there before digging.</span></div>');
     }
     log('occurrences drawn: '+drawn+' ('+rust+' on or beside encumbered ground)','ok');
-    log('federal register only — claimed '+fedClaimed+' · none returned '+fedNone+' · no answer '+fedUnknown,'warn');
-    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn');
+    log('federal register only — claimed '+fedClaimed+' · none returned '+fedNone+' · no answer '+fedUnknown,'warn','land');
+    log('"none returned" is NOT open ground: this reach is state land and state claims are not in that register','warn','land');
     btn.textContent=LABEL; btn.disabled=false;
     if(drawn===0) log('(zoom to a district like Hatcher Pass, then scan)','');
   });

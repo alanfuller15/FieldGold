@@ -12,6 +12,17 @@
 // Green on one distribution is not evidence about the other, and a bumped
 // version with no rebuild ships the fix to browsers and to nobody's phone.
 //
+// v10 (2026-07-29): land-status warnings and failure reports are separate
+// kinds, classified at the call site. A v9 phone offline headlines the
+// problem row with "REM candidates: 20 plotted (8 clean, 0 unchecked, 12
+// avoid)" — true and important, and not the reason the screen is black,
+// which sits two lines down behind a tap. tally() logs `warn` whenever a
+// bench is on encumbered ground, so a first-line rule picks it. The two are
+// different channels and ranking them against each other was the error: the
+// row headlines the first FAILURE, and the land-status line keeps its warn
+// class, its place in the run log and its place in the expanded list. With
+// no failure at all it takes the headline, which is the point.
+//
 // v9 (2026-07-29): warnings are visible without any user action. A v8 phone
 // with no signal shows a black map with correct diamonds on it and NO word
 // of explanation: every line map.html writes about what went wrong goes into
@@ -142,7 +153,7 @@
 // their HTML would produce a page that looks like FieldGold, carries no
 // land-status layer, and shows nothing at all. A browser offline error is the
 // more honest outcome. Each of them now says so on screen in red.
-const CACHE = 'fieldgold-v9';
+const CACHE = 'fieldgold-v10';
 
 const SHELL = [
   './',

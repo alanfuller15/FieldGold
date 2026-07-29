@@ -110,10 +110,20 @@
  * itself disabled by the collapse that hid it. What Alan saw was a black screen
  * with correct diamonds on it and no word of explanation.
  *
- * FIRST line, not most severe: the causally upstream one explains the ones
- * below it. Offline that is "basemap tiles unavailable — no signal", which
- * accounts for the six that follow; severity ordering would promote a
- * downstream err and bury the cause.
+ * THE HEADLINE IS THE FIRST FAILURE, and the two kinds of line are NOT ranked
+ * against each other. A land-status warning is the app WORKING and saying
+ * something important ("12 of these 20 benches are on encumbered ground"); a
+ * failure report is the app saying what it COULD NOT DO ("basemap tiles
+ * unavailable — no signal"). Ordering one against the other was the mistake:
+ * chronological-first headlined the REM tally while the screen was black and
+ * unexplained, and severity-first would have promoted `geochem markers failed`
+ * over the no-signal line that explains it. The kind is decided AT THE CALL
+ * SITE in map.html, never by matching on message text — a line's kind is a
+ * property of what produced it, and a regex over wording breaks silently.
+ *
+ * With no failure at all, the land-status line takes the slot, by design. It is
+ * never demoted by this rule, only outranked by something more urgent, and it
+ * stays in the list below with the count accounting for it.
  *
  * First line in full + a count is not softening. Nothing is truncated, the
  * count makes the remainder unmissable, and the affordance that reaches them is
