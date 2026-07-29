@@ -1,11 +1,13 @@
 # FieldGold — migration state
 
-Last updated: 2026-07-28 (first **simulator** build, install, launch and render.
-The app runs and the map draws. Two flagged questions are now answered, both
-badly: the service worker does NOT register, and the Field tools
-`target="_blank"` buttons do NOTHING. **Signing is no longer the blocker** —
-the Developer Program is paid and the Apple ID is added; what blocks Phase 0 is
-a Lightning cable that carries data. No physical device has run this app)
+Last updated: 2026-07-28 (**first build, install and launch on a physical
+iPhone.** Signing is resolved, the device is registered, a provisioning profile
+exists, and FieldGold runs on Alan's iPhone 14. The cable blocker is gone. One
+finding is now confirmed on real hardware with a real finger and is **worse
+than the simulator recorded it**: the three internal `target="_blank"` links do
+nothing, and since `map.html` is referenced exactly once in `index.html` — by
+that dead anchor — **the map is UNREACHABLE from the app's UI on a phone.** Not
+a broken button: the primary field tool cannot be opened at all)
 
 ## Active phase
 
@@ -27,15 +29,19 @@ changes to app code.
 | Xcode licence agreed | **done** 2026-07-28 — `sudo xcodebuild -license` accepted by Alan. `xcodebuild -version` and `git status` both exit 0 [self-tested]. Until this landed, **`git` itself was refusing** — see below |
 | Project opens in Xcode (step 4) | **done** 2026-07-28 — window `App — App.xcodeproj`, document loaded, **active scheme `App`** [self-tested]. **`cap open ios` did not achieve this on the first run** — see below |
 | Builds for **simulator** | **done** 2026-07-28 — `xcodebuild -scheme App -sdk iphonesimulator` → `** BUILD SUCCEEDED **`, and the artifact was checked, not the exit code: `App.app` exists, `App` is a Mach-O 64-bit arm64 executable, `public/` carries all 20 web assets including the five stage maps and `vendor/leaflet/` [self-tested] |
-| Builds for **device** | **blocked, and attempted** 2026-07-28 — `xcodebuild -sdk iphoneos` fails at `GatherProvisioningInputs`, exit 65, on "No profiles for `io.github.alanfuller15.fieldgold` were found". Not a decision gap; see the cable blocker [self-tested] |
+| Builds for **device** | **done** 2026-07-28 — `xcodebuild -sdk iphoneos -destination id=00008110-...` → `** BUILD SUCCEEDED **`, exit 0. Verified by artifact, not exit code: `App.app/App` is Mach-O arm64, `embedded.mobileprovision` is present and names this device, and `codesign --verify --deep --strict` exits 0 "satisfies its Designated Requirement" under authority `Apple Development: Alan Fuller (VSSL232H55)` → Apple WWDR CA → Apple Root CA. **A real chain, not the simulator's ad-hoc `--sign -`** [self-tested] |
 | Apple Developer Program | **done** 2026-07-28 — **paid, enrollment approved.** Verified from the machine: `isFreeProvisioningTeam = 0`, `teamType = Individual`, team `PWCMJWTT6J` "Alan Fuller" [self-tested] |
 | Apple ID added in Xcode | **done** 2026-07-28 — one account under `IDE.Identifiers.Prod`; team resolves and is set in the pbxproj [self-tested] |
-| Signing configured | **partly.** Automatic signing on, team set on both configs, and 4 valid `Apple Development` certificates issued 2026-07-28. **What is missing is a provisioning profile**, and it cannot be generated — see the cable blocker |
-| **Data cable** | **BLOCKED — this is the only thing stopping Phase 0.** The iPhone 14 needs Lightning; the USB-A cable + USB-C adapter on hand carries power but not data. Finder does not see the phone, `devicectl list devices` reports `No devices found`. Hardware gap, not a decision |
+| Signing configured | **done** 2026-07-28 — **1** valid identity (`8F3132ED…` `Apple Development: Alan Fuller (VSSL232H55)`), automatic signing, team `PWCMJWTT6J` on both configs. The four earlier certificates were issued to a **different machine**; see the resolution below |
+| **Data cable** | **RESOLVED** 2026-07-28 — a data-carrying Lightning cable is in hand. `devicectl list devices` shows `Alans IPhone`, `iPhone 14 (iPhone14,7)`, UDID `00008110-0006398C0ABA401E`, state `connected`, `pairingState paired`, `tunnelState connected`, `transportType wired` [self-tested] |
+| Developer Mode on device | **done** 2026-07-28 — Alan enabled it on the phone and rebooted. `developerModeStatus` `disabled` → **`enabled`**, `ddiServicesAvailable` `false` → **`true`**. Corroborated independently: the model string resolved from raw `iPhone14,7` to `iPhone 14 (iPhone14,7)`, which only happens once the DDI mounts. **This blocks destination resolution, which runs BEFORE provisioning** — with it off, `xcodebuild` exits 70 on "Timed out waiting for all destinations", and no signing error is ever reached [self-tested] |
+| Device registered | **done** 2026-07-28 — registration happened when Alan selected the phone as the run destination in Xcode. Confirmed by artifact: the profile's `ProvisionedDevices` array contains exactly `00008110-0006398C0ABA401E` [self-tested] |
+| Provisioning profile | **done** 2026-07-28 — the profiles directory, absent for the whole project until now, holds `150382bc-….mobileprovision`: `iOS Team Provisioning Profile: *`, team `PWCMJWTT6J`, AppID `PWCMJWTT6J.*`, `get-task-allow true`, created 2026-07-28, expires 2027-07-28 [self-tested] |
 | Installed on **simulator** | **done** 2026-07-28 — `simctl install` then `get_app_container` returned a real bundle path, so the install was confirmed by lookup rather than by exit code [self-tested] |
 | Launches and renders on **simulator** | **done** 2026-07-28 — launched to PID with `ps` state `Ss`, `index.html` renders, `map.html` loads and draws. Full findings below [self-tested] |
-| Installed on device | not started — **no physical device has run this app.** The cable path is not carrying data |
-| Launches and renders | not started — device row. The simulator rows above do not satisfy it |
+| Installed on device | **done** 2026-07-28 — `devicectl device install app` reported `bundleID io.github.alanfuller15.fieldgold`. Confirmed by **independent lookup** rather than by that output: `devicectl device info apps --bundle-id …` returns `FieldGold  io.github.alanfuller15.fieldgold  1.0  1` [self-tested] |
+| Launches on device | **done** 2026-07-28 — confirmed by process lookup, not by the launcher's message: PID **814** at `/private/var/containers/Bundle/Application/57A8A239-972C-416C-B133-1D8EF070D5E1/App.app/App`, the bundle UUID the install returned [self-tested] |
+| Renders on device | **done — both pages** [externally-verified] 2026-07-28. `index.html`: Alan drove the real UI — launcher drew, Tools sheet opened, Knowledge tab rendered, external link worked. `map.html`: **draws on the device**, reached via `location.href` in Web Inspector because the UI route is dead. **Rendering is not the same as usable** — the map's controls cannot be tapped; see the safe-area section |
 
 ## Xcode — installed, licensed, project open
 
@@ -152,7 +158,48 @@ That is the signature of this being a device-registration gap.
 **What unblocks it is a Lightning cable that carries data.** Nothing in the
 software needs changing, and no further certificate work will help.
 
-### One anomaly, deliberately recorded rather than explained away
+### RESOLVED 2026-07-28 — the certificates belonged to another machine
+
+**The anomaly recorded below is closed, and the recorded hypothesis was wrong.
+Both of the guesses this file made were wrong, in the same direction: each
+assumed the tooling was misreporting. It was not.**
+
+What it actually was: the four `Apple Development` certificates were issued to a
+**different machine** — "Caitlin's MacBook Pro" — and their private keys were
+never on this Mac at all. `find-identity` reporting **0 valid identities** was
+not an instrument problem, a keychain-location problem, or a sandbox problem. It
+was the literal truth: an identity is a certificate *plus its private key*, the
+keys did not exist here, so there were no identities. Corroborated on
+2026-07-28 from three independent directions before the fix — `find-identity -v`
+returned 0 across **all** policies rather than just `-p codesigning`; four certs
+were nonetheless present in `login.keychain-db`; and Xcode's own build error
+said it outright:
+
+```
+error: Revoke certificate: Your account already has an Apple Development signing
+certificate for this machine, but its private key is not installed in your
+keychain. Xcode can create a new one after revoking your existing certificate.
+```
+
+**The fix, performed by Alan.** Xcode could not revoke them and the account was
+at Apple's certificate limit, so he revoked them at `developer.apple.com`, then
+created a new one via **Xcode → Settings → Accounts → Manage Certificates → ＋**,
+which generates the keypair **locally** and installs it in the login keychain.
+Selecting the phone as the run destination then triggered device registration
+and profile generation in one step. Result: `find-identity -p codesigning` now
+reports **1** valid identity.
+
+**The generalisable lesson, and it is the one this file keeps having to relearn:**
+when a tool reports an absence, the cheap hypothesis is that the tool is looking
+in the wrong place. That hypothesis was written down twice here and was wrong
+both times. `find-identity` was correct throughout. Same family as `cap open
+ios` exiting 0, a Pages `built` status naming an earlier commit, and
+`caches.open()` creating an empty cache — except inverted: those were tools
+reporting **success** that meant nothing, and this was a tool reporting
+**failure** that meant exactly what it said. Check the instrument's claim
+against a second source before deciding the instrument is broken.
+
+### One anomaly, deliberately recorded rather than explained away — CLOSED, see above
 
 `security find-identity -v -p codesigning` reports **0 valid identities**, and
 `codesign --sign "Apple Development: Alan Fuller (VSSL232H55)"` fails with
@@ -304,7 +351,13 @@ Do not read this section as evidence that offline behaviour is verified.
 
 ### Two things seen that are not yet filed as defects
 
-- **The header collides with the status bar.** On the simulator the `index.html`
+- **The header collides with the status bar. CONFIRMED ON THE PHYSICAL
+  iPhone 14, 2026-07-28 [externally-verified] — this is not a simulator
+  artifact.** Alan read it off the device: the "Field Brain" header still paints
+  under the clock and the Dynamic Island on real hardware, exactly as the
+  simulator showed. **This half of the safe-area item is closed**; the
+  `map.html` panel half remains open and is the one that matters, because that
+  panel carries the land-status warnings. On the simulator the `index.html`
   header ("Field Brain · Placer prospecting · Mat-Su") paints underneath the
   clock and the Dynamic Island — the title and the time overlap, and the
   subtitle sits under the island. There is no `safe-area-inset` handling,
@@ -328,8 +381,39 @@ Do not read this section as evidence that offline behaviour is verified.
 
 ### The Field tools buttons are dead in the shell
 
+> **CONFIRMED ON PHYSICAL HARDWARE, 2026-07-28 [externally-verified].** Alan
+> tapped the buttons on his iPhone 14 with a real finger. Test A — the internal
+> `map.html` card — **did nothing at all.** Test B, the control, was an
+> `https://` link on the *same* `target="_blank"` anchor pattern going through
+> the *same* delegate under the *same* gesture: **it opened.** The only variable
+> between them is the URL scheme. This closes the one link the simulator run
+> could only infer — that a genuine tap reaches the delegate — and it closes it
+> the right way round: the delegate *is* reached, and it fails on the scheme.
+>
+> **The consequence is worse than "the buttons are broken", and it was found by
+> counting references rather than by tapping.** `map.html` is referenced
+> **exactly once** in `index.html` — line 2766, and that reference *is* the dead
+> anchor. There is no other link, no `location.href`, no `window.open` pointing
+> at it. So on a phone, **`map.html` is UNREACHABLE from the app's UI.** The
+> primary field tool — the only field map screen, the one carrying the
+> land-status colours — cannot be opened at all. `bench_hunter.html` and
+> `creek_manual.html` are in exactly the same position.
+>
+> A person holding this app on the ground has the launcher and nothing else.
+> **This raises Phase 1's priority: it is no longer a divergence to tidy up, it
+> is the app's primary function being absent on the distribution that goes into
+> terrain.**
+>
+> Measured 2026-07-28: `index.html` carries **12** `target="_blank"` links. Only
+> **3** are internal (`map.html`, `bench_hunter.html`, `creek_manual.html`) and
+> are therefore dead. The other **9** are `https://` — five YouTube, two Apple
+> Maps, two dynamic — and per this mechanism they work, which is what Test B
+> demonstrated. The fix must not blanket-strip `target="_blank"`; it is doing
+> real and correct work on nine of the twelve.
+
 **`target="_blank"` links do nothing under Capacitor. Not "open elsewhere" —
-nothing, silently.** Tested on the simulator 2026-07-28 [self-tested]. This
+nothing, silently.** Tested on the simulator 2026-07-28 [self-tested], and
+confirmed on device [externally-verified] — see above. This
 affects **all three** Field tools buttons in `openTools()`: `map.html`
 (`index.html:2766`), `bench_hunter.html` (:2781) and `creek_manual.html`
 (:2796).
@@ -386,6 +470,29 @@ these open a tab and the launcher stays put — so this is a genuine divergence
 between the two distributions, the same shape as the service-worker finding,
 and not simply a mistake to delete.
 
+**THE FIX IS DEMONSTRATED, BEFORE IT IS WRITTEN — 2026-07-28
+[externally-verified].** In the Web Inspector console on the physical device,
+`location.href = 'map.html'` **navigated**: the inspector's title changed to
+`— localhost — map.html`, `location.href` read
+`capacitor://localhost/map.html`, and `map.html` drew. This is a **same-origin
+navigation inside the webview**; it never reaches
+`webView:createWebViewWithConfiguration:` and so never hands a `capacitor://`
+URL to `UIApplication.shared.open`. It is recorded as its own result, not folded
+into the inset measurement, because it establishes the remedy independently:
+**dropping `target="_blank"` on the three internal links should restore them.**
+
+Two constraints that fall out of it and must survive into Phase 1:
+
+- **Do not blanket-strip `target="_blank"`.** Of the 12 in `index.html`, only 3
+  are internal and dead; the other 9 are `https://` and work correctly *because*
+  of it — that is what the device control test established.
+- The `https://` links opening externally is **correct behaviour** on both
+  distributions and must not be "fixed".
+
+*(A console error `leaflet.js.map couldn't be opened` appeared during this. That
+is a source map requested only by the attached debugger; it is not fetched by
+the app and is not a bundle defect.)*
+
 **One link is inferred rather than observed end to end.** Step 1→2 — that a real
 finger tap reaches the delegate — was not exercised. A scripted
 `dispatchEvent(new MouseEvent('click'))` on the anchor produced no navigation,
@@ -398,6 +505,104 @@ watched. Closing it needs a genuine HID event: no tap tooling exists on this
 machine (`idb`, `fbsimctl`, `appium` all absent; `simctl` has no tap), so it
 needs either Accessibility permission for **Terminal.app** so AppleScript can
 click the Simulator window, or an XCUITest target.
+
+### Safe-area insets on the device — text is SAFE, controls are NOT
+
+Measured on the **physical iPhone 14** 2026-07-28 via Safari Web Inspector
+against the **shipping bundle** — no instrumented copy, no re-sign, nothing
+written to `docs/` [externally-verified]. All three results below are device
+readings, not simulator ones.
+
+**1. The land-status text is fully reachable. This is the clean result and it
+should be read first.**
+
+| | |
+|---|---|
+| text nodes walked in `#panelbody` (excl. `#status`) | 57 |
+| hit-test sample points | **291** |
+| reachable | **291** |
+| covered | **0** |
+| never on screen | **0** |
+| **FAILS** | **0** |
+
+Once the panel is open, **every land-status warning on `map.html` is readable on
+the device.** CLAUDE.md's "layout is a way of deleting text" rule **does not
+fire**. This was the thing most feared going into the device run — the panel
+that carries the AVOID tiers, the BLM federal-register caveat and the
+"we do not know how near the nearest state claim is" statement — and it did not
+happen. Say so plainly; do not let it get buried under the two problems below.
+
+The measurement is trustworthy on its own terms: `overflowY` computed to `auto`
+with `scrollH 860` vs `clientH 844`, so the scroll range was genuine and gated
+on computed overflow per the recorded `no-overflow` mutant gotcha, not merely on
+`scrollTop` accepting a value.
+
+**2. The CONTROLS are unreachable, and on `map.html` that is worse than the
+launcher collision.**
+
+`#panel` measures `top:0, left:0, w:390, h:844` — full-screen from y=0 on a
+390x844 device. Its **top 47px sit inside the status-bar region**. The text
+flows below that and survives, which is why result 1 is clean. **The toggle does
+not.** Alan could not tap the panel's collapse/expand control on the device, and
+the Leaflet zoom controls are equally unoperable — both render under the time
+and battery icons.
+
+`wasCollapsed: true` confirms `map.html:128` auto-collapses the panel at
+`innerWidth <= 600`. So the **first** thing a user sees on the map is a
+collapsed panel whose only control cannot be pressed.
+
+Snippet C measured the panel at all only because it removes the `collapsed`
+class **programmatically**, sidestepping the very control a finger cannot reach.
+The measurement route and the user's route are not the same route, and that gap
+is the finding.
+
+**On `index.html` this collision is cosmetic — readable text under the clock. On
+`map.html` it makes the map inoperable. The map draws and cannot be used.**
+
+**3. The obvious fix would ship as a no-op. This is a constraint on the fix, not
+a footnote.**
+
+`env(safe-area-inset-*)` reads **`0px` on all four sides, on both pages**, while
+a 47px notch physically exists. The cause is measured, not guessed:
+
+- Neither `index.html` nor `map.html` sets **`viewport-fit=cover`**. Both carry
+  only `width=device-width, initial-scale=1.0, maximum-scale=1.0,
+  user-scalable=no`.
+- The **only** `env()` in the entire tree is `index.html:166`, a
+  `padding-bottom`.
+- `innerWH == screenWH == [390, 844]` and `visualViewport.offsetTop == 0` — the
+  webview is the full screen and **no inset is applied anywhere**.
+
+Without `viewport-fit=cover`, iOS resolves `env(safe-area-inset-*)` to zero. So
+a Phase 1 fix that adds `padding-top: env(safe-area-inset-top)` would ship,
+compute to `padding-top: 0`, and change nothing on the device — while looking
+correct in the diff and in every desktop browser. **`viewport-fit=cover` must
+land first, or the padding does nothing.**
+
+Corroborating geometry on the launcher: `headerRect.top` is **20**, so the
+"Field Brain" header paints **27px inside** the 47px status-bar region.
+
+### The class is now confirmed three times over
+
+**Correct on GitHub Pages, broken in the iOS shell, nothing reported on screen.**
+Three independent instances, all found on this project's first trip to a device:
+
+| # | Mechanism | On Pages | In the shell |
+|---|---|---|---|
+| 1 | **Service worker** | `sw.js` is the whole update path | `navigator.serviceWorker` absent — never registers, silently |
+| 2 | **`target="_blank"`** | opens a tab, launcher stays put | delegate hands `capacitor://` to iOS, which refuses it — **`map.html` unreachable** |
+| 3 | **Safe-area insets** | irrelevant; a browser tab is already inset | webview is full-bleed, `env()` reads 0 — **map controls unusable** |
+
+Each is a *divergence between two distributions*, not a bug in either one, and
+each fails **silently** — no error, no console message, nothing on screen. That
+is the shared shape, and it is the reason none of the three were found before a
+device existed.
+
+**This changes what Phase 1 is for.** It was filed as consolidation — routing
+scattered HTML into one app, tidying the bundle/Pages divergence. It is now the
+work that **makes the app usable on a phone at all**: the primary field tool
+cannot be opened, and when reached by other means its controls cannot be
+pressed. Priority accordingly.
 
 ### How the render findings were obtained
 
@@ -520,6 +725,95 @@ default, so the shipping bundle cannot report on itself.
   **no `DEVELOPMENT_TEAM`**, **0 valid codesigning identities**, and **no
   provisioning profiles directory**. Xcode resolves no valid run destinations
   for scheme `App` [self-tested] 2026-07-28
+- **The iPhone 14 is visible to the toolchain**, not merely to Finder: UDID
+  `00008110-0006398C0ABA401E`, `paired` / `connected` / `wired`, iOS 26.5.2
+  [self-tested] 2026-07-28
+- **Developer Mode gates destination resolution, which runs before provisioning.**
+  With it disabled, `xcodebuild` exits **70** on "Timed out waiting for all
+  destinations", listing the device with `error:Developer Mode disabled` — no
+  signing error is reached at all. After enabling, `developerModeStatus enabled`
+  and `ddiServicesAvailable true` [self-tested] 2026-07-28
+- **The four earlier `Apple Development` certificates were issued to a different
+  machine and their private keys were never on this Mac.** `find-identity -v`
+  returned 0 across **all** policies, not just codesigning, while 4 certs sat in
+  `login.keychain-db`; Xcode's build error named the missing private key
+  explicitly. Revoked at developer.apple.com, reissued via Manage Certificates →
+  ＋, which generated the keypair locally → **1** valid identity
+  [self-tested] 2026-07-28
+- **A provisioning profile exists for the first time in this project's history.**
+  `iOS Team Provisioning Profile: *`, team `PWCMJWTT6J`, AppID `PWCMJWTT6J.*`,
+  `ProvisionedDevices` = exactly `00008110-0006398C0ABA401E`, expires
+  2027-07-28 [self-tested] 2026-07-28
+- **The device build is signed with a real certificate chain**, unlike the
+  simulator's ad-hoc `--sign -`: authority `Apple Development: Alan Fuller
+  (VSSL232H55)` → Apple WWDR CA → Apple Root CA, `TeamIdentifier PWCMJWTT6J`,
+  entitlement `application-identifier PWCMJWTT6J.io.github.alanfuller15.fieldgold`,
+  and `codesign --verify --deep --strict` exits 0 "satisfies its Designated
+  Requirement" [self-tested] 2026-07-28
+- **The device bundle is `docs/` exactly**, same as the simulator's: `diff -rq`
+  reports only `cordova.js` and `cordova_plugins.js` as extra, 26 files, all
+  five stage maps present, **0** `.py` or `test_*` files [self-tested] 2026-07-28
+- **FieldGold is installed, launched and running on a physical iPhone.**
+  Install confirmed by independent lookup (`devicectl device info apps` →
+  `FieldGold 1.0`), launch confirmed by process lookup (PID 814 at the bundle
+  UUID the install returned) rather than by either command's own success message
+  [self-tested] 2026-07-28
+- **`index.html` renders and is interactive on the physical device** — launcher
+  drawn, Tools sheet opens, Knowledge tab renders, external link opens
+  [externally-verified] 2026-07-28
+- **The dead `target="_blank"` links are confirmed on physical hardware with a
+  real finger**, with an `https://` control on the same anchor pattern, same
+  delegate and same gesture that **did** open. The scheme is the only variable
+  [externally-verified] 2026-07-28
+- **`map.html` is unreachable from the app UI on a phone.** It is referenced
+  exactly once in `index.html` (line 2766) and that reference is the dead
+  anchor; there is no other link, `location.href` or `window.open` to it. Same
+  for `bench_hunter.html` and `creek_manual.html` [self-tested] 2026-07-28
+- Of 12 `target="_blank"` links in `index.html`, **3 are internal and dead, 9
+  are `https://` and work**. A blanket strip would break the nine
+  [self-tested] 2026-07-28
+- **Capacitor ships as a `binaryTarget` xcframework, so `#if DEBUG` inside it is
+  resolved at Ionic's build time, not ours** — our build compiled 0 Capacitor
+  Swift files. Web inspection therefore depends on the `CAPACITOR_DEBUG`
+  Info.plist fallback, which **is** satisfied: the built `Info.plist` carries
+  `CAPACITOR_DEBUG = true`, so `webView.isInspectable` is true and Safari Web
+  Inspector can attach [self-tested] 2026-07-28
+- **The land-status warning text on `map.html` is fully reachable on the
+  physical device.** 291 of 291 hit-test sample points across 57 text nodes in
+  `#panelbody` (excluding `#status`) resolved to the text's own element — 0
+  covered, 0 never-on-screen, **FAILS 0**. Scroll range gated on computed
+  `overflow-y: auto` (`scrollH 860` / `clientH 844`), not on `scrollTop`
+  accepting a value [externally-verified] 2026-07-28
+- **`map.html`'s panel controls are unusable on the device.** `#panel` measures
+  `top:0 left:0 w:390 h:844`, so its top 47px lie under the status bar. Alan
+  could not tap the collapse/expand toggle, and the Leaflet zoom controls are
+  equally unoperable. `wasCollapsed: true` — the panel auto-collapses at phone
+  width (`map.html:128`), so the first sight of the map is a collapsed panel
+  whose only control cannot be pressed. **The map draws and cannot be used**
+  [externally-verified] 2026-07-28
+- **`env(safe-area-inset-*)` reads `0px` on all four sides on BOTH pages** while
+  a 47px notch physically exists, because **neither page sets
+  `viewport-fit=cover`** and the only `env()` in the tree is
+  `index.html:166` (a `padding-bottom`). `innerWH == screenWH == [390,844]` and
+  `visualViewport.offsetTop == 0` — the webview is full-bleed with no inset
+  applied. **A fix adding `padding-top: env(safe-area-inset-top)` without
+  `viewport-fit=cover` computes to 0 and ships as a no-op**
+  [externally-verified] 2026-07-28
+- The launcher header paints **27px inside** the status-bar region:
+  `headerRect.top` is 20 against a 47px inset [externally-verified] 2026-07-28
+- **`navigator.serviceWorker` is absent on the physical device too**, confirming
+  the simulator finding on real hardware; `isSecureContext` is `true`
+  [externally-verified] 2026-07-28
+- **Same-origin in-webview navigation works on the device**:
+  `location.href = 'map.html'` navigated to `capacitor://localhost/map.html` and
+  the map drew, without touching the `createWebViewWith` delegate. Phase 1's
+  likely fix for the dead internal links, demonstrated before being written
+  [externally-verified] 2026-07-28
+- **Safari Web Inspector measures the SHIPPING bundle.** All device page
+  measurements above were taken against the installed, unmodified app over USB —
+  no instrumented copy, no re-sign, no reinstall, nothing written to `docs/`. The
+  caveat the simulator findings had to carry does not apply to them
+  [self-tested] 2026-07-28
 
 ## Decisions made
 
@@ -661,6 +955,16 @@ does not require a cache version bump.
 
 ## Phase 1 — enforce the bundle/Pages divergence
 
+> **Phase 1's scope grew on 2026-07-28 and its priority changed.** The device
+> run found **three** silent divergences between the Pages build and the iOS
+> shell — service worker, `target="_blank"`, safe-area insets — two of which
+> make the app unusable rather than untidy: the primary field tool cannot be
+> opened, and when reached by other means its controls cannot be pressed. The
+> bundle/Pages exclusion described below is now the *smallest* of Phase 1's
+> items. See "The class is now confirmed three times over" for the set, and note
+> the constraint that `viewport-fit=cover` must precede any `env()` padding or
+> the fix is a no-op.
+
 **Filed 2026-07-28, not started. This is an item, not a note.** It is the
 branch Phase 0 did not take, deferred with a reason rather than dropped.
 
@@ -718,7 +1022,28 @@ These were considered and deferred. Do not start them without Alan saying so.
 
 ## Next action
 
-**Buy a Lightning cable that carries data. That is the whole list.**
+**The cable arrived and Phase 0's device path is essentially done.** Signing is
+resolved, the device is registered, a profile exists, the app is built with a
+real certificate chain, installed, launched, and `index.html` renders on Alan's
+iPhone 14. What remains in Phase 0:
+
+1. ~~Measure `map.html`'s safe-area insets on the device.~~ **DONE
+   [externally-verified] 2026-07-28** via Safari Web Inspector against the
+   shipping bundle. Text safe (FAILS 0); controls unusable; the obvious fix
+   would be a no-op without `viewport-fit=cover`. See the safe-area section.
+2. ~~The header/status-bar collision on `index.html`.~~ **DONE
+   [externally-verified] 2026-07-28** — confirmed on real hardware, not a
+   simulator artifact.
+3. **The step-5 commit.** `ios/App/App.xcodeproj/project.pbxproj` lands together
+   with the profile and the first device install, as one coherent change — the
+   condition the residue set for it has been met.
+
+**Phase 0 is otherwise complete.** What remains is Phase 1, and its scope has
+changed: see "The class is now confirmed three times over".
+
+*Historical, retained: the blocker for most of 2026-07-28 was a Lightning cable
+that carries data. It arrived. Everything below this line was written under that
+block and is kept because the reasoning is still legible.*
 
 *Session residue from the 2026-07-28 simulator run is at the end of this file —
 read it before re-testing anything, particularly before spending a round on
@@ -758,15 +1083,22 @@ physical iPhone has run this app. The simulator has its own rows.
 
 Two things the simulator run added to step 5's checklist, both open:
 
-- ~~**Exercise the `target="_blank"` links.**~~ **DONE 2026-07-28 — they are
-  dead.** All three Field tools buttons do nothing in the shell. Phase 1 item;
-  see "The Field tools buttons are dead in the shell". Original text kept below.
+- ~~**Exercise the `target="_blank"` links.**~~ **CLOSED 2026-07-28 on physical
+  hardware.** Dead, with an `https://` control that opened. And worse than
+  recorded: `map.html` is unreachable from the app UI entirely. Phase 1 item,
+  now a priority one; see "The Field tools buttons are dead in the shell".
+  Original text kept below.
 - **Exercise the `target="_blank"` links.** `map.html` was reached directly, not
   through the Field tools button. Whether that button works in the shell is
   untested and is the first thing to tap on the device.
-- **Check the safe-area insets.** The header already collides with the status
-  bar on the simulator. `map.html`'s panel carries land-status warnings, and
-  CLAUDE.md's own rule is that layout is a way of deleting text.
+- ~~**Check the safe-area insets.**~~ **CLOSED 2026-07-28 on physical hardware,
+  and the answer is split.** The land-status **text is safe** — 291/291 sample
+  points reachable, FAILS 0, so "layout is a way of deleting text" does not
+  fire. The **controls are not** — `map.html`'s panel toggle and the Leaflet
+  zoom controls sit under the status bar and cannot be tapped, making the map
+  inoperable. And `env(safe-area-inset-*)` reads 0 on both pages for want of
+  `viewport-fit=cover`, so the obvious fix would ship as a no-op. See the
+  safe-area section.
 
 The procedure for the Capacitor half is
 **`.claude/skills/phase-0-shell/SKILL.md`** — Capacitor init, `cap add ios`,
@@ -833,6 +1165,15 @@ only if something genuinely gesture-gated turns up — a popup, a permission
 prompt, a drag. It was not worth it for this.
 
 ### `find-identity` — hypothesis, and the exact trigger to re-check it
+
+> **CLOSED 2026-07-28. The hypothesis below is REFUTED.** It was not the
+> data-protection keychain and `find-identity` was not the wrong instrument —
+> the certificates were issued to another machine and the private keys never
+> existed here. See "RESOLVED — the certificates belonged to another machine"
+> above. The re-check trigger written below did fire exactly as specified, which
+> is the part worth keeping: the device build was run once a profile existed,
+> and it failed on the certificate rather than the profile. Retained unedited so
+> the reasoning that produced a wrong answer stays legible.
 
 `security find-identity -v -p codesigning` → **0 identities**, and
 `codesign --sign "Apple Development: Alan Fuller (VSSL232H55)"` →
