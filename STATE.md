@@ -870,6 +870,42 @@ default, so the shipping bundle cannot report on itself.
 - **The `map.html` panel toggle is untappable on a virgin install**, confirming
   it is not state-dependent. Second finger test, second container
   [externally-verified] 2026-07-28
+- **Capacitor does not enable WKWebView's back/forward swipe gesture, and this
+  is now direct source evidence rather than inference.**
+  `allowsBackForwardNavigationGestures` appears **nowhere in `node_modules/`** —
+  not in `@capacitor/ios`, not in any transitive dependency. Apple documents the
+  property as off by default. Capacitor 8.4.2's `CAPBridgeViewController.swift`
+  configures `scrollView.bounces`, `contentInsetAdjustmentBehavior`,
+  `allowsLinkPreview`, `scrollView.isScrollEnabled`, the user agent and the
+  background colour, and never touches the gesture. **This supersedes the
+  earlier argument from the existence of three community plugins**, which was
+  inference from a workaround's existence; the grep is the fact
+  [self-tested] 2026-07-29
+- **The `terrain ✓` prediction HELD, and the count was five, not four.**
+  STATE.md predicted from source that `terrain` was mechanically the worst case
+  of the false-tick defect — a ✓ logged off `load` paired with an explicitly
+  EMPTY `tileerror` handler that swallows every failure — and filed it untested
+  because terrain is off by default and neither device run toggled it. Toggled
+  on with the network cut it prints `terrain ✓` having loaded nothing. So the
+  offline log carries **five** false green ticks against **0 of 100** tiles, not
+  the four the device runs saw. Predicted from reading the shipping source
+  before it was exercised on any target [self-tested] 2026-07-29
+- **Phase 1 item D is COMPLETE and needed no device** (`33b5f5c`). Layers now
+  report from tile outcomes, not from Leaflet's `load`. `test_offline_map.py`
+  39 → 60 assertions; three new mutants (`tick-on-load`, `silent-on-fail`,
+  `base-tick-after-warn`) all caught; all 12 suites green at 510 assertions;
+  `sw.js` v5 → v6. **The suite had been running the defect's exact conditions
+  since it was written and asserting nothing about them** — sections 4-6 cut the
+  network and read the status log, and never looked at the ✓ lines. That is how
+  it reached a device through a green gate [self-tested] 2026-07-29
+- **`test_offline_map.py` pinned the cache version rather than reading it.** It
+  asserted `!= "fieldgold-v6"`, so the first legitimate sequential bump to v6
+  failed a CORRECT change — the behaviour CLAUDE.md warns pinned assertions
+  produce, found by hitting it. Generalised to `> 3` to match
+  `test_stage_maps.py` and `test_state_claims.py`, and its `sw-stale-cache`
+  mutant repointed v6 → v3 so it still violates. CLAUDE.md had claimed all three
+  suites already asserted "past v3"; that claim is now true rather than edited
+  to look true [self-tested] 2026-07-29
 
 ## Decisions made
 
