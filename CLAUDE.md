@@ -261,7 +261,7 @@ in the tests row did.
 | document | lines | role |
 |---|---|---|
 | `CLAUDE.md` | 815 | this file — the whole brief for anyone changing the repo |
-| `STATE.md` | 2776 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
+| `STATE.md` | 2852 | **source of truth for the active migration phase.** Read it first; do not infer phase from conversation history. Points at the phase-0 runbook for procedure |
 | `PHASE1-DESIGN.md` | 696 | **the Phase 1 design — approved 2026-07-29, amended once since, nothing built.** Consolidation of the five documents into one, the working set (multi-point selection distinct from saved Sites), layer defaults and tile honesty, and the feature popup. `STATE.md` is how far; this is what the work is. Records the D7 scope ruling, N1–N3, five premises it had to correct against the tree, what survives from PR #6, and what it does not address. Not a web asset: it stays at the repo root and must never ship in `docs/` |
 | `README.md` | 200 | the public-facing README, written for a prospector. What GitHub renders. Re-read 2026-07-28 against the moved tree — it names no file paths, so Phase 0a did not stale it |
 | `docs/vendor/leaflet/PROVENANCE.md` | 137 | where the vendored Leaflet bytes came from and how they were verified. Moved into `docs/` with the bytes it documents in Phase 0a. Carries a 2026-07-28 correction: the `.gitattributes` it cited does not exist |

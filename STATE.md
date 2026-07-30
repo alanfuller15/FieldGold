@@ -1384,7 +1384,7 @@ Same policy and fetch date as the Phase 3 filing above.
    names** — and Capacitor exposes an override, so this one is at least
    addressable. Untested: whether setting it is possible without native Swift.
 
-### WMS failures are detectable today — and the BLM layer is the one that is untested
+### WMS failures are detectable today — and the BLM layer is SETTLED, 2026-07-29
 
 **Filed 2026-07-29 from the prior-art pass. Half a finding is good news and must
 not be lost with the half that was declined.**
@@ -1410,7 +1410,7 @@ wording right.
 layer is **not WMS** — it is an ArcGIS `export?` with `f:image`
 (`docs/map.html:185`) — so `EXCEPTIONS` does not apply to it and its error
 behaviour is ArcGIS's own. **Whether it returns a blank or transparent image on
-failure has not been tested.** If it does, a failed BLM fetch is
+failure was untested when this was filed and is now settled — see below.** If it does, a failed BLM fetch is
 indistinguishable from the empty answer that layer legitimately returns over
 Hatcher Pass — and **this is the layer whose entire on-screen treatment exists to
 stop a blank being over-read**: the "BLM FEDERAL claims only" label, the note that
@@ -1418,10 +1418,86 @@ blank here is not "no claims", the 1-vs-143 measurement, the rename of
 `isClaimed()` to `federalClaimAt()`. A silent failure on that layer would be the
 federal-register bug arriving a second time through a different door.
 
-How to settle it: request one tile URL from that service with a deliberately
-invalid parameter and read the response — content type, status, and whether the
-bytes are a blank PNG. One fetch, no device needed. Not done here because this
-pass was a design review.
+#### SETTLED 2026-07-29 [fetched] — and the answer is "something else"
+
+Seven requests to the live service, no device needed. **It is neither cleanly
+detectable nor cleanly undetectable: it splits by failure class, and the split is
+the finding.**
+
+The request template is the one `docs/map.html:184` builds, with only `bbox`
+varying:
+
+```
+https://gis.blm.gov/akarcgis/rest/services/Minerals/
+  BLM_AK_Federal_Mining_Claims/MapServer/export
+  ?bbox=<minx,miny,maxx,maxy>&bboxSR=3857&imageSR=3857
+  &size=256,256&format=png32&transparent=true&f=image&layers=show:0
+```
+
+Two baselines first, so nothing below is interpreted alone. Both bboxes are
+Leaflet z=11 tiles.
+
+| # | request | HTTP | content-type | bytes | md5 | non-transparent pixels |
+|---|---|---|---|---|---|---|
+| **A** | valid, Hatcher Pass tile — **legitimately empty** | 200 | `image/png` | 886 | `7be830c6…` | **0** of 65536 |
+| **G** | valid, wide Fairbanks envelope — **143 claims present** | 200 | `image/png` | 1682 | `9ef162e3…` | **300** of 65536 |
+
+The emptiness in A is real, not a broken request: a `MapServer/0/query`
+`returnCountOnly` against the same envelopes returns **0** for the Hatcher tile
+and **143** for the wide Fairbanks envelope — the same 143 already recorded in
+`CLAUDE.md`. The service reports `minScale 0 / maxScale 0` on all three
+sublayers (0 Active, 1 Closed, 2 CEU), so nothing is scale-suppressed.
+
+Then the failures:
+
+| # | deliberate fault | HTTP | content-type | bytes | non-transparent px | app can tell? |
+|---|---|---|---|---|---|---|
+| **F** | `size=abc` | 200 | **`text/plain`** — `{"error":{"code":400,"message":"Invalid 'size'."}}` | 63 | n/a | **YES** — not an image, so the tile load fails → `tileerror` |
+| **C** | `bbox=not-a-bbox` | 200 | `image/png` | 1703 | **276** | **NO** — a successful image load, and 276 faint pixels reads as blank |
+| **D** | `bboxSR=99999` | 200 | `image/png` | 886 | 0 | **NO** — **byte-identical to A**, md5 `7be830c6…` |
+| **E** | `layers=show:99` | 200 | `image/png` | 886 | 0 | **NO** — **byte-identical to A**, md5 `7be830c6…` |
+| — | no signal / server unreachable | connection error | — | — | — | **YES** — `tileerror`, which PR #6 item D already counts |
+
+**The verdict, against the three options the question offered: "something else."**
+
+- **The failure mode that matters in the field IS detectable.** No signal and a
+  server that does not answer both produce `tileerror`, so Design 3's counting
+  works for the case a person actually meets at a trailhead. That is the good
+  news and it should be read first.
+- **Server-side rejections are mostly NOT detectable, and two of them are
+  byte-identical to a legitimate empty answer.** `bboxSR=99999` and
+  `layers=show:99` return the *same 886 bytes and the same md5* as the correct
+  answer over ground with no claims. There is no measurement, in the page or
+  outside it, that separates those. This is the federal-register shape exactly —
+  an answer that means nothing rendering identically to an answer that means
+  something — arriving through the transport rather than through the wrong
+  register.
+- **One coincidence is worth staring at.** The malformed-`bbox` error image
+  (1703 B, 276 inked pixels) and the real 143-claim answer (1682 B, 300 inked
+  pixels) are the **same order of size and the same order of ink**. So even a
+  hypothetical "count the non-transparent pixels" heuristic would not separate a
+  rendered error from a rendered answer. Do not build one.
+
+**Two consequences, recorded and not acted on.**
+
+1. **Design 3's per-layer count for `claims` means "the server answered with an
+   image", not "the layer is working."** For the WMS layers the count means more
+   than that, because their default `EXCEPTIONS=XML` makes a rejection non-image.
+   The two layers are not equivalent and Design 3 currently treats them alike.
+   **Design 3 is unchanged pending Alan's ruling** — this entry is the input to
+   that decision, not the decision.
+2. **A parameter typo in a future edit would produce a permanently blank claims
+   layer with a green tick, and nothing anywhere would notice.** Change `3857` to
+   `3758`, or `show:0` to `show:O`, and the layer returns 886 transparent bytes
+   forever. The cheap tripwire is static, needs no network, and would fit the
+   existing suites: assert the literal `bboxSR`, `imageSR` and `layers` values in
+   the URL `map.html` builds. Proposed, not written.
+
+*(Measurement notes, so this is reproducible: pixel counts are from decoding the
+PNG `IDAT` with `zlib` and reading the alpha byte of each RGBA pixel — all four
+images are 256×256, colour type 6, bit depth 8. Byte-identity is md5 over the
+whole response body. All seven requests were made 2026-07-29 from the dev
+machine.)*
 
 ### The un-subscribed consumer — a ten-line fix, available today
 
