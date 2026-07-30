@@ -1,6 +1,14 @@
 # Prior art — the Phase 1 design, checked before it is built
 
-**Run 2026-07-29 under `.claude/skills/prior-art/SKILL.md`.**
+**Run 2026-07-29 under the prior-art protocol — now `genesis:prior-art`.**
+
+> **This pass predates the protocol it will now be read against.** It was run
+> under a project copy of the protocol, since deleted (see `CLAUDE.md`, under the
+> document index, for why and for the local bindings that survived it). The
+> plugin's version requires the two queries as a **field of the report shape**;
+> this document records every query in the body instead, so it **satisfies the
+> stricter shape incidentally rather than by design**. No rework: the queries are
+> all here. Somebody comparing the two later should not have to work that out.
 
 > **RULED 2026-07-29. See "Conflicts and gaps, collected" at the end for the
 > three rulings and their reasoning.** In summary: **conflict 1 declined**

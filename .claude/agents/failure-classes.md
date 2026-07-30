@@ -240,9 +240,14 @@ worth keeping — **both were caught by an audit pass rather than by the author*
   origin. Its evident intent — fetch before citing, and an identifier supplied
   without a fetch is worth less than a description — was stated inline in that
   brief anyway, so the work proceeded on the intent and the citation was
-  reported as unfindable. It is now written in this project's own words in
-  `.claude/skills/prior-art/SKILL.md` rather than held by reference to a rule
-  that does not exist here.
+  reported as unfindable. **Where that rule is now held is a weaker claim than it
+  was, and the weakening is worth stating rather than smoothing.** It was written
+  into a project copy of the prior-art protocol; that copy was deleted 2026-07-29
+  in favour of the plugin's, so the rule now lives in **`genesis:prior-art`** — a
+  plugin this repo installs and can read, which is not the same as this repo. The
+  mitigation is local and is the thing to check: `CLAUDE.md`, under the document
+  index, binds fetch-before-citing to this repo's own three verification tiers.
+  **That binding is in the repo; the protocol it binds is not.**
 
 **Why this is an instance and not a category.** It is not "beware of wrong
 citations" in general. It is one specific, recurring, cheap-to-check thing:

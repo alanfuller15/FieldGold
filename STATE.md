@@ -1240,8 +1240,9 @@ grows into).
 
 ### The design has been checked against prior art — `PRIOR-ART-PHASE1.md`
 
-**Run 2026-07-29 before any of the design was built, under the protocol in
-`.claude/skills/prior-art/SKILL.md`.** Six items checked, two searches each,
+**Run 2026-07-29 before any of the design was built, under the prior-art
+protocol — now `genesis:prior-art`; the project copy it was run under was deleted
+the same day, see `CLAUDE.md`.** Six items checked, two searches each,
 every query recorded verbatim. **None returned "no prior art found"** — the
 design's invented vocabulary was hiding it. Read that file before building, and
 note what it changed and what it did not: **the design was not amended by the
