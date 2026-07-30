@@ -585,16 +585,40 @@ line is the short form, at the moment of the event — and it does not attempt t
 distinguish a rejected request from an empty answer, because that has been
 measured to be impossible for this layer.
 
-**One open question, flagged rather than decided, because it touches PR #6's item
-C ruling.** Item C classifies each line at the call site as either a
-land-status line or a failure, with **failure as the default**, so that a
-warning added later without a kind is over-reported rather than silently
-omitted. The claims line is **neither**: it is not a land-status warning and it
-is not a failure — it is the app stating what it cannot verify, which is rule 5's
-category. Under the existing two kinds the safe behaviour is to give it **no
-kind**, which makes it a failure and lets it headline the problem row: that
-over-reports, which the recorded ruling prefers to silent omission. Whether a
-third kind should exist is **Alan's call**, not this design's.
+### The kind question — RULED 2026-07-29: no third kind. Two kinds stay.
+
+The question was whether the claims line needs a kind of its own. Item C
+classifies each line at the call site as either a land-status line or a failure,
+with **failure as the default**, so a warning added later without a kind is
+over-reported rather than silently omitted. The claims line is **neither**: it is
+not a land-status warning and it is not a failure — it is the app stating what it
+cannot verify, which is rule 5's category.
+
+**Alan's ruling: no. The claims line gets no kind**, which makes it a failure by
+default and lets it headline the problem row. Over-reporting is what item C's
+ruling already prefers to silent omission, and this is exactly that case.
+
+**The reasoning, recorded because a later session will find the classification
+uncomfortable and want to fix it.** A third kind would be *correct* and would
+cost more than it is worth. **Every kind added is a kind every future call site
+has to choose between**, and the failure mode of a three-way choice is a line
+classified into the quiet bucket by somebody in a hurry. **Two kinds with a known
+over-reporting case is safer than three kinds with a new way to under-report.**
+
+**What the ruling costs, stated so it is not discovered later as a bug.** The
+problem row will headline
+
+> `claims: 12 images received — NOT verified`
+
+**as though it were a failure, on a run where nothing failed.** That is noise. It
+is deliberate. **It is the direction this project fails in** — the same direction
+as `unchecked` never becoming `clean`, and as failure being the default kind.
+
+**If it proves noisy enough in the field to matter, the fix is a third kind, and
+this ruling is the thing to revisit.** It is **not** a quiet reclassification of
+the claims line into the land-status kind, which would hide it in the bucket that
+does not headline — the exact under-reporting the ruling exists to prevent. Reopen
+the ruling; do not route around it.
 
 **Assertable in the harness, no network needed:** the claims layer's line never
 contains "loaded" and never contains "✓". Plus the static tripwire that now
