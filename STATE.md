@@ -1238,6 +1238,37 @@ survives from PR #6 (B and D intact, C improved by consolidation, A partly
 redundant but **not to be un-picked** — its bottom bar is the seam the navigation
 grows into).
 
+### The design has been checked against prior art — `PRIOR-ART-PHASE1.md`
+
+**Run 2026-07-29 before any of the design was built, under the protocol in
+`.claude/skills/prior-art/SKILL.md`.** Six items checked, two searches each,
+every query recorded verbatim. **None returned "no prior art found"** — the
+design's invented vocabulary was hiding it. Read that file before building, and
+note what it changed and what it did not: **the design was not amended by the
+pass**; it produced two conflicts needing a ruling and four gaps.
+
+The three findings that matter most to whoever builds this:
+
+- **D6 is not an invention — Android ships it.** Its official comparison table
+  has a "Saved state" row that survives system-initiated process death and does
+  **not** survive user dismissal, which is D6 exactly. The web platform documents
+  the opposite: the discarded state *"is not observable by developers"*, `unload`
+  does not fire when an app is closed from the app switcher, and the prescription
+  is to persist at `hidden`. So the distinction is **expressible natively and not
+  expressible from a web view** — a feature divergence D8 says must be visible to
+  the user rather than silent.
+- **`init`/`enter` is `viewDidLoad`/`viewWillAppear`, and two hooks were not
+  enough.** iOS 17 added a third because the second fires before the view's
+  geometry is final — the same trap this project found in `#status`'s
+  `scrollTop = scrollHeight` writing 0 to 0. The design says `enter` runs "after
+  `.active` is applied", which is not the same claim as "after layout".
+- **The WMS standard already named both halves of the tile ambiguity.**
+  `EXCEPTIONS=BLANK` is the standard's name for a failure that renders exactly
+  like empty coverage; `EXCEPTIONS=INIMAGE` is its answer. Measured here: this
+  tree sets **no `EXCEPTIONS` parameter**, so WMS failures are detectable today —
+  but the BLM layer is an ArcGIS `export?`, not WMS, and its blank-on-failure
+  behaviour is **untested**.
+
 ### Rulings recorded here because they are decisions, not design
 
 - **D7 is scoped, 2026-07-29.** Query layers (`ardf`, `geo`, `claim`, `terrain`)
