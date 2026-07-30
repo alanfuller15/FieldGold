@@ -119,6 +119,31 @@ This project's most-repeated failure, in six recorded forms:
 - **A Pages build status of `built` naming an earlier commit.** Read
   `pages/builds/latest.commit` and require it to equal the SHA you pushed.
   `CLAUDE.md`, "Deploying to GitHub Pages — verify the artifact, not the status".
+- **The most literal instance this project has: two answers that are the same
+  object.** Measured against the live BLM ArcGIS `export?` endpoint 2026-07-29
+  (`STATE.md`, "the BLM layer is SETTLED"). A correct request over ground with no
+  federal claims returns HTTP 200, `image/png`, **886 bytes, md5
+  `7be830c61ed940eb68430ae9628af377`**, 0 of 65536 pixels with any alpha. A
+  request with **`bboxSR=99999`** returns the same. A request with
+  **`layers=show:99`** returns the same. **Same status, same content type, same
+  byte count, same md5.** These are not two similar responses — they are one
+  response, and **no measurement inside the page or outside it separates them.**
+  Everywhere else in this catalogue the two things merely *render* alike; here
+  they *are* alike, all the way down to the bytes. The consequence is a claims
+  layer that would be blank forever, reported by Leaflet as a successful tile
+  load, on the one layer whose entire on-screen treatment exists to stop a blank
+  being over-read.
+
+  **The obvious workaround is foreclosed, and it was measured too. Nobody should
+  build it.** "Count the non-transparent pixels and call a near-empty tile a
+  failure" does not work: the malformed-`bbox` error image is **1703 bytes with
+  276 inked pixels** and the real answer over an envelope holding **143 claims**
+  is **1682 bytes with 300 inked pixels**. Same order of size, same order of ink.
+  A pixel heuristic cannot separate a rendered error from a rendered answer, and
+  one that appeared to work would be worse than none. The only tripwire that
+  exists is static — `tests/test_stage_maps.py` asserts the literal request
+  parameters, with mutants `claims-sr` and `claims-layer`.
+
 - **In data:** an unknown `land_status` normalising to `clean` would be this class
   in the schema. It normalises to `unchecked` on purpose — "a data gap into a
   green light on a page read at a trailhead." `CLAUDE.md`, "Land status is part

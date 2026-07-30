@@ -254,6 +254,16 @@ def apply_mutant(root):
         edit(root, "stage3_map.html",
              '</span>BLM <b style="color:#E8C04A;">FEDERAL</b> claims only</label>',
              "</span>Mining claims — DON'T dig here</label>")
+    elif MUTATE == "claims-sr":
+        # A transposition, which is what a typo actually looks like. The
+        # service ACCEPTS this request: HTTP 200, image/png, 886 bytes,
+        # md5 7be830c6…, byte-identical to a correct empty answer. Nothing at
+        # runtime can catch it, which is why the static check exists.
+        edit(root, "map.html", "bboxSR:'3857'", "bboxSR:'3758'")
+    elif MUTATE == "claims-layer":
+        # Capital O for a zero. Same response as above: a valid, transparent,
+        # permanently blank PNG.
+        edit(root, "map.html", "layers:'show:0'", "layers:'show:O'")
     elif MUTATE == "shell-stages":
         # The "helpful" future change: cache the stage maps for offline use.
         # They draw nothing without a network, so this produces a page that
@@ -398,6 +408,47 @@ def main():
               "state</b>" in txt[f] and "Alaska DNR" in txt[f])
         check("  %s: the note carries the measurement" % f,
               "143" in txt[f] and "1 federal polygon" in txt[f])
+
+        # THE REQUEST PARAMETERS ARE ASSERTED LITERALLY, AND THIS IS NOT
+        # OVER-SPECIFICATION. Do not delete it as pedantry.
+        #
+        # Measured against the live BLM service 2026-07-29, seven requests,
+        # recorded in STATE.md: a typo in these values DOES NOT FAIL. The
+        # ArcGIS `export?` endpoint answers HTTP 200, content-type image/png,
+        # 886 bytes, md5 7be830c61ed940eb68430ae9628af377 — which is
+        # BYTE-IDENTICAL to a correct empty answer over Hatcher Pass. Both
+        # bboxSR=99999 and layers=show:99 return exactly that. Not similar to
+        # the right answer: the same object.
+        #
+        # So a wrong value here produces a claims layer that is blank forever,
+        # that Leaflet reports as a successful tile load, and that no other
+        # assertion in this repo can see. It would be silent and permanent, on
+        # the ONE layer whose entire on-screen treatment exists to stop a blank
+        # being over-read — the FEDERAL label, the "not the same as no claims"
+        # note, the 1-vs-143 measurement, and the isClaimed() ->
+        # federalClaimAt() rename that section 2 above defends.
+        #
+        # Unlike the WMS layers, this one has no honest failure channel: they
+        # send no EXCEPTIONS parameter, so the WMS default of XML makes a
+        # server-side rejection non-image and the tile load fails visibly. The
+        # export endpoint returns a valid PNG either way. This static check is
+        # the only tripwire available, and it needs no network.
+        flat = re.sub(r"\s+", " ", txt[f])
+        check("  %s: the claims URL carries the exact parameter tuple" % f,
+              ("bboxSR:'3857', imageSR:'3857', size:'256,256', "
+               "format:'png32', transparent:'true', f:'image', "
+               "layers:'show:0'") in flat,
+              flat[flat.find("bboxSR"):][:140] if "bboxSR" in flat else "no bboxSR at all")
+        # Every occurrence, not merely one, so a second divergent copy of the
+        # URL cannot hide behind a correct first one.
+        check("  %s: every bboxSR is 3857" % f,
+              len(re.findall(r"bboxSR:'", txt[f]))
+              == len(re.findall(r"bboxSR:'3857'", txt[f])),
+              re.findall(r"bboxSR:'[^']*'", txt[f]))
+        check("  %s: every imageSR is 3857" % f,
+              len(re.findall(r"imageSR:'", txt[f]))
+              == len(re.findall(r"imageSR:'3857'", txt[f])),
+              re.findall(r"imageSR:'[^']*'", txt[f]))
 
     # ------------------------------------------------------------------
     # 5. sw.js — the version bump, and the SHELL exclusion as a DECISION.

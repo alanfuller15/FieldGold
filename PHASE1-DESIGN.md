@@ -525,6 +525,83 @@ seeder.
 Built to the D7 ruling above: query layers off, record layers on, basemap not a
 toggle.
 
+### AMENDED 2026-07-29 — the two layer classes do not report through the same sentence
+
+> **This section originally treated all query layers alike.** After the BLM
+> measurement (`STATE.md`, "the BLM layer is SETTLED"), that was **the failure
+> this phase exists to fix, one level up, in our own instrumentation**: a
+> per-layer count that means "the layer is working" for one class and "the server
+> answered with an image" for another, **reported in the same words**, is absence
+> rendering as presence in the reporting channel. Alan's ruling: amend.
+
+**The two classes, stated explicitly, because the difference is invisible in the
+code and decides what the app may claim:**
+
+- **The WMS layers — `ardf`, `geo`, `terrain`.** `docs/map.html` sets **no
+  `EXCEPTIONS` parameter** (`:168`, `:197`), so the WMS 1.3.0 default of `XML`
+  applies and a server-side rejection comes back as **non-image bytes**. The
+  `<img>` load fails, `tileerror` fires, item D counts it. **A count therefore
+  distinguishes "answered" from "rejected"**, and the existing sentence is
+  honest for these three.
+- **The claims layer — the ArcGIS `export?` endpoint (`:185`).** It does not.
+  The app can establish that **a response arrived** and that **it was an
+  image**. It cannot establish that **the request was well-formed.** Measured
+  2026-07-29: `bboxSR=99999` and `layers=show:99` both return HTTP 200,
+  `image/png`, **886 bytes, md5 `7be830c6…` — byte-identical to a correct empty
+  answer over Hatcher Pass.** Not similar to the right answer: the same object.
+  A malformed `bbox` returns a different 200 PNG with 276 faint pixels, which is
+  also a successful load. Only a non-image response (`size=abc` → `text/plain`
+  JSON) or an unreachable server produces `tileerror`.
+- **Therefore the two classes must not report through the same sentence.** There
+  is no wording that is true of both.
+
+### What the app says for the claims layer — proposed
+
+Held to rule 5 (the page says what is unverified) and to the existing discipline
+(report what was counted, never guess a cause). **The acceptance test this had to
+pass: a reader who sees only the claims-layer message, and who does not know the
+ArcGIS/WMS distinction, must not come away believing the layer was verified as
+working.**
+
+**The structural rule, which is the part that matters more than the words: the
+two classes use different verbs, and the claims layer never gets a tick.**
+
+| | WMS layers (`ardf`, `geo`, `terrain`) | the claims layer |
+|---|---|---|
+| tiles arrive | `ardf: 12 of 12 tiles loaded` | `claims: 12 images received — NOT verified` |
+| second line | — | `this layer answers 200 with a blank image whether the request was right or wrong; blank here is not "no claims"` |
+| nothing arrives | `ardf: 0 of 12 tiles loaded — the layer did not answer` | `claims: 0 of 12 images received — the layer did not answer` |
+| ever prints ✓ | may | **never** |
+| verb | **loaded** — which the app can establish | **received** — which is all the app can establish |
+
+Same sentence shape, different verb, so the difference is visible without a
+footnote and without a lecture. "Received" is the whole claim: bytes arrived and
+were an image. "NOT verified" is what stops the sentence being read as a tick.
+Neither line guesses a cause, and neither says "no coverage".
+
+Two things this deliberately does **not** do: it does not repeat the
+federal-register explanation that the panel already carries in full — the second
+line is the short form, at the moment of the event — and it does not attempt to
+distinguish a rejected request from an empty answer, because that has been
+measured to be impossible for this layer.
+
+**One open question, flagged rather than decided, because it touches PR #6's item
+C ruling.** Item C classifies each line at the call site as either a
+land-status line or a failure, with **failure as the default**, so that a
+warning added later without a kind is over-reported rather than silently
+omitted. The claims line is **neither**: it is not a land-status warning and it
+is not a failure — it is the app stating what it cannot verify, which is rule 5's
+category. Under the existing two kinds the safe behaviour is to give it **no
+kind**, which makes it a failure and lets it headline the problem row: that
+over-reports, which the recorded ruling prefers to silent omission. Whether a
+third kind should exist is **Alan's call**, not this design's.
+
+**Assertable in the harness, no network needed:** the claims layer's line never
+contains "loaded" and never contains "✓". Plus the static tripwire that now
+exists — `tests/test_stage_maps.py` asserts the literal `bboxSR`, `imageSR` and
+`layers` values in every page that builds that URL, with two mutants
+(`claims-sr`, `claims-layer`) verified caught.
+
 ### What the app says when tiles fail
 
 PR #6's item D gives per-layer tile outcomes. The honest message is built from
