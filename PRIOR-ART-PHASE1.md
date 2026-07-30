@@ -1,8 +1,15 @@
 # Prior art — the Phase 1 design, checked before it is built
 
-**Run 2026-07-29 under `.claude/skills/prior-art/SKILL.md`. Findings only.
-Nothing in `PHASE1-DESIGN.md` was changed by this pass, and nothing found here
-has been adopted.** Amending the design is a separate decision and is Alan's.
+**Run 2026-07-29 under `.claude/skills/prior-art/SKILL.md`.**
+
+> **RULED 2026-07-29. See "Conflicts and gaps, collected" at the end for the
+> three rulings and their reasoning.** In summary: **conflict 1 declined**
+> (`EXCEPTIONS=INIMAGE` is not adopted), **conflict 2 declined in both
+> directions** (absence is not symbolized, because the condition Alan set for
+> adopting it cannot be met honestly), and **gap 3 amended into the design** —
+> `PHASE1-DESIGN.md` now specifies three lifecycle phases rather than two. That
+> amendment is the **only** change made to the design by this pass. Gaps 4, 5 and
+> 6 remain open and unamended.
 
 **Why it was run.** `PHASE1-DESIGN.md` is approved and unbuilt, and it invents
 vocabulary — "working set", "view registry", "problem row". Invented vocabulary
@@ -584,25 +591,95 @@ the design should simply say so.
 
 ---
 
-## Conflicts and gaps, collected
+## Conflicts and gaps, collected — with the 2026-07-29 rulings
 
-**Conflicts — reported, not resolved. Each needs Alan's ruling.**
+### Conflict 1 — `EXCEPTIONS=INIMAGE` — **DECLINED**
 
-1. **`EXCEPTIONS=INIMAGE` versus controlled wording.** The WMS standard offers
-   self-describing failure tiles; adopting it renders a third party's error text
-   on the map a person reads in terrain. Rules 4 and 5 pull in opposite
-   directions.
-2. **Cartography symbolizes absence; Design 3 explains it in text.** The field's
-   convention is to give absence its own visual class in the legend. It is only
-   partly applicable, because "outside coverage" is undetectable here, so
-   adopting it for the detectable case may make the undetectable case read as
-   fine.
+**Alan's ruling, 2026-07-29: do not adopt.** The standard offers self-describing
+failure tiles, and taking them would render **a third party's error text into a
+map read in terrain**. That is exactly what rules 4 and 5 exist to prevent: we
+would be surfacing wording we do not control, on a screen whose entire discipline
+is controlling wording. The federal-register work, the "not the same as no
+claims" line, the `avoid` phrasing, the ARDF caveat — all of it is wording chosen
+against a known misreading. A remote server's exception string is chosen against
+nothing.
 
-**Gaps — things the design does not currently state, surfaced by the search.**
+**Recorded as found, and declined on its merits rather than overlooked.** The
+`EXCEPTIONS` parameter and its three values are real, `INIMAGE` is mandatory for
+a conformant server, and it would genuinely put a failure where the user is
+already looking. It is still the wrong trade here.
 
-3. **`enter` must be defined as post-layout.** iOS added a third lifecycle hook
-   because the second fires before geometry is final. The design says "after
-   `.active` is applied", which is not the same claim.
+**What declining costs, stated so it is not read as free:** we keep explaining
+failures in our own text, and we **inherit the burden of getting that wording
+right** — for every layer, every failure mode, and every future layer somebody
+adds. The standard offered to carry that burden for us and we are keeping it. The
+mitigation is the discipline already in the design: report what was counted,
+never guess a cause, and say what a blank does not mean.
+
+**The free half of the finding is taken.** No `EXCEPTIONS` parameter is set
+today, so the default is `XML`, so **WMS failures are detectable** — which is why
+the counting approach in Design 3 works at all. That is now a known property
+rather than an accident, and it must not be changed casually: setting
+`EXCEPTIONS=BLANK` on either WMS layer would silently destroy the app's ability
+to detect a failed layer. **The untested layer is filed separately** — see
+`STATE.md`, "Filed, not acted on".
+
+### Conflict 2 — symbolizing absence — **DECLINED IN BOTH DIRECTIONS**
+
+**Alan's ruling, 2026-07-29: partially adopt only if the undetectable case can be
+symbolized honestly as its own class — otherwise decline both and keep the text
+explanation. Report which.**
+
+**Reported: it cannot be done honestly. Both are declined; the text explanation
+stands.** The reasoning, because the ruling asked for the answer and not the
+preference:
+
+- **The detectable case is symbolizable.** A layer with 0 of 12 tiles loaded is a
+  known failure and could carry an extrinsic hatch over the viewport.
+- **The undetectable case is not, and the only faithful symbol for it covers the
+  entire working reach, permanently.** "This layer returned tiles and their
+  blankness is uninterpretable" is true of every square metre of Hatcher Pass,
+  every time a query layer is on. A hatch that is always present over everything
+  is not a class, it is a background.
+- **This project has already measured what that does.** The flat 2000 m avoid
+  radius "reads seven of the eight clean benches as encumbered — a warning that
+  fires everywhere gets dismissed everywhere, including the once it is right"
+  (`CLAUDE.md`). Symbolizing the undetectable class is the same failure in a new
+  medium, and it would sit *underneath* the land-status diamonds, competing with
+  the one signal on that screen that must not be diluted.
+- **So Alan's condition bites in the direction he named:** symbolizing only the
+  detectable case would make the map read as *"we would tell you if something
+  were wrong"*, which for outside-coverage it cannot. Declining both keeps the
+  map's silence uniformly uninterpreted and puts the whole explanation in text,
+  where it can be precise about which of the three things is known.
+
+**One route that could narrow this later, recorded rather than pursued.** WMS
+`GetCapabilities` publishes each layer's declared geographic bounding box, so
+"outside the declared extent" *is* establishable — server-side, shipped as dated
+static data in this project's established pattern rather than fetched at load
+(rule 2). Two limits: a declared bbox is **one-sided** (outside it means no
+coverage; inside it means nothing, because a layer may declare Alaska and have
+holes), and the working reach is **inside** the declared extent of every layer
+this app uses — so it would not narrow the case that actually matters here. Worth
+knowing before anyone re-opens this.
+
+### Gap 3 — `enter` must be post-layout — **AMENDED INTO THE DESIGN**
+
+**Alan's ruling, 2026-07-29: amend.** *"The field needed three hooks and we
+specified two, and this project has already paid for that exact mistake once."*
+
+`PHASE1-DESIGN.md` now specifies **three** phases — `init`, `enter`, `measure` —
+with `measure` defined as post-layout by construction rather than by hope, and
+required to verify a non-zero size rather than assume one. `map.invalidateSize()`,
+the bounded-scroller heights and the hidden-layer resume all moved from `enter`
+to `measure`, and the four other references to `enter` in the document were made
+consistent. **That is the only amendment made to the design by this pass.**
+
+### Gaps still open and unamended
+
+**Ruled 2026-07-29: not amended. They stay filed here as findings.** Each is a
+thing the design does not currently state; none is a contradiction of it.
+
 4. **Focus visibility under two layers of sticky content.** WCAG 2.4.11 (AA)
    names sticky footers as the canonical obscurer, and the design stacks a pinned
    popup footer under `.fg-chrome`. No scroll-padding or focus obligation is

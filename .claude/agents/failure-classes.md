@@ -201,9 +201,31 @@ whether Safari supports it.
   `tests/test_offline_map.py` pins `!= "fieldgold-v6"`. Fixed on the unmerged
   PR #6 branch. Check the tree, not the sentence.
 
-**There is no "rule 11" in this repo.** The ground rules are numbered 1–7. If a
-request cites a numbered rule above 7, it is from another project — say so rather
-than inventing a mapping.
+**A rule cited by a number above 7 is from another project. Name it; do not map
+it.** The ground rules here are numbered **1–7**. Two instances so far, both in
+briefs written from memory rather than from the files, and — this is the part
+worth keeping — **both were caught by an audit pass rather than by the author**:
+
+- **"rule 11's three forms and eight instances"**, in the failure-catalogue
+  brief, 2026-07-29. Traced to a GRADE/evidence-appraisal document in the
+  author's paste history, alongside "rule 8, rule 8a, rule 10", an estimand
+  mismatch and a degenerate Spearman. The *class* it named — a status document
+  diverging from the tree — is real here and is this entry; the numbering is not.
+- **"Citations follow rule 8a"**, in the prior-art brief, 2026-07-29. Same
+  origin. Its evident intent — fetch before citing, and an identifier supplied
+  without a fetch is worth less than a description — was stated inline in that
+  brief anyway, so the work proceeded on the intent and the citation was
+  reported as unfindable. It is now written in this project's own words in
+  `.claude/skills/prior-art/SKILL.md` rather than held by reference to a rule
+  that does not exist here.
+
+**Why this is an instance and not a category.** It is not "beware of wrong
+citations" in general. It is one specific, recurring, cheap-to-check thing:
+**a rule number above 7 does not resolve in this repo.** One grep settles it.
+The failure mode if it goes unchecked is a design or a document built on a rule
+nobody can read, which then gets cited onward as though it were local — and a
+model asked to comply will invent a plausible mapping rather than say the rule is
+absent. Say it is absent.
 
 **The general form:** a document that describes the tree is a claim about the
 tree, and claims decay. Where a change edits one, check the sentence against the

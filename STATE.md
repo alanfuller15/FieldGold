@@ -1267,7 +1267,19 @@ The three findings that matter most to whoever builds this:
   like empty coverage; `EXCEPTIONS=INIMAGE` is its answer. Measured here: this
   tree sets **no `EXCEPTIONS` parameter**, so WMS failures are detectable today —
   but the BLM layer is an ArcGIS `export?`, not WMS, and its blank-on-failure
-  behaviour is **untested**.
+  behaviour is **untested**. `INIMAGE` was **declined**; the BLM gap is filed
+  under "Filed, not acted on" below.
+
+**Three rulings landed on that pass, 2026-07-29.** `EXCEPTIONS=INIMAGE`
+**declined** — a third party's wording must not render into a map read in
+terrain. Symbolizing absence **declined in both directions**, because the
+condition set for adopting it could not be met honestly: the only faithful symbol
+for the undetectable case covers the entire working reach permanently, which is
+the fires-everywhere failure this project already measured on the flat 2000 m
+avoid radius. And the lifecycle gap **amended into the design** — three phases
+(`init`, `enter`, `measure`) rather than two, with `measure` defined as
+post-layout. **That amendment is the only change made to `PHASE1-DESIGN.md` after
+approval.**
 
 ### Rulings recorded here because they are decisions, not design
 
@@ -1371,6 +1383,45 @@ Same policy and fetch date as the Phase 3 filing above.
    iOS shell WKWebView sends a browser-default UA, which is the thing the policy
    names** — and Capacitor exposes an override, so this one is at least
    addressable. Untested: whether setting it is possible without native Swift.
+
+### WMS failures are detectable today — and the BLM layer is the one that is untested
+
+**Filed 2026-07-29 from the prior-art pass. Half a finding is good news and must
+not be lost with the half that was declined.**
+
+The good half, [self-tested] 2026-07-29: **`docs/map.html` sets no `EXCEPTIONS`
+parameter** on either WMS layer (`:168` ardf/geochem, `:197` terrain). Per WMS
+1.3.0 the default is `XML`, so a failed tile returns non-image bytes, Leaflet
+raises `tileerror`, and PR #6's item D counts it. **That is why the tile-outcome
+counting in `PHASE1-DESIGN.md`'s Design 3 works at all**, and it is now a known
+property rather than an accident. **Setting `EXCEPTIONS=BLANK` on either layer
+would silently destroy the app's ability to detect a failed layer** — the
+standard defines that value as "return a blank image on error", which is
+pixel-identical to empty coverage. Do not set it.
+
+`EXCEPTIONS=INIMAGE` — the standard's own answer, a failure tile that describes
+itself — was **declined by Alan 2026-07-29**: it renders a third party's error
+text into a map read in terrain, which is what rules 4 and 5 exist to prevent.
+The cost of declining is recorded with the ruling in `PRIOR-ART-PHASE1.md`: we
+keep explaining failures in our own text and inherit the burden of getting that
+wording right.
+
+**The untested layer, and it is the worst one to be untested.** The BLM claims
+layer is **not WMS** — it is an ArcGIS `export?` with `f:image`
+(`docs/map.html:185`) — so `EXCEPTIONS` does not apply to it and its error
+behaviour is ArcGIS's own. **Whether it returns a blank or transparent image on
+failure has not been tested.** If it does, a failed BLM fetch is
+indistinguishable from the empty answer that layer legitimately returns over
+Hatcher Pass — and **this is the layer whose entire on-screen treatment exists to
+stop a blank being over-read**: the "BLM FEDERAL claims only" label, the note that
+blank here is not "no claims", the 1-vs-143 measurement, the rename of
+`isClaimed()` to `federalClaimAt()`. A silent failure on that layer would be the
+federal-register bug arriving a second time through a different door.
+
+How to settle it: request one tile URL from that service with a deliberately
+invalid parameter and read the response — content type, status, and whether the
+bytes are a blank PNG. One fetch, no device needed. Not done here because this
+pass was a design review.
 
 ### The un-subscribed consumer — a ten-line fix, available today
 

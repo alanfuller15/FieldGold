@@ -5,6 +5,14 @@
 they apply. Nothing here has been implemented; no application code was written
 to produce this document.
 
+**Amended once since approval, 2026-07-29: the view lifecycle is three phases,
+not two.** `init` / `enter` / `measure`, with `measure` defined as post-layout —
+see Design 1. The reason is in `PRIOR-ART-PHASE1.md` item 3: the field needed a
+third hook for exactly this, and this project has already paid for the two-phase
+mistake once. **That is the only change made to this document after approval.**
+Two other findings from that pass were ruled on and changed nothing here —
+`EXCEPTIONS=INIMAGE` declined, symbolizing absence declined in both directions.
+
 **What this file is.** The design for Phase 1's rescope. `STATE.md` remains the
 source of truth for *how far* the work has got and points here for *what the
 work is*; `CLAUDE.md` remains the brief that constrains it. Where this file and
@@ -168,7 +176,7 @@ that invites breaking it):
 
 1. **A seventh view, `view-map`.** `map.html`'s body moves into it.
 2. **The `if` chain becomes a declared registry** — a plain object:
-   `VIEWS = { evaluate:{init,enter}, sites:{…}, knowledge:{…}, photo:{…},
+   `VIEWS = { evaluate:{init,enter,measure}, sites:{…}, knowledge:{…}, photo:{…},
    research:{…}, checklist:{…}, map:{…} }`.
 
 The registry buys one thing the chain cannot: **a test can assert that every
@@ -176,10 +184,50 @@ The registry buys one thing the chain cannot: **a test can assert that every
 rule 4's routing extension made checkable — a view reachable by a route with no
 control, or a control pointing at nothing, fails a suite instead of shipping.
 
-### `init` vs `enter`, and why the distinction is load-bearing
+### `init`, `enter` and `measure` — why three phases, not two
 
-`init` runs once and is idempotent. `enter` runs every time a view becomes
-visible, **after** `.active` is applied.
+> **AMENDED 2026-07-29, and this is the only amendment made after approval.**
+> This section originally specified **two** phases, `init` and `enter`, with
+> `enter` running "after `.active` is applied". The prior-art pass
+> (`PRIOR-ART-PHASE1.md`, item 3) found that the field needed **three**: iOS 17
+> added `viewIsAppearing` because `viewWillAppear` fires before the view's
+> geometry is final — *"It's too early in viewDidLoad or viewWillAppear as the
+> view is not yet added to the view hierarchy"* [fetched]. **This project has
+> already paid for that exact mistake once**, when `log()`'s
+> `S.scrollTop = S.scrollHeight` wrote 0 to 0 against a `display:none` subtree.
+> Specifying two phases was repeating it in a new place. Alan's ruling,
+> 2026-07-29: amend.
+
+Three phases. The names are ours; the shape is UIKit's.
+
+| phase | runs | for |
+|---|---|---|
+| `init` | **once**, idempotent | building DOM, constructing the Leaflet map, binding listeners. **Never measures anything** |
+| `enter` | every time the view becomes visible, immediately after `.active` is applied | state changes that do not depend on geometry: subscribing, reading the record, clearing a stale results pane, setting the hash |
+| `measure` | every time the view becomes visible, **after the browser has computed layout for it** | anything that reads or writes geometry: `map.invalidateSize()`, scroll positions, bounded-scroller heights, reachability-dependent decisions |
+
+**Why `enter` cannot be the measuring phase.** Applying `.active` makes layout
+*obtainable*; it does not mean layout has been *computed* at the moment the
+handler runs. The DOM is more forgiving than UIKit here — a forced reflow inside
+the same task will produce correct numbers — but "more forgiving" is not
+"guaranteed", and the distinction is invisible in a diff and on a desktop. Making
+it a named phase is what stops the next person putting a measurement in the wrong
+one.
+
+**Two rules that go with `measure`, both from this project's own history:**
+
+- **It runs after layout, by construction, not by hope.** Either read a layout
+  property to force a synchronous reflow before measuring, or defer to the next
+  frame. Which one is an implementation choice; that the phase is *defined* as
+  post-layout is not.
+- **It verifies a non-zero size rather than assuming one.** A zero size means the
+  view is not laid out and the measurement is void — that is the
+  `scrollHeight === 0` failure, and the correct response is to report it, not to
+  proceed with zeros. This is the same discipline as gating scroll assertions on
+  computed `overflow-y` rather than on `scrollTop` accepting a value.
+
+`init` remains once-only because re-running `L.map()` on the same container
+throws ("container is already initialized").
 
 The reason is measured, not stylistic. **A `display:none` container has no
 layout box**, and this repo has already been bitten by exactly that: `log()`'s
@@ -190,11 +238,11 @@ by the number of hidden views.
 
 - **Leaflet cannot initialise usefully in a hidden container.** `map.getSize()`
   reads 0×0, no tiles are requested, markers place wrong.
-  `map.invalidateSize()` must run on every `enter`. Re-running `L.map()` throws
+  `map.invalidateSize()` must run on every `measure`. Re-running `L.map()` throws
   ("container is already initialized"), which is why `init` must be once-only.
 - **General rule for the whole design:** no measurement, scroll assignment or
   geometry read inside an inactive view is valid. Anything that measures runs in
-  `enter`, and any assertion about it reads **computed style** rather than
+  `measure`, and any assertion about it reads **computed style** rather than
   trusting an assignment to succeed.
 
 ### The map's closure has to be opened, and that is the real cost
@@ -207,7 +255,7 @@ cache from the console.
 
 Consolidation **requires** driving the map from outside — the working set must
 add and remove markers — so the closure must be opened into something like
-`MapView = { init, enter, syncWorkingSet, … }`, with the same `const`s inside
+`MapView = { init, enter, measure, syncWorkingSet, … }`, with the same `const`s inside
 and only what is needed exposed.
 
 **Cost, stated plainly: this refactor touches the most safety-critical file in
@@ -267,7 +315,7 @@ meaning under `capacitor://localhost`. Foreclosed deliberately.
 | `fieldgold_sites` (legacy blob) | `index.html:2736` writes it; `map.html` reads it as untrusted input with counted drops | **stop writing, keep reading.** Old devices hold it, and dropped records are reported rather than skipped |
 | `kind:'occurrence', pending:true` | the single-slot hand-off | **replaced by the working set**, per N1 |
 | `fieldgold_rem_seeded_v1/v2` | seed flags | untouched |
-| the seven `t-*` toggles | not persisted; markup defaults | in one document, checkbox state survives a view switch for free. **Hazard to verify, not assume:** a hidden map view still holds its Leaflet layers; it should not request tiles while hidden (no `moveend`, no size) but will resume on `enter` |
+| the seven `t-*` toggles | not persisted; markup defaults | in one document, checkbox state survives a view switch for free. **Hazard to verify, not assume:** a hidden map view still holds its Leaflet layers; it should not request tiles while hidden (no `moveend`, no size) but will resume on `measure` |
 
 **`sw.js` SHELL** keeps the same entries — the stubs are real URLs — and adds
 nothing. It **requires a cache version bump**, because `index.html`'s contents
@@ -600,7 +648,7 @@ stays filed. A builder must not read the popup work as having fixed E.
 
 **Automatable (Playwright/node, no device):** registry ↔ tab-bar completeness
 both ways; each of the seven rule-7 paths leaves the results pane
-empty-or-bannered; the map container has non-zero size after `enter`; popup
+empty-or-bannered; the map container has non-zero size after `measure`; popup
 scroller assertions gated on computed `overflow-y`; layer defaults (count of
 `checked` = the record layers only); the "0 of N tiles" message and its "not the
 same as no claims" line with the network blocked; every feature popup carries a
